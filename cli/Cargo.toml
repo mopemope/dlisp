@@ -1,0 +1,9 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dlisp-core = { path = "../core" }
+rustyline = { workspace = true }
+anyhow = { workspace = true }
