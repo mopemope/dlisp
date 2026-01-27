@@ -1,29 +1,19 @@
-[package]
-name = "dlisp"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "2"
+members = [
+    "core"
+]
 
-[dependencies]
-# Error handling
+[workspace.dependencies]
 anyhow = "1.0"
 thiserror = "2.0"
-
-# Parsing
 chumsky = "0.9"
-
-# JIT Compiler
-# Note: Cranelift versions change frequently, pinning to a recent stable-ish version is good practice, 
-# but for now we'll use wildcards or recent versions.
 cranelift = "0.108"
 cranelift-jit = "0.108"
 cranelift-module = "0.108"
 cranelift-native = "0.108"
 cranelift-frontend = "0.108"
 cranelift-codegen = "0.108"
-
-# REPL
 rustyline = "14.0"
-
-# Logging/Tracing (optional but good)
 tracing = "0.1"
-tracing-subscriber = "0.3"
+# ... and other deps shared across crates if desired

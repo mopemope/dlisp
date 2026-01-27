@@ -232,7 +232,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dlisp"
+name = "dlisp-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,0 +1,27 @@
+[package]
+name = "dlisp-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Parsing
+chumsky = { workspace = true }
+
+# JIT Compiler
+cranelift = { workspace = true }
+cranelift-jit = { workspace = true }
+cranelift-module = { workspace = true }
+cranelift-native = { workspace = true }
+cranelift-frontend = { workspace = true }
+cranelift-codegen = { workspace = true }
+
+# REPL
+rustyline = { workspace = true }
+
+# Logging/Tracing
+tracing = { workspace = true }
+tracing-subscriber = "0.3"
