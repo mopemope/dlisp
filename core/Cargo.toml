@@ -18,6 +18,7 @@ cranelift-module = { workspace = true }
 cranelift-native = { workspace = true }
 cranelift-frontend = { workspace = true }
 cranelift-codegen = { workspace = true }
+cranelift-object = { workspace = true }
 
 # REPL
 rustyline = { workspace = true }

@@ -2,6 +2,8 @@
 
 pub mod ast;
 pub mod builtins;
+pub mod codegen;
+pub mod compiler;
 pub mod environment;
 pub mod forms;
 pub mod interpreter;

@@ -1,20 +1,38 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
+use dlisp_core::compiler::AOTCompiler;
 use dlisp_core::interpreter::{default_env, Interpreter};
 use dlisp_core::parser::parse;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
+use tracing::info;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(version)]
 struct Cli {
-    /// Optional script file to execute
+    #[command(subcommand)]
+    command: Option<Commands>,
+
+    /// Optional script file to execute if no subcommand is given
+    #[arg(required = false)]
     file: Option<PathBuf>,
 }
-use tracing::info;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Compile a script to a native executable
+    Compile {
+        /// Source file
+        file: PathBuf,
+        /// Output filename
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+}
 
 fn get_state_dir() -> Option<PathBuf> {
     let mut path = dirs::state_dir().or_else(dirs::home_dir)?;
@@ -55,9 +73,59 @@ fn setup_logging() -> Option<WorkerGuard> {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
-    info!("Starting dlisp REPL...");
 
     let args = Cli::parse();
+
+    if let Some(cmd) = args.command {
+        match cmd {
+            Commands::Compile { file, output } => {
+                let content = fs::read_to_string(&file)?;
+                match parse(&content) {
+                    Ok(vals) => {
+                        let compiler = AOTCompiler::new();
+                        match compiler.compile(vals) {
+                            Ok(bytes) => {
+                                let object_file = file.with_extension("o");
+                                fs::write(&object_file, bytes)?;
+
+                                let output_file = output
+                                    .or_else(|| file.file_stem().map(PathBuf::from))
+                                    .unwrap_or_else(|| PathBuf::from("a.out"));
+
+                                info!("Linking object file {:?} to {:?}", object_file, output_file);
+
+                                let status = Command::new("cc")
+                                    .arg(&object_file)
+                                    .arg("-o")
+                                    .arg(&output_file)
+                                    .status()?;
+
+                                if !status.success() {
+                                    eprintln!("Linking failed");
+                                    std::process::exit(1);
+                                }
+
+                                // Cleanup object file
+                                let _ = fs::remove_file(object_file);
+                                println!("Compiled to {:?}", output_file);
+                            }
+                            Err(e) => {
+                                eprintln!("Compilation Error: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("\x1b[31mParse Error:\x1b[0m {:?}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    info!("Starting dlisp REPL...");
     let local = tokio::task::LocalSet::new();
 
     local
