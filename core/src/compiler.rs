@@ -37,6 +37,8 @@ impl AOTCompiler {
     }
 
     pub fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
+        let mut has_main = false;
+
         for expr in ast {
             if let Value::List(ref l) = expr {
                 if let Some(Value::Symbol(s)) = l.first() {
@@ -45,8 +47,8 @@ impl AOTCompiler {
                         if l.len() < 3 {
                             return Err("defun requires at least 3 arguments".to_string());
                         }
-                        let name = match &l[1] {
-                            Value::Symbol(n) => n,
+                        let mut name = match &l[1] {
+                            Value::Symbol(n) => n.clone(),
                             _ => return Err("defun name must be a symbol".to_string()),
                         };
                         let args_list = match &l[2] {
@@ -63,11 +65,21 @@ impl AOTCompiler {
                             }
                         }
 
+                        if name == "main" {
+                            name = "dlisp_user_main".to_string();
+                            has_main = true;
+                        }
+
                         self.codegen
-                            .compile(&mut self.module, name, &arg_names, body)?;
+                            .compile(&mut self.module, &name, &arg_names, body)?;
                     }
                 }
             }
+        }
+
+        if has_main {
+            self.codegen
+                .compile_entry_point(&mut self.module, "dlisp_user_main")?;
         }
 
         let product = self.module.finish();

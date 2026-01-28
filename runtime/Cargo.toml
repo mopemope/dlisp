@@ -1,0 +1,12 @@
+[package]
+name = "dlisp_runtime"
+version = "0.0.1"
+edition = "2024"
+
+[lib]
+name = "dlisp_runtime"
+crate-type = ["staticlib"]
+
+[dependencies]
+tokio = { version = "1.43", features = ["full", "rt-multi-thread"] }
+libc = "0.2"

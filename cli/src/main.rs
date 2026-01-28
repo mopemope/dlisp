@@ -94,8 +94,23 @@ async fn main() -> anyhow::Result<()> {
 
                                 info!("Linking object file {:?} to {:?}", object_file, output_file);
 
+                                let mut lib_path = PathBuf::from("target/debug/libdlisp_runtime.a");
+                                if !lib_path.exists() {
+                                    if let Ok(exe_path) = std::env::current_exe() {
+                                        let candidate =
+                                            exe_path.parent().unwrap().join("libdlisp_runtime.a");
+                                        if candidate.exists() {
+                                            lib_path = candidate;
+                                        }
+                                    }
+                                }
+
                                 let status = Command::new("cc")
                                     .arg(&object_file)
+                                    .arg(&lib_path)
+                                    .arg("-lpthread")
+                                    .arg("-ldl")
+                                    .arg("-lm")
                                     .arg("-o")
                                     .arg(&output_file)
                                     .status()?;

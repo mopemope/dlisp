@@ -11,7 +11,8 @@ resolver = "2"
 members = [
     "core",
     "cli",
-    "stdlib"
+    "stdlib",
+    "runtime"
 ]
 default-members = ["cli"]
 
