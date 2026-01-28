@@ -35,16 +35,79 @@ cargo build
 ```
 
 ### Run REPL
+Start the interactive Read-Eval-Print Loop:
 ```bash
 cargo run --bin cli
 ```
 
-### Run Tests
+### Run Script
+Execute a Lisp script file:
 ```bash
-cargo test
+cargo run --bin cli -- path/to/script.lisp
+```
+
+### Compile to Native Executable
+Compile a Lisp script into a standalone native executable:
+```bash
+cargo run --bin cli compile path/to/script.lisp -o my_app
+./my_app
+```
+
+## Command-line Options
+
+```text
+dlisp [FILE] [COMMAND]
+
+Arguments:
+  [FILE]  Optional script file to execute if no subcommand is given
+
+Commands:
+  compile  Compile a script to a native executable
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+Compile options:
+  -o, --output <OUTPUT>  Output filename
+```
+
+## Configuration & Data
+
+`dlisp` follows the XDG Base Directory Specification on Linux:
+
+- **History**: REPL command history is saved in `~/.local/state/dlisp/history.txt`.
+- **Logs**: Debug logs are stored in `~/.local/state/dlisp/debug.log`.
+
+You can control logging levels via the `RUST_LOG` environment variable:
+```bash
+RUST_LOG=debug cargo run --bin cli
+```
+
+## Quick Examples
+
+### Arithmetic & Functions
+```lisp
+user> (+ 1 2 (* 3 4))
+=> 15
+user> (defun square (x) (* x x))
+=> <user-func:square>
+user> (square 5)
+=> 25
+```
+
+### Concurrent Tasks
+```lisp
+user> (defun async-task () (print "Hello from thread!"))
+=> <user-func:async-task>
+user> (spawn async-task)
+=> nil
 ```
 
 ## Features
-- Interactive REPL with history (stored in `~/.local/state/dlisp/history.txt`).
-- JIT compilation of arithmetic expressions.
-- Debug logging (logs stored in `~/.local/state/dlisp/debug.log`).
+- Interactive REPL with history support.
+- JIT compilation for user-defined functions (arithmetic expressions).
+- Ahead-of-Time (AOT) compilation to native binaries via Cranelift.
+- Asynchronous task spawning.
+- XDG-compliant state management.
