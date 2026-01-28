@@ -58,77 +58,8 @@ impl Interpreter {
         env: &mut Rc<RefCell<Environment>>,
     ) -> Result<Option<Value>, String> {
         match name {
-            "defun" => {
-                if args.len() < 3 {
-                    return Err("defun requires at least 3 arguments".to_string());
-                }
-                let func_name = match &args[0] {
-                    Value::Symbol(n) => n.clone(),
-                    _ => return Err("defun name must be a symbol".to_string()),
-                };
-                let params = match &args[1] {
-                    Value::List(l) => l,
-                    _ => return Err("defun args must be a list".to_string()),
-                };
-                let mut arg_names = Vec::new();
-                for arg in params {
-                    match arg {
-                        Value::Symbol(n) => arg_names.push(n.clone()),
-                        _ => return Err("defun arg must be a symbol".to_string()),
-                    }
-                }
-                let body = args[2..].to_vec();
-
-                let jit_code = match self.jit.compile(&func_name, &arg_names, &body) {
-                    Ok(code) => Some(code as usize),
-                    Err(_) => None,
-                };
-
-                let func = Value::UserFunc {
-                    args: arg_names,
-                    body,
-                    jit_code,
-                };
-                env.borrow_mut().set(func_name.clone(), func);
-                Ok(Some(Value::Symbol(func_name)))
-            }
-            "spawn" => {
-                if args.is_empty() {
-                    return Err("spawn requires a function or function call".to_string());
-                }
-
-                let func_val = self.eval(args[0].clone(), env).await?;
-                let env_clone = env.clone();
-
-                tokio::task::spawn_local(async move {
-                    match func_val {
-                        Value::UserFunc {
-                            args: _param_names,
-                            body,
-                            jit_code: _,
-                        } => {
-                            let func_env = Environment::new(Some(env_clone));
-                            let func_env_rc = Rc::new(RefCell::new(func_env));
-                            let mut interpreter = Interpreter::new();
-                            for expr in body {
-                                if let Err(e) =
-                                    interpreter.eval(expr, &mut func_env_rc.clone()).await
-                                {
-                                    eprintln!("Spawned task error: {}", e);
-                                }
-                            }
-                        }
-                        Value::NativeFunc(f) => {
-                            if let Err(e) = f(&[]).await {
-                                eprintln!("Spawned task error: {}", e);
-                            }
-                        }
-                        _ => eprintln!("Spawn expected a function"),
-                    }
-                });
-
-                Ok(Some(Value::Nil))
-            }
+            "defun" => crate::forms::defun::defun(&mut self.jit, args, env),
+            "spawn" => crate::forms::spawn::spawn(self, args, env).await,
             _ => Ok(None),
         }
     }
