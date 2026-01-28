@@ -61,6 +61,7 @@ impl Interpreter {
             "defun" => crate::forms::defun::defun(&mut self.jit, args, env),
             "spawn" => crate::forms::spawn::spawn(self, args, env).await,
             "let" => crate::forms::let_expr::let_form(self, args, env).await,
+            "if" => crate::forms::if_expr::if_form(self, args, env).await,
             "lambda" => crate::forms::lambda::lambda(args, env),
             _ => Ok(None),
         }
@@ -458,5 +459,50 @@ mod tests {
         ]);
         let res = interpreter.eval(let_expr, &mut env.clone()).await;
         assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_eval_if_true() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (if 1 2 3) -> 2
+        let if_expr = Value::List(vec![
+            Value::Symbol("if".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
+        let res = interpreter.eval(if_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(2));
+    }
+
+    #[tokio::test]
+    async fn test_eval_if_false() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (if 0 2 3) -> 3 (Assuming 0 is false)
+        let if_expr = Value::List(vec![
+            Value::Symbol("if".to_string()),
+            Value::Integer(0),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
+        let res = interpreter.eval(if_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(3));
+    }
+
+    #[tokio::test]
+    async fn test_eval_if_nil() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (if nil 2 3) -> 3
+        let if_expr = Value::List(vec![
+            Value::Symbol("if".to_string()),
+            Value::Nil,
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
+        let res = interpreter.eval(if_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(3));
     }
 }

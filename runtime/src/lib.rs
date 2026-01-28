@@ -1,8 +1,34 @@
 use std::ffi::c_void;
 use tokio::runtime::Runtime;
 
+// Boehm GC bindings (Manual FFI)
+#[link(name = "gc")]
+unsafe extern "C" {
+    pub fn GC_init();
+    pub fn GC_malloc(size: usize) -> *mut c_void;
+}
+
+/// Initialize the Boehm garbage collector.
+/// Must be called once at program start before any allocations.
+#[unsafe(no_mangle)]
+pub extern "C" fn dlisp_gc_init() {
+    unsafe {
+        GC_init();
+    }
+}
+
+/// Allocate memory using Boehm GC.
+/// The allocated memory will be automatically garbage collected when unreachable.
+#[unsafe(no_mangle)]
+pub extern "C" fn dlisp_gc_malloc(size: usize) -> *mut c_void {
+    unsafe { GC_malloc(size) }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn dlisp_main(user_main_ptr: extern "C" fn(*mut c_void) -> i64) {
+    // Initialize GC
+    dlisp_gc_init();
+
     let rt = Runtime::new().unwrap();
     rt.block_on(async {
         // Run the user's main function

@@ -28,7 +28,7 @@ pub struct Builtins {
     pub printf_fmt: IrValue,
     pub dlisp_spawn: FuncId,
     pub dlisp_sleep: FuncId,
-    pub malloc: FuncId,
+    pub gc_malloc: FuncId,
 }
 
 impl Default for CodeGen {
@@ -103,12 +103,12 @@ impl CodeGen {
             .declare_function("dlisp_sleep", Linkage::Import, &sleep_sig)
             .map_err(|e| e.to_string())?;
 
-        // malloc(size_t) -> void*
+        // dlisp_gc_malloc(size_t) -> void*
         let mut malloc_sig = module.make_signature();
         malloc_sig.params.push(AbiParam::new(int));
         malloc_sig.returns.push(AbiParam::new(int));
         let malloc_id = module
-            .declare_function("malloc", Linkage::Import, &malloc_sig)
+            .declare_function("dlisp_gc_malloc", Linkage::Import, &malloc_sig)
             .map_err(|e| e.to_string())?;
 
         // Function Signature: (env, args...)
@@ -134,7 +134,7 @@ impl CodeGen {
             printf_fmt: builder.ins().global_value(int, printf_fmt_val),
             dlisp_spawn: spawn_id,
             dlisp_sleep: sleep_id,
-            malloc: malloc_id,
+            gc_malloc: malloc_id,
         };
 
         // Param 0 is env, Param 1..N are args
@@ -415,7 +415,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         let size_val = self.builder.ins().iconst(self.ptr_type, closure_size);
         let local_malloc = self
             .module
-            .declare_func_in_func(self.builtins.malloc, self.builder.func);
+            .declare_func_in_func(self.builtins.gc_malloc, self.builder.func);
         let call = self.builder.ins().call(local_malloc, &[size_val]);
         let closure_ptr = self.builder.inst_results(call)[0];
 
@@ -454,9 +454,10 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         if let Value::Symbol(ref op) = list[0] {
             match op.as_str() {
                 "let" => self.compile_let(list),
+                "if" => self.compile_if(list),
                 "lambda" => self.compile_lambda(list),
                 "spawn" => self.compile_spawn(list),
-                "print" | "+" | "-" | "*" | "sleep" => self.compile_builtin(op, list),
+                "print" | "+" | "-" | "*" | "sleep" | ">" => self.compile_builtin(op, list),
                 _ => {
                     // Check if 'op' is a variable (parameter) -> Indirect call
                     if self.is_variable_bound(op) {
@@ -469,6 +470,54 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         } else {
             Err("JIT function calls not supported yet".to_string())
         }
+    }
+
+    fn compile_if(&mut self, list: &[Value]) -> Result<IrValue, String> {
+        if list.len() < 3 {
+            return Err("if requires condition and then-branch".to_string());
+        }
+
+        let cond_val = self.compile_expr(&list[1])?;
+
+        let then_block = self.builder.create_block();
+        let else_block = self.builder.create_block();
+        let merge_block = self.builder.create_block();
+
+        // Use stack slot to pass result effectively acting as Phi
+        let slot = self.builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            8,
+            3,
+        )); // 8 bytes for ptr_type, 2^3 align
+
+        // Branch
+        self.builder
+            .ins()
+            .brif(cond_val, then_block, &[], else_block, &[]);
+
+        // Then Block
+        self.builder.switch_to_block(then_block);
+        self.builder.seal_block(then_block);
+        let then_val = self.compile_expr(&list[2])?;
+        self.builder.ins().stack_store(then_val, slot, 0);
+        self.builder.ins().jump(merge_block, &[]);
+
+        // Else Block
+        self.builder.switch_to_block(else_block);
+        self.builder.seal_block(else_block);
+        let else_val = if list.len() > 3 {
+            self.compile_expr(&list[3])?
+        } else {
+            self.builder.ins().iconst(self.ptr_type, 0)
+        };
+        self.builder.ins().stack_store(else_val, slot, 0);
+        self.builder.ins().jump(merge_block, &[]);
+
+        // Merge Block
+        self.builder.switch_to_block(merge_block);
+        self.builder.seal_block(merge_block);
+
+        Ok(self.builder.ins().stack_load(self.ptr_type, slot, 0))
     }
 
     fn compile_let(&mut self, list: &[Value]) -> Result<IrValue, String> {
@@ -557,7 +606,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
             let size_val = self.builder.ins().iconst(self.ptr_type, env_size);
             let local_malloc = self
                 .module
-                .declare_func_in_func(self.builtins.malloc, self.builder.func);
+                .declare_func_in_func(self.builtins.gc_malloc, self.builder.func);
             let call = self.builder.ins().call(local_malloc, &[size_val]);
             self.builder.inst_results(call)[0]
         } else {
@@ -605,7 +654,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 printf_fmt: builder.ins().global_value(int, printf_fmt_val),
                 dlisp_spawn: self.builtins.dlisp_spawn,
                 dlisp_sleep: self.builtins.dlisp_sleep,
-                malloc: self.builtins.malloc,
+                gc_malloc: self.builtins.gc_malloc,
             };
 
             let env_param = builder.block_params(entry_block)[0];
@@ -657,7 +706,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         let size_val = self.builder.ins().iconst(self.ptr_type, closure_size);
         let local_malloc = self
             .module
-            .declare_func_in_func(self.builtins.malloc, self.builder.func);
+            .declare_func_in_func(self.builtins.gc_malloc, self.builder.func);
         let call = self.builder.ins().call(local_malloc, &[size_val]);
         let closure_ptr = self.builder.inst_results(call)[0];
 
@@ -712,16 +761,27 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
 
     fn compile_spawn(&mut self, list: &[Value]) -> Result<IrValue, String> {
         if list.len() != 2 {
-            return Err("spawn requires exactly one argument (function)".to_string());
+            return Err("spawn requires exactly one argument (function call)".to_string());
         }
-        // Compile argument to get function pointer
-        let func_ptr = self.compile_expr(&list[1])?;
 
+        // We need to wrap the body in a lambda: (lambda () body)
+        // list[1] is the body.
+        let body = list[1].clone();
+
+        // Construct (lambda () body)
+        let lambda_sym = Value::Symbol("lambda".to_string());
+        let args_list = Value::List(vec![]); // Empty args
+        let synthetic_lambda = vec![lambda_sym, args_list, body];
+
+        // Compile the lambda to get a closure_ptr
+        let closure_ptr = self.compile_lambda(&synthetic_lambda)?;
+
+        // Call dlisp_spawn(closure_ptr)
         let local_spawn = self
             .module
             .declare_func_in_func(self.builtins.dlisp_spawn, self.builder.func);
 
-        self.builder.ins().call(local_spawn, &[func_ptr]);
+        self.builder.ins().call(local_spawn, &[closure_ptr]);
 
         // spawn returns nil (0)
         Ok(self.builder.ins().iconst(self.ptr_type, 0))
@@ -759,7 +819,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     .call(local_printf, &[self.builtins.printf_fmt, arg_val]);
                 Ok(arg_val)
             }
-            "+" | "-" | "*" => {
+            "+" | "-" | "*" | ">" => {
                 if list.len() == 3 {
                     let lhs = self.compile_expr(&list[1])?;
                     let rhs = self.compile_expr(&list[2])?;
@@ -767,6 +827,12 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                         "+" => Ok(self.builder.ins().iadd(lhs, rhs)),
                         "-" => Ok(self.builder.ins().isub(lhs, rhs)),
                         "*" => Ok(self.builder.ins().imul(lhs, rhs)),
+                        ">" => {
+                            let cmp = self.builder.ins().icmp(IntCC::SignedGreaterThan, lhs, rhs);
+                            let one = self.builder.ins().iconst(self.ptr_type, 1);
+                            let zero = self.builder.ins().iconst(self.ptr_type, 0);
+                            Ok(self.builder.ins().select(cmp, one, zero))
+                        }
                         _ => unreachable!(),
                     }
                 } else {

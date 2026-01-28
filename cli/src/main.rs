@@ -112,6 +112,7 @@ async fn main() -> anyhow::Result<()> {
                                     .arg("-lpthread")
                                     .arg("-ldl")
                                     .arg("-lm")
+                                    .arg("-lgc")
                                     .arg("-o")
                                     .arg(&output_file)
                                     .status()?;
