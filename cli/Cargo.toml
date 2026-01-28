@@ -8,6 +8,9 @@ dlisp-core = { path = "../core" }
 rustyline = { workspace = true }
 anyhow = { workspace = true }
 dirs = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 
 [dev-dependencies]
 tempfile = "3.8"
