@@ -54,3 +54,28 @@ fn test_aot_multiple_functions() {
     let compiler = AOTCompiler::new();
     compiler.compile(vals).expect("Compilation failed");
 }
+
+#[tokio::test]
+async fn test_mixed_execution() {
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+
+    // Test mixing builtins (+) and user function calls in nested positions
+    let code = "
+    (defun inc (x) (+ x 1))
+    (defun double (x) (+ x x))
+    (defun complex_calc (x) 
+        (double (+ (inc x) 2)))
+    
+    (print (complex_calc 5))
+    ";
+
+    // (inc 5) -> 6
+    // (+ 6 2) -> 8
+    // (double 8) -> 16
+
+    let vals = parse(code).unwrap();
+    for val in vals {
+        interpreter.eval(val, &mut env).await.unwrap();
+    }
+}

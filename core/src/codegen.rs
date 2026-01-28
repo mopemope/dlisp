@@ -113,8 +113,19 @@ impl CodeGen {
         }
 
         let mut result_val = builder.ins().iconst(int, 0);
-        for expr in body {
-            result_val = compile_expr(&mut builder, module, &builtins, expr, &variables, int)?;
+
+        {
+            let mut trans_ctx = FunctionTranslationContext {
+                builder: &mut builder,
+                module,
+                builtins: &builtins,
+                variables: &variables,
+                ptr_type: int,
+            };
+
+            for expr in body {
+                result_val = trans_ctx.compile_expr(expr)?;
+            }
         }
 
         builder.ins().return_(&[result_val]);
@@ -139,94 +150,105 @@ impl CodeGen {
     }
 }
 
-fn compile_expr<M: Module>(
-    builder: &mut FunctionBuilder,
-    module: &mut M,
-    builtins: &Builtins,
-    val: &Value,
-    variables: &HashMap<String, Variable>,
-    int: Type,
-) -> Result<IrValue, String> {
-    match val {
-        Value::Integer(n) => Ok(builder.ins().iconst(int, *n)),
-        Value::Symbol(s) => {
-            if let Some(var) = variables.get(s) {
-                Ok(builder.use_var(*var))
-            } else {
-                Err(format!(
-                    "Undefined variable (or not supported in JIT): {}",
-                    s
-                ))
-            }
-        }
-        Value::List(list) => {
-            if list.is_empty() {
-                return Ok(builder.ins().iconst(int, 0)); // nil?
-            }
-            if let Value::Symbol(ref op) = list[0] {
-                // Builtins and Ops
-                match op.as_str() {
-                    "print" => {
-                        if list.len() != 2 {
-                            return Err("print takes 1 arg".to_string());
-                        }
-                        let arg_val =
-                            compile_expr(builder, module, builtins, &list[1], variables, int)?;
+struct FunctionTranslationContext<'a, 'func, M: Module> {
+    builder: &'a mut FunctionBuilder<'func>,
+    module: &'a mut M,
+    builtins: &'a Builtins,
+    variables: &'a HashMap<String, Variable>,
+    ptr_type: Type,
+}
 
-                        // Prepare verification of function declaration
-                        let local_printf =
-                            module.declare_func_in_func(builtins.printf, builder.func);
-
-                        builder
-                            .ins()
-                            .call(local_printf, &[builtins.printf_fmt, arg_val]);
-                        Ok(arg_val)
-                    }
-                    "+" | "-" | "*" => {
-                        if list.len() == 3 {
-                            let lhs =
-                                compile_expr(builder, module, builtins, &list[1], variables, int)?;
-                            let rhs =
-                                compile_expr(builder, module, builtins, &list[2], variables, int)?;
-                            match op.as_str() {
-                                "+" => Ok(builder.ins().iadd(lhs, rhs)),
-                                "-" => Ok(builder.ins().isub(lhs, rhs)),
-                                "*" => Ok(builder.ins().imul(lhs, rhs)),
-                                _ => unreachable!(),
-                            }
-                        } else {
-                            Err(format!("Binary ops require 2 args: {}", op))
-                        }
-                    }
-                    _ => {
-                        // Function call
-                        let mut args = Vec::new();
-                        for arg in &list[1..] {
-                            args.push(compile_expr(
-                                builder, module, builtins, arg, variables, int,
-                            )?);
-                        }
-
-                        let mut sig = module.make_signature();
-                        for _ in &args {
-                            sig.params.push(AbiParam::new(int));
-                        }
-                        sig.returns.push(AbiParam::new(int));
-
-                        let func_id = module
-                            .declare_function(op, Linkage::Export, &sig)
-                            .map_err(|e| e.to_string())?;
-
-                        let local_func = module.declare_func_in_func(func_id, builder.func);
-                        let call = builder.ins().call(local_func, &args);
-                        let result = builder.inst_results(call)[0];
-                        Ok(result)
-                    }
+impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
+    fn compile_expr(&mut self, val: &Value) -> Result<IrValue, String> {
+        match val {
+            Value::Integer(n) => Ok(self.builder.ins().iconst(self.ptr_type, *n)),
+            Value::Symbol(s) => {
+                if let Some(var) = self.variables.get(s) {
+                    Ok(self.builder.use_var(*var))
+                } else {
+                    Err(format!(
+                        "Undefined variable (or not supported in JIT): {}",
+                        s
+                    ))
                 }
-            } else {
-                Err("JIT function calls not supported yet".to_string())
             }
+            Value::List(list) => self.compile_list(list),
+            _ => Err(format!("Unsupported Value type for JIT: {:?}", val)),
         }
-        _ => Err(format!("Unsupported Value type for JIT: {:?}", val)),
+    }
+
+    fn compile_list(&mut self, list: &[Value]) -> Result<IrValue, String> {
+        if list.is_empty() {
+            return Ok(self.builder.ins().iconst(self.ptr_type, 0)); // nil?
+        }
+        if let Value::Symbol(ref op) = list[0] {
+            // Builtins and Ops
+            match op.as_str() {
+                "print" | "+" | "-" | "*" => self.compile_builtin(op, list),
+                _ => self.compile_function_call(op, list),
+            }
+        } else {
+            Err("JIT function calls not supported yet".to_string())
+        }
+    }
+
+    fn compile_builtin(&mut self, op: &str, list: &[Value]) -> Result<IrValue, String> {
+        match op {
+            "print" => {
+                if list.len() != 2 {
+                    return Err("print takes 1 arg".to_string());
+                }
+                let arg_val = self.compile_expr(&list[1])?;
+
+                // Prepare verification of function declaration
+                let local_printf = self
+                    .module
+                    .declare_func_in_func(self.builtins.printf, self.builder.func);
+
+                self.builder
+                    .ins()
+                    .call(local_printf, &[self.builtins.printf_fmt, arg_val]);
+                Ok(arg_val)
+            }
+            "+" | "-" | "*" => {
+                if list.len() == 3 {
+                    let lhs = self.compile_expr(&list[1])?;
+                    let rhs = self.compile_expr(&list[2])?;
+                    match op {
+                        "+" => Ok(self.builder.ins().iadd(lhs, rhs)),
+                        "-" => Ok(self.builder.ins().isub(lhs, rhs)),
+                        "*" => Ok(self.builder.ins().imul(lhs, rhs)),
+                        _ => unreachable!(),
+                    }
+                } else {
+                    Err(format!("Binary ops require 2 args: {}", op))
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn compile_function_call(&mut self, op: &str, list: &[Value]) -> Result<IrValue, String> {
+        // Function call
+        let mut args = Vec::new();
+        for arg in &list[1..] {
+            args.push(self.compile_expr(arg)?);
+        }
+
+        let mut sig = self.module.make_signature();
+        for _ in &args {
+            sig.params.push(AbiParam::new(self.ptr_type));
+        }
+        sig.returns.push(AbiParam::new(self.ptr_type));
+
+        let func_id = self
+            .module
+            .declare_function(op, Linkage::Export, &sig)
+            .map_err(|e| e.to_string())?;
+
+        let local_func = self.module.declare_func_in_func(func_id, self.builder.func);
+        let call = self.builder.ins().call(local_func, &args);
+        let result = self.builder.inst_results(call)[0];
+        Ok(result)
     }
 }
