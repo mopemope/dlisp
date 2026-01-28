@@ -1,7 +1,7 @@
 use crate::ast::Value;
 use chumsky::prelude::*;
 
-pub fn parser() -> impl Parser<char, Value, Error = Simple<char>> {
+pub fn parser() -> impl Parser<char, Vec<Value>, Error = Simple<char>> {
     let float = text::digits(10)
         .then(just('.'))
         .then(text::digits(10))
@@ -47,10 +47,11 @@ pub fn parser() -> impl Parser<char, Value, Error = Simple<char>> {
         ))
     })
     .padded()
+    .repeated() // Allow multiple top-level expressions
     .then_ignore(end())
 }
 
-pub fn parse(src: &str) -> Result<Value, Vec<Simple<char>>> {
+pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Simple<char>>> {
     parser().parse(src)
 }
 
@@ -60,18 +61,22 @@ mod tests {
 
     #[test]
     fn test_parse_basics() {
-        assert_eq!(parse("123").unwrap(), Value::Integer(123));
-        assert_eq!(parse("12.3").unwrap(), Value::Float(12.3));
-        assert_eq!(parse("true").unwrap(), Value::Bool(true));
-        assert_eq!(parse("nil").unwrap(), Value::Nil);
-        assert_eq!(parse("foo").unwrap(), Value::Symbol("foo".to_string()));
-        assert_eq!(parse("\"bar\"").unwrap(), Value::String("bar".to_string()));
+        assert_eq!(parse("123").unwrap()[0], Value::Integer(123));
+        assert_eq!(parse("12.3").unwrap()[0], Value::Float(12.3));
+        assert_eq!(parse("true").unwrap()[0], Value::Bool(true));
+        assert_eq!(parse("nil").unwrap()[0], Value::Nil);
+        assert_eq!(parse("foo").unwrap()[0], Value::Symbol("foo".to_string()));
+        assert_eq!(
+            parse("\"bar\"").unwrap()[0],
+            Value::String("bar".to_string())
+        );
     }
 
     #[test]
     fn test_parse_list() {
         // Test with extra whitespace
-        let val = parse("(  1   2 )").unwrap();
+        let vals = parse("(  1   2 )").unwrap();
+        let val = &vals[0];
         if let Value::List(v) = val {
             assert_eq!(v.len(), 2);
             assert_eq!(v[0], Value::Integer(1));
@@ -83,7 +88,8 @@ mod tests {
 
     #[test]
     fn test_parse_nested() {
-        let val = parse("(+ 1 (* 2 3))").unwrap();
+        let vals = parse("(+ 1 (* 2 3))").unwrap();
+        let val = &vals[0];
         if let Value::List(v) = val {
             assert_eq!(v.len(), 3);
             assert_eq!(v[0], Value::Symbol("+".to_string()));

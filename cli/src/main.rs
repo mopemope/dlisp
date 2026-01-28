@@ -1,9 +1,17 @@
+use clap::Parser;
 use dlisp_core::interpreter::{default_env, Interpreter};
 use dlisp_core::parser::parse;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 use std::fs;
 use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(version)]
+struct Cli {
+    /// Optional script file to execute
+    file: Option<PathBuf>,
+}
 use tracing::info;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -48,6 +56,33 @@ fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
     info!("Starting dlisp REPL...");
 
+    let args = Cli::parse();
+
+    if let Some(file) = args.file {
+        let content = fs::read_to_string(file)?;
+        let mut env = default_env();
+        let mut interpreter = Interpreter::new();
+        match parse(&content) {
+            Ok(vals) => {
+                for val in vals {
+                    if let Err(e) = interpreter.eval(val, &mut env) {
+                        eprintln!("\x1b[31mError:\x1b[0m {}", e);
+                        std::process::exit(1);
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("\x1b[31mParse Error:\x1b[0m {:?}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        run_repl()
+    }
+}
+
+fn run_repl() -> anyhow::Result<()> {
     let mut rl = DefaultEditor::new()?;
     let history_path = get_history_path();
 
@@ -72,10 +107,14 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 match parse(&line) {
-                    Ok(ast) => match interpreter.eval(ast, &mut env.clone()) {
-                        Ok(val) => println!("=> {}", val),
-                        Err(e) => println!("Error: {}", e),
-                    },
+                    Ok(vals) => {
+                        for val in vals {
+                            match interpreter.eval(val, &mut env.clone()) {
+                                Ok(res) => println!("=> {}", res),
+                                Err(e) => println!("Error: {}", e),
+                            }
+                        }
+                    }
                     Err(errs) => {
                         for e in errs {
                             println!("Parse Error: {:?}", e);
