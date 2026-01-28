@@ -1,10 +1,10 @@
 use crate::ast::Value;
+use async_recursion::async_recursion;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-#[derive(Clone, Debug, PartialEq)] // Rc<RefCell> implies we need careful PartialEq or just bypass?
-// Environment usually is not compared for equality in tests.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Environment {
     pub parent: Option<Rc<RefCell<Environment>>>,
     pub values: HashMap<String, Value>,
@@ -31,8 +31,6 @@ impl Environment {
     pub fn set(&mut self, name: String, value: Value) {
         self.values.insert(name, value);
     }
-
-    // Define a root environment with builtins?
 }
 
 use crate::jit::JIT;
@@ -46,7 +44,8 @@ impl Interpreter {
         Self { jit: JIT::new() }
     }
 
-    pub fn eval(
+    #[async_recursion(?Send)]
+    pub async fn eval(
         &mut self,
         val: Value,
         env: &mut Rc<RefCell<Environment>>,
@@ -102,18 +101,81 @@ impl Interpreter {
                         };
                         env.borrow_mut().set(name.clone(), func.clone());
                         return Ok(Value::Symbol(name));
+                    } else if s == "spawn" {
+                        // (spawn (func args...)) or (spawn func)
+                        // This accepts an expression that evaluates to a function, or a function application
+                        if list.len() < 2 {
+                            return Err("spawn requires a function or function call".to_string());
+                        }
+
+                        // Evaluate the first argument to get the function
+                        let func_val = self.eval(list[1].clone(), env).await?;
+                        let func_args = if list.len() > 2 {
+                            // (spawn func arg1 arg2) - wait, classic lisp spawn usually takes a lambda
+                            // If we do (spawn (task)) -> list[1] is (task) which evaluates to result of task? No.
+                            // If we do (spawn task) -> list[1] is task -> evaluates to UserFunc.
+                            // Let's support (spawn func_symbol) for now as 0-arity call.
+                            Vec::new()
+                        } else {
+                            Vec::new()
+                        };
+
+                        // Environment cloning for the new task
+                        let env_clone = env.clone();
+
+                        // We need to move `func_val` and `env_clone` into the future
+                        tokio::task::spawn_local(async move {
+                            match func_val {
+                                Value::UserFunc {
+                                    args: param_names,
+                                    body,
+                                    jit_code: _,
+                                } => {
+                                    // Check arg count
+                                    if param_names.len() != func_args.len() {
+                                        eprintln!("Spawned task argument mismatch");
+                                        return;
+                                    }
+
+                                    // Create function scope env with PARENT as the cloned env
+                                    let func_env = Environment::new(Some(env_clone));
+                                    // Bind args if we supported them (currently empty)
+
+                                    let func_env_rc = Rc::new(RefCell::new(func_env));
+                                    let mut interpreter = Interpreter::new(); // New interpreter instance, but shared Env!
+
+                                    for expr in body {
+                                        if let Err(e) =
+                                            interpreter.eval(expr, &mut func_env_rc.clone()).await
+                                        {
+                                            eprintln!("Spawned task error: {}", e);
+                                        }
+                                    }
+                                }
+                                Value::NativeFunc(f) => {
+                                    if let Err(e) = f(&func_args).await {
+                                        eprintln!("Spawned task error: {}", e);
+                                    }
+                                }
+                                _ => {
+                                    eprintln!("Spawn expected a function");
+                                }
+                            }
+                        });
+
+                        return Ok(Value::Nil);
                     }
                 }
 
                 // Function call
-                let func_val = self.eval(list[0].clone(), env)?;
+                let func_val = self.eval(list[0].clone(), env).await?;
                 let mut args = Vec::new();
                 for arg in &list[1..] {
-                    args.push(self.eval(arg.clone(), env)?);
+                    args.push(self.eval(arg.clone(), env).await?);
                 }
 
                 match func_val {
-                    Value::NativeFunc(f) => f(&args),
+                    Value::NativeFunc(f) => f(&args).await,
                     Value::UserFunc {
                         args: param_names,
                         body,
@@ -131,13 +193,6 @@ impl Interpreter {
                         if let Some(code_ptr) = jit_code {
                             let all_ints = args.iter().all(|v| matches!(v, Value::Integer(_)));
                             if all_ints {
-                                // Prepare args
-                                // Current JIT supports 2 args mostly based on compile_expr?
-                                // Actually compile supports N args.
-                                // We need to cast function pointer to correct signature.
-                                // LIMITATION: Rust cannot dynamically call variadic C functions easily without asm or libffi.
-                                // For this step, we'll support strictly 2 arguments for JIT as per implementation plan goal "fn(i64, i64) -> i64"
-                                // or try to unsafe transmute based on len.
                                 match args.len() {
                                     0 => {
                                         let func: extern "C" fn() -> i64 =
@@ -184,8 +239,7 @@ impl Interpreter {
                                         return Ok(Value::Integer(func(a1, a2, a3)));
                                     }
                                     _ => {
-                                        // Fallback if arg count > 3
-                                        // (Real implementation would use libffi or generated trampoline)
+                                        // Fallback
                                     }
                                 }
                             }
@@ -199,7 +253,7 @@ impl Interpreter {
                         let func_env_rc = Rc::new(RefCell::new(func_env));
                         let mut result = Value::Nil;
                         for expr in body {
-                            result = self.eval(expr, &mut func_env_rc.clone())?;
+                            result = self.eval(expr, &mut func_env_rc.clone()).await?;
                         }
                         Ok(result)
                     }
@@ -217,12 +271,16 @@ pub fn default_env() -> Rc<RefCell<Environment>> {
     Rc::new(RefCell::new(env))
 }
 
+pub fn default_interpreter() -> Interpreter {
+    Interpreter::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_eval_add() {
+    #[tokio::test]
+    async fn test_eval_add() {
         let env = default_env();
         let mut interpreter = Interpreter::new();
         // (+ 1 2)
@@ -231,17 +289,14 @@ mod tests {
             Value::Integer(1),
             Value::Integer(2),
         ]);
-        let res = interpreter.eval(ast, &mut env.clone());
+        let res = interpreter.eval(ast, &mut env.clone()).await;
         assert_eq!(res.unwrap(), Value::Integer(3));
     }
 
-    #[test]
-    fn test_eval_nested() {
+    #[tokio::test]
+    async fn test_eval_nested() {
         let env = default_env();
         let mut interpreter = Interpreter::new();
-        // (+ 1 (* 2 3)) is hard to construct manually, let's assume we have it correct or use parser in integration test.
-        // Let's test basic recursion if we had it.
-        // For now, manual AST construction:
         // (+ 1 (+ 2 3))
         let ast = Value::List(vec![
             Value::Symbol("+".to_string()),
@@ -252,12 +307,12 @@ mod tests {
                 Value::Integer(3),
             ]),
         ]);
-        let res = interpreter.eval(ast, &mut env.clone());
+        let res = interpreter.eval(ast, &mut env.clone()).await;
         assert_eq!(res.unwrap(), Value::Integer(6));
     }
 
-    #[test]
-    fn test_eval_defun() {
+    #[tokio::test]
+    async fn test_eval_defun() {
         let env = default_env();
         let mut interpreter = Interpreter::new();
         // (defun add2 (x) (+ x 2))
@@ -271,22 +326,22 @@ mod tests {
                 Value::Integer(2),
             ]),
         ]);
-        interpreter.eval(defun_expr, &mut env.clone()).unwrap();
+        interpreter
+            .eval(defun_expr, &mut env.clone())
+            .await
+            .unwrap();
 
         // (add2 3)
         let call_expr = Value::List(vec![Value::Symbol("add2".to_string()), Value::Integer(3)]);
-        let res = interpreter.eval(call_expr, &mut env.clone());
+        let res = interpreter.eval(call_expr, &mut env.clone()).await;
         assert_eq!(res.unwrap(), Value::Integer(5));
     }
 
-    #[test]
-    fn test_eval_defun_3args() {
+    #[tokio::test]
+    async fn test_eval_defun_3args() {
         let env = default_env();
         let mut interpreter = Interpreter::new();
         // (defun add3 (x y z) (+ x (+ y z)))
-        // Manual AST construction is tedious, but we don't have parser in core library exposed cleanly without pulling modules?
-        // We do have parser in core::parser if we used it, but tests here are unit tests for interpreter.
-        // Let's construct AST manually for: (+ x (+ y z))
         let body_expr = Value::List(vec![
             Value::Symbol("+".to_string()),
             Value::Symbol("x".to_string()),
@@ -307,7 +362,10 @@ mod tests {
             ]),
             body_expr,
         ]);
-        interpreter.eval(defun_expr, &mut env.clone()).unwrap();
+        interpreter
+            .eval(defun_expr, &mut env.clone())
+            .await
+            .unwrap();
 
         // (add3 1 2 3)
         let call_expr = Value::List(vec![
@@ -316,7 +374,7 @@ mod tests {
             Value::Integer(2),
             Value::Integer(3),
         ]);
-        let res = interpreter.eval(call_expr, &mut env.clone());
+        let res = interpreter.eval(call_expr, &mut env.clone()).await;
         assert_eq!(res.unwrap(), Value::Integer(6));
     }
 }

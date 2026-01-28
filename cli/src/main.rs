@@ -52,37 +52,43 @@ fn setup_logging() -> Option<WorkerGuard> {
     Some(guard)
 }
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> anyhow::Result<()> {
     let _guard = setup_logging();
     info!("Starting dlisp REPL...");
 
     let args = Cli::parse();
+    let local = tokio::task::LocalSet::new();
 
-    if let Some(file) = args.file {
-        let content = fs::read_to_string(file)?;
-        let mut env = default_env();
-        let mut interpreter = Interpreter::new();
-        match parse(&content) {
-            Ok(vals) => {
-                for val in vals {
-                    if let Err(e) = interpreter.eval(val, &mut env) {
-                        eprintln!("\x1b[31mError:\x1b[0m {}", e);
+    local
+        .run_until(async move {
+            if let Some(file) = args.file {
+                let content = fs::read_to_string(file)?;
+                let mut env = default_env();
+                let mut interpreter = Interpreter::new();
+                match parse(&content) {
+                    Ok(vals) => {
+                        for val in vals {
+                            if let Err(e) = interpreter.eval(val, &mut env).await {
+                                eprintln!("\x1b[31mError:\x1b[0m {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                        Ok(())
+                    }
+                    Err(e) => {
+                        eprintln!("\x1b[31mParse Error:\x1b[0m {:?}", e);
                         std::process::exit(1);
                     }
                 }
-                Ok(())
+            } else {
+                run_repl().await
             }
-            Err(e) => {
-                eprintln!("\x1b[31mParse Error:\x1b[0m {:?}", e);
-                std::process::exit(1);
-            }
-        }
-    } else {
-        run_repl()
-    }
+        })
+        .await
 }
 
-fn run_repl() -> anyhow::Result<()> {
+async fn run_repl() -> anyhow::Result<()> {
     let mut rl = DefaultEditor::new()?;
     let history_path = get_history_path();
 
@@ -109,7 +115,7 @@ fn run_repl() -> anyhow::Result<()> {
                 match parse(&line) {
                     Ok(vals) => {
                         for val in vals {
-                            match interpreter.eval(val, &mut env.clone()) {
+                            match interpreter.eval(val, &mut env.clone()).await {
                                 Ok(res) => println!("=> {}", res),
                                 Err(e) => println!("Error: {}", e),
                             }
