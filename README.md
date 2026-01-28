@@ -27,11 +27,23 @@ The project leverages the following key libraries:
 - **[Tracing](https://github.com/tokio-rs/tracing)**: Framework for instrumenting Rust programs to collect structured, event-based diagnostic information.
 - **[Anyhow](https://github.com/dtolnay/anyhow)** & **[Thiserror](https://github.com/dtolnay/thiserror)**: Error handling.
 
+## System Requirements
+
+To build and run `dlisp`, you need the following dependencies installed on your system:
+
+- **Rust**: Latest stable version (via rustup).
+- **Boehm GC**: `libgc-dev` (Debian/Ubuntu) or `bdwgc` (others).
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install libgc-dev pkg-config
+```
+
 ## Usage
 
 ### Build
 ```bash
-cargo build
+cargo build --workspace
 ```
 
 ### Run REPL
@@ -105,9 +117,36 @@ user> (spawn async-task)
 => nil
 ```
 
+## Language Features
+
+### Data Types
+- **Integers**: `1`, `42`, `-10`
+- **Floats**: `3.14`, `-0.5`
+- **Symbols**: `x`, `foo-bar`, `+`
+- **Lists**: `(1 2 3)`, `(print "hello")`
+
+### Special Forms
+- **`defun`**: Define global functions.
+- **`let`**: Bind local variables.
+- **`lambda`**: Create anonymous functions (closures).
+- **`if`**: Conditional execution.
+- **`spawn`**: Spawn a new concurrent thread for a task.
+
+### Built-in Functions
+- **Arithmetic**: `+`, `-`, `*`
+- **Comparison**: `>`
+- **I/O**: `print`
+- **System**: `sleep`
+
+## Architecture Highlights
+
+- **Garbage Collection**: Uses **Boehm GC** (`libgc`) for automatic memory management, ensuring thread safety and preventing leaks in both interpreted and compiled code.
+- **JIT & AOT**: Shares a common Cranelift backend for both Just-In-Time execution in the REPL and Ahead-of-Time compilation to native binaries.
+- **Concurrency**: Native OS threads spawned via `spawn`, heavily stress-tested for GC safety across thread boundaries.
+
 ## Features
 - Interactive REPL with history support.
-- JIT compilation for user-defined functions (arithmetic expressions).
-- Ahead-of-Time (AOT) compilation to native binaries via Cranelift.
-- Asynchronous task spawning.
-- XDG-compliant state management.
+- JIT compilation for immediate feedback.
+- AOT compilation to standalone executables.
+- Asynchronous threaded execution.
+- XDG-compliant configuration.
