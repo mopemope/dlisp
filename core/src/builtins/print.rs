@@ -1,7 +1,6 @@
 use crate::ast::Value;
-use futures::future::BoxFuture;
 
-pub fn print(args: &[Value]) -> BoxFuture<'static, Result<Value, String>> {
+pub fn print(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
     Box::pin(async move {
         for (i, arg) in args.iter().enumerate() {

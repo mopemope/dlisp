@@ -1,8 +1,8 @@
 use crate::ast::Value;
-use futures::future::BoxFuture;
+
 use tokio::time::{Duration, sleep};
 
-pub fn sleep_fn(args: &[Value]) -> BoxFuture<'static, Result<Value, String>> {
+pub fn sleep_fn(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
     Box::pin(async move {
         if args.len() != 1 {

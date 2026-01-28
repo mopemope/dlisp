@@ -38,6 +38,7 @@ pub fn defun(
         args: arg_names,
         body,
         jit_code,
+        env: Some(env.clone()),
     };
     env.borrow_mut().set(func_name.clone(), func);
     Ok(Some(Value::Symbol(func_name)))

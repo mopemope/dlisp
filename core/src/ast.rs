@@ -1,5 +1,6 @@
-use futures::future::BoxFuture;
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(unpredictable_function_pointer_comparisons)]
@@ -13,11 +14,12 @@ pub enum Value {
     // We'll use a wrapper struct or just string for now to avoid complexity in this step if possible?
     // No, we need to call them.
     // Let's use a function type alias.
-    NativeFunc(fn(&[Value]) -> BoxFuture<'static, Result<Value, String>>),
+    NativeFunc(fn(&[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>>),
     UserFunc {
         args: Vec<String>,
         body: Vec<Value>,
         jit_code: Option<usize>,
+        env: Option<Rc<RefCell<crate::environment::Environment>>>,
     },
     List(Vec<Value>),
     Nil,

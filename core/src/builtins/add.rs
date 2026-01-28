@@ -1,7 +1,6 @@
 use crate::ast::Value;
-use futures::future::BoxFuture;
 
-pub fn add(args: &[Value]) -> BoxFuture<'static, Result<Value, String>> {
+pub fn add(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
     Box::pin(async move {
         let mut i_sum = 0;

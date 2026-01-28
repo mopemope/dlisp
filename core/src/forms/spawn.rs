@@ -22,6 +22,7 @@ pub async fn spawn(
                 args: _param_names,
                 body,
                 jit_code: _,
+                env: _,
             } => {
                 let func_env = Environment::new(Some(env_clone));
                 let func_env_rc = Rc::new(RefCell::new(func_env));

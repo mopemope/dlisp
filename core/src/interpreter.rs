@@ -61,6 +61,7 @@ impl Interpreter {
             "defun" => crate::forms::defun::defun(&mut self.jit, args, env),
             "spawn" => crate::forms::spawn::spawn(self, args, env).await,
             "let" => crate::forms::let_expr::let_form(self, args, env).await,
+            "lambda" => crate::forms::lambda::lambda(args, env),
             _ => Ok(None),
         }
     }
@@ -77,6 +78,7 @@ impl Interpreter {
                 args: param_names,
                 body,
                 jit_code,
+                env: captured_env,
             } => {
                 if args.len() != param_names.len() {
                     return Err(format!(
@@ -139,7 +141,16 @@ impl Interpreter {
                     }
                 }
 
-                let mut func_env = Environment::new(Some(env.clone()));
+                // Lexical scoping: use captured_env if available, otherwise use current env (dynamic/fallback)
+                // For properly implemented closures, captured_env should be Some.
+                // If None (e.g. naive defun), we might fall back to env.
+                let parent_env = if let Some(c_env) = captured_env {
+                    c_env
+                } else {
+                    env.clone()
+                };
+
+                let mut func_env = Environment::new(Some(parent_env));
                 for (name, val) in param_names.iter().zip(args.into_iter()) {
                     func_env.set(name.clone(), val);
                 }

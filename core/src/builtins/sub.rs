@@ -1,7 +1,6 @@
 use crate::ast::Value;
-use futures::future::BoxFuture;
 
-pub fn sub(args: &[Value]) -> BoxFuture<'static, Result<Value, String>> {
+pub fn sub(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
     Box::pin(async move {
         if args.is_empty() {

@@ -182,6 +182,14 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
             return Ok(self.builder.ins().iconst(self.ptr_type, 0)); // nil?
         }
         if let Value::Symbol(ref op) = list[0] {
+            // Check if 'op' is a variable (parameter) - Indirect call logic not implemented
+            if self.variables.contains_key(op) {
+                return Err(format!(
+                    "JIT does not support indirect function calls (variable '{}')",
+                    op
+                ));
+            }
+
             // Builtins and Ops
             match op.as_str() {
                 "print" | "+" | "-" | "*" => self.compile_builtin(op, list),
