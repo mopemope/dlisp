@@ -1,39 +1,6 @@
 use crate::ast::Value;
-use crate::interpreter::Environment;
 
-fn add(args: &[Value]) -> Result<Value, String> {
-    let mut i_sum = 0;
-    let mut f_sum = 0.0;
-    let mut is_float = false;
-
-    for arg in args {
-        match arg {
-            Value::Integer(n) => {
-                if is_float {
-                    f_sum += *n as f64;
-                } else {
-                    i_sum += n;
-                }
-            }
-            Value::Float(n) => {
-                if !is_float {
-                    is_float = true;
-                    f_sum = i_sum as f64;
-                }
-                f_sum += n;
-            }
-            _ => return Err(format!("Expected number, got {}", arg)),
-        }
-    }
-
-    if is_float {
-        Ok(Value::Float(f_sum))
-    } else {
-        Ok(Value::Integer(i_sum))
-    }
-}
-
-fn sub(args: &[Value]) -> Result<Value, String> {
+pub fn sub(args: &[Value]) -> Result<Value, String> {
     if args.is_empty() {
         return Err("Expected at least one argument".to_string());
     }
@@ -91,21 +58,4 @@ fn sub(args: &[Value]) -> Result<Value, String> {
     } else {
         Ok(Value::Integer(i_acc))
     }
-}
-
-fn print(args: &[Value]) -> Result<Value, String> {
-    for (i, arg) in args.iter().enumerate() {
-        if i > 0 {
-            print!(" ");
-        }
-        print!("{}", arg);
-    }
-    println!();
-    Ok(Value::Nil)
-}
-
-pub fn install(env: &mut Environment) {
-    env.set("+".to_string(), Value::NativeFunc(add));
-    env.set("-".to_string(), Value::NativeFunc(sub));
-    env.set("print".to_string(), Value::NativeFunc(print));
 }
