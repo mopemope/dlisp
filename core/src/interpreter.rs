@@ -364,4 +364,74 @@ mod tests {
         let res = interpreter.eval(let_expr, &mut env.clone()).await;
         assert_eq!(res.unwrap(), Value::Integer(1));
     }
+
+    #[tokio::test]
+    async fn test_eval_let_shadowing() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (let ((x 10)) (let ((x 20)) x)) -> 20
+        let let_expr = Value::List(vec![
+            Value::Symbol("let".to_string()),
+            Value::List(vec![Value::List(vec![
+                Value::Symbol("x".to_string()),
+                Value::Integer(10),
+            ])]),
+            Value::List(vec![
+                Value::Symbol("let".to_string()),
+                Value::List(vec![Value::List(vec![
+                    Value::Symbol("x".to_string()),
+                    Value::Integer(20),
+                ])]),
+                Value::Symbol("x".to_string()),
+            ]),
+        ]);
+        let res = interpreter.eval(let_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(20));
+    }
+
+    #[tokio::test]
+    async fn test_eval_let_multiple_body() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (let ((x 10)) (+ x 1) (+ x 2)) -> 12
+        let let_expr = Value::List(vec![
+            Value::Symbol("let".to_string()),
+            Value::List(vec![Value::List(vec![
+                Value::Symbol("x".to_string()),
+                Value::Integer(10),
+            ])]),
+            Value::List(vec![
+                Value::Symbol("+".to_string()),
+                Value::Symbol("x".to_string()),
+                Value::Integer(1),
+            ]),
+            Value::List(vec![
+                Value::Symbol("+".to_string()),
+                Value::Symbol("x".to_string()),
+                Value::Integer(2),
+            ]),
+        ]);
+        let res = interpreter.eval(let_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(12));
+    }
+
+    #[tokio::test]
+    async fn test_eval_let_parallel_undefined() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (let ((x 1) (y x)) y) -> Error because x is not defined in outer env
+        let let_expr = Value::List(vec![
+            Value::Symbol("let".to_string()),
+            Value::List(vec![
+                Value::List(vec![Value::Symbol("x".to_string()), Value::Integer(1)]),
+                Value::List(vec![
+                    Value::Symbol("y".to_string()),
+                    Value::Symbol("x".to_string()),
+                ]),
+            ]),
+            Value::Symbol("y".to_string()),
+        ]);
+        let res = interpreter.eval(let_expr, &mut env.clone()).await;
+        assert!(res.is_err());
+    }
 }
