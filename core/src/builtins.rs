@@ -93,7 +93,19 @@ fn sub(args: &[Value]) -> Result<Value, String> {
     }
 }
 
+fn print(args: &[Value]) -> Result<Value, String> {
+    for (i, arg) in args.iter().enumerate() {
+        if i > 0 {
+            print!(" ");
+        }
+        print!("{}", arg);
+    }
+    println!();
+    Ok(Value::Nil)
+}
+
 pub fn install(env: &mut Environment) {
     env.set("+".to_string(), Value::NativeFunc(add));
     env.set("-".to_string(), Value::NativeFunc(sub));
+    env.set("print".to_string(), Value::NativeFunc(print));
 }
