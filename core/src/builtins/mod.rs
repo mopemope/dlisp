@@ -1,5 +1,5 @@
 use crate::ast::Value;
-use crate::interpreter::Environment;
+use crate::environment::Environment;
 
 mod add;
 mod print;

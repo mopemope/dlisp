@@ -1,37 +1,8 @@
 use crate::ast::Value;
+use crate::environment::Environment;
 use async_recursion::async_recursion;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Environment {
-    pub parent: Option<Rc<RefCell<Environment>>>,
-    pub values: HashMap<String, Value>,
-}
-
-impl Environment {
-    pub fn new(parent: Option<Rc<RefCell<Environment>>>) -> Self {
-        Environment {
-            parent,
-            values: HashMap::new(),
-        }
-    }
-
-    pub fn get(&self, name: &str) -> Option<Value> {
-        if let Some(val) = self.values.get(name) {
-            Some(val.clone())
-        } else if let Some(parent) = &self.parent {
-            parent.borrow().get(name)
-        } else {
-            None
-        }
-    }
-
-    pub fn set(&mut self, name: String, value: Value) {
-        self.values.insert(name, value);
-    }
-}
 
 use crate::jit::JIT;
 
@@ -59,208 +30,195 @@ impl Interpreter {
                 if list.is_empty() {
                     return Ok(Value::Nil);
                 }
-                // Handle special forms like defun
+
+                // Try special forms first
                 if let Value::Symbol(ref s) = list[0] {
-                    if s == "defun" {
-                        // (defun name (args...) body...)
-                        if list.len() < 4 {
-                            return Err("defun requires at least 3 arguments".to_string());
-                        }
-                        let name = match &list[1] {
-                            Value::Symbol(n) => n.clone(),
-                            _ => return Err("defun name must be a symbol".to_string()),
-                        };
-                        let args_val = match &list[2] {
-                            Value::List(l) => l,
-                            _ => return Err("defun args must be a list".to_string()),
-                        };
-                        let mut arg_names = Vec::new();
-                        for arg in args_val {
-                            match arg {
-                                Value::Symbol(n) => arg_names.push(n.clone()),
-                                _ => return Err("defun arg must be a symbol".to_string()),
-                            }
-                        }
-                        // Body is the rest
-                        let body = list[3..].to_vec();
-
-                        // Try JIT compilation
-                        let jit_code = match self.jit.compile(&name, &arg_names, &body) {
-                            Ok(code) => Some(code as usize),
-                            Err(_e) => {
-                                // JIT failed (maybe unsupported ops), ignore and use interpreter
-                                // println!("JIT compilation failed for {}: {}", name, e);
-                                None
-                            }
-                        };
-
-                        let func = Value::UserFunc {
-                            args: arg_names,
-                            body,
-                            jit_code,
-                        };
-                        env.borrow_mut().set(name.clone(), func.clone());
-                        return Ok(Value::Symbol(name));
-                    } else if s == "spawn" {
-                        // (spawn (func args...)) or (spawn func)
-                        // This accepts an expression that evaluates to a function, or a function application
-                        if list.len() < 2 {
-                            return Err("spawn requires a function or function call".to_string());
-                        }
-
-                        // Evaluate the first argument to get the function
-                        let func_val = self.eval(list[1].clone(), env).await?;
-                        let func_args = if list.len() > 2 {
-                            // (spawn func arg1 arg2) - wait, classic lisp spawn usually takes a lambda
-                            // If we do (spawn (task)) -> list[1] is (task) which evaluates to result of task? No.
-                            // If we do (spawn task) -> list[1] is task -> evaluates to UserFunc.
-                            // Let's support (spawn func_symbol) for now as 0-arity call.
-                            Vec::new()
-                        } else {
-                            Vec::new()
-                        };
-
-                        // Environment cloning for the new task
-                        let env_clone = env.clone();
-
-                        // We need to move `func_val` and `env_clone` into the future
-                        tokio::task::spawn_local(async move {
-                            match func_val {
-                                Value::UserFunc {
-                                    args: param_names,
-                                    body,
-                                    jit_code: _,
-                                } => {
-                                    // Check arg count
-                                    if param_names.len() != func_args.len() {
-                                        eprintln!("Spawned task argument mismatch");
-                                        return;
-                                    }
-
-                                    // Create function scope env with PARENT as the cloned env
-                                    let func_env = Environment::new(Some(env_clone));
-                                    // Bind args if we supported them (currently empty)
-
-                                    let func_env_rc = Rc::new(RefCell::new(func_env));
-                                    let mut interpreter = Interpreter::new(); // New interpreter instance, but shared Env!
-
-                                    for expr in body {
-                                        if let Err(e) =
-                                            interpreter.eval(expr, &mut func_env_rc.clone()).await
-                                        {
-                                            eprintln!("Spawned task error: {}", e);
-                                        }
-                                    }
-                                }
-                                Value::NativeFunc(f) => {
-                                    if let Err(e) = f(&func_args).await {
-                                        eprintln!("Spawned task error: {}", e);
-                                    }
-                                }
-                                _ => {
-                                    eprintln!("Spawn expected a function");
-                                }
-                            }
-                        });
-
-                        return Ok(Value::Nil);
+                    if let Some(result) = self.eval_special_form(s, &list[1..], env).await? {
+                        return Ok(result);
                     }
                 }
 
-                // Function call
+                // Standard function call
                 let func_val = self.eval(list[0].clone(), env).await?;
                 let mut args = Vec::new();
                 for arg in &list[1..] {
                     args.push(self.eval(arg.clone(), env).await?);
                 }
 
-                match func_val {
-                    Value::NativeFunc(f) => f(&args).await,
-                    Value::UserFunc {
-                        args: param_names,
-                        body,
-                        jit_code,
-                    } => {
-                        if args.len() != param_names.len() {
-                            return Err(format!(
-                                "Function expects {} arguments, got {}",
-                                param_names.len(),
-                                args.len()
-                            ));
-                        }
+                self.apply(func_val, args, env).await
+            }
+            _ => Ok(val), // Self-evaluating
+        }
+    }
 
-                        // Try JIT execution if available and args are integers
-                        if let Some(code_ptr) = jit_code {
-                            let all_ints = args.iter().all(|v| matches!(v, Value::Integer(_)));
-                            if all_ints {
-                                match args.len() {
-                                    0 => {
-                                        let func: extern "C" fn() -> i64 =
-                                            unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                        return Ok(Value::Integer(func()));
-                                    }
-                                    1 => {
-                                        let a1 = match args[0] {
-                                            Value::Integer(i) => i,
-                                            _ => 0,
-                                        };
-                                        let func: extern "C" fn(i64) -> i64 =
-                                            unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                        return Ok(Value::Integer(func(a1)));
-                                    }
-                                    2 => {
-                                        let a1 = match args[0] {
-                                            Value::Integer(i) => i,
-                                            _ => 0,
-                                        };
-                                        let a2 = match args[1] {
-                                            Value::Integer(i) => i,
-                                            _ => 0,
-                                        };
-                                        let func: extern "C" fn(i64, i64) -> i64 =
-                                            unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                        return Ok(Value::Integer(func(a1, a2)));
-                                    }
-                                    3 => {
-                                        let a1 = match args[0] {
-                                            Value::Integer(i) => i,
-                                            _ => 0,
-                                        };
-                                        let a2 = match args[1] {
-                                            Value::Integer(i) => i,
-                                            _ => 0,
-                                        };
-                                        let a3 = match args[2] {
-                                            Value::Integer(i) => i,
-                                            _ => 0,
-                                        };
-                                        let func: extern "C" fn(i64, i64, i64) -> i64 =
-                                            unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                        return Ok(Value::Integer(func(a1, a2, a3)));
-                                    }
-                                    _ => {
-                                        // Fallback
-                                    }
+    async fn eval_special_form(
+        &mut self,
+        name: &str,
+        args: &[Value],
+        env: &mut Rc<RefCell<Environment>>,
+    ) -> Result<Option<Value>, String> {
+        match name {
+            "defun" => {
+                if args.len() < 3 {
+                    return Err("defun requires at least 3 arguments".to_string());
+                }
+                let func_name = match &args[0] {
+                    Value::Symbol(n) => n.clone(),
+                    _ => return Err("defun name must be a symbol".to_string()),
+                };
+                let params = match &args[1] {
+                    Value::List(l) => l,
+                    _ => return Err("defun args must be a list".to_string()),
+                };
+                let mut arg_names = Vec::new();
+                for arg in params {
+                    match arg {
+                        Value::Symbol(n) => arg_names.push(n.clone()),
+                        _ => return Err("defun arg must be a symbol".to_string()),
+                    }
+                }
+                let body = args[2..].to_vec();
+
+                let jit_code = match self.jit.compile(&func_name, &arg_names, &body) {
+                    Ok(code) => Some(code as usize),
+                    Err(_) => None,
+                };
+
+                let func = Value::UserFunc {
+                    args: arg_names,
+                    body,
+                    jit_code,
+                };
+                env.borrow_mut().set(func_name.clone(), func);
+                Ok(Some(Value::Symbol(func_name)))
+            }
+            "spawn" => {
+                if args.is_empty() {
+                    return Err("spawn requires a function or function call".to_string());
+                }
+
+                let func_val = self.eval(args[0].clone(), env).await?;
+                let env_clone = env.clone();
+
+                tokio::task::spawn_local(async move {
+                    match func_val {
+                        Value::UserFunc {
+                            args: _param_names,
+                            body,
+                            jit_code: _,
+                        } => {
+                            let func_env = Environment::new(Some(env_clone));
+                            let func_env_rc = Rc::new(RefCell::new(func_env));
+                            let mut interpreter = Interpreter::new();
+                            for expr in body {
+                                if let Err(e) =
+                                    interpreter.eval(expr, &mut func_env_rc.clone()).await
+                                {
+                                    eprintln!("Spawned task error: {}", e);
                                 }
                             }
                         }
-
-                        // Interpreter fallback
-                        let mut func_env = Environment::new(Some(env.clone()));
-                        for (name, val) in param_names.iter().zip(args.into_iter()) {
-                            func_env.set(name.clone(), val);
+                        Value::NativeFunc(f) => {
+                            if let Err(e) = f(&[]).await {
+                                eprintln!("Spawned task error: {}", e);
+                            }
                         }
-                        let func_env_rc = Rc::new(RefCell::new(func_env));
-                        let mut result = Value::Nil;
-                        for expr in body {
-                            result = self.eval(expr, &mut func_env_rc.clone()).await?;
-                        }
-                        Ok(result)
+                        _ => eprintln!("Spawn expected a function"),
                     }
-                    _ => Err(format!("Not a function: {}", list[0])),
-                }
+                });
+
+                Ok(Some(Value::Nil))
             }
-            _ => Ok(val), // Self-evaluating
+            _ => Ok(None),
+        }
+    }
+
+    async fn apply(
+        &mut self,
+        func: Value,
+        args: Vec<Value>,
+        env: &mut Rc<RefCell<Environment>>,
+    ) -> Result<Value, String> {
+        match func {
+            Value::NativeFunc(f) => f(&args).await,
+            Value::UserFunc {
+                args: param_names,
+                body,
+                jit_code,
+            } => {
+                if args.len() != param_names.len() {
+                    return Err(format!(
+                        "Function expects {} arguments, got {}",
+                        param_names.len(),
+                        args.len()
+                    ));
+                }
+
+                if let Some(code_ptr) = jit_code {
+                    let all_ints = args.iter().all(|v| matches!(v, Value::Integer(_)));
+                    if all_ints {
+                        match args.len() {
+                            0 => {
+                                let func_ptr: extern "C" fn() -> i64 =
+                                    unsafe { std::mem::transmute(code_ptr as *const u8) };
+                                return Ok(Value::Integer(func_ptr()));
+                            }
+                            1 => {
+                                let a1 = match args[0] {
+                                    Value::Integer(i) => i,
+                                    _ => 0,
+                                };
+                                let func_ptr: extern "C" fn(i64) -> i64 =
+                                    unsafe { std::mem::transmute(code_ptr as *const u8) };
+                                return Ok(Value::Integer(func_ptr(a1)));
+                            }
+                            2 => {
+                                let a1 = match args[0] {
+                                    Value::Integer(i) => i,
+                                    _ => 0,
+                                };
+                                let a2 = match args[1] {
+                                    Value::Integer(i) => i,
+                                    _ => 0,
+                                };
+                                let func_ptr: extern "C" fn(i64, i64) -> i64 =
+                                    unsafe { std::mem::transmute(code_ptr as *const u8) };
+                                return Ok(Value::Integer(func_ptr(a1, a2)));
+                            }
+                            3 => {
+                                let a1 = match args[0] {
+                                    Value::Integer(i) => i,
+                                    _ => 0,
+                                };
+                                let a2 = match args[1] {
+                                    Value::Integer(i) => i,
+                                    _ => 0,
+                                };
+                                let a3 = match args[2] {
+                                    Value::Integer(i) => i,
+                                    _ => 0,
+                                };
+                                let func_ptr: extern "C" fn(i64, i64, i64) -> i64 =
+                                    unsafe { std::mem::transmute(code_ptr as *const u8) };
+                                return Ok(Value::Integer(func_ptr(a1, a2, a3)));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                let mut func_env = Environment::new(Some(env.clone()));
+                for (name, val) in param_names.iter().zip(args.into_iter()) {
+                    func_env.set(name.clone(), val);
+                }
+                let func_env_rc = Rc::new(RefCell::new(func_env));
+                let mut result = Value::Nil;
+                for expr in body {
+                    result = self.eval(expr, &mut func_env_rc.clone()).await?;
+                }
+                Ok(result)
+            }
+            _ => Err("Value is not a function".to_string()),
         }
     }
 }
