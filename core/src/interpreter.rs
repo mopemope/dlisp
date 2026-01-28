@@ -377,4 +377,38 @@ mod tests {
         let res = interpreter.eval(call_expr, &mut env.clone()).await;
         assert_eq!(res.unwrap(), Value::Integer(6));
     }
+
+    #[tokio::test]
+    async fn test_eval_spawn() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+
+        // (defun task () (+ 1 2))
+        let defun_expr = Value::List(vec![
+            Value::Symbol("defun".to_string()),
+            Value::Symbol("task".to_string()),
+            Value::List(vec![]),
+            Value::List(vec![
+                Value::Symbol("+".to_string()),
+                Value::Integer(1),
+                Value::Integer(2),
+            ]),
+        ]);
+        interpreter
+            .eval(defun_expr, &mut env.clone())
+            .await
+            .unwrap();
+
+        // (spawn task)
+        let spawn_expr = Value::List(vec![
+            Value::Symbol("spawn".to_string()),
+            Value::Symbol("task".to_string()),
+        ]);
+
+        let res = interpreter.eval(spawn_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Nil);
+
+        // Allow the spawned task to execute
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    }
 }
