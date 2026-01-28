@@ -13,6 +13,11 @@ pub enum Value {
     // No, we need to call them.
     // Let's use a function type alias.
     NativeFunc(fn(&[Value]) -> Result<Value, String>),
+    UserFunc {
+        args: Vec<String>,
+        body: Vec<Value>,
+        jit_code: Option<usize>,
+    },
     List(Vec<Value>),
     Nil,
 }
@@ -41,6 +46,7 @@ impl fmt::Display for Value {
             }
             Value::Nil => write!(f, "nil"),
             Value::NativeFunc(_) => write!(f, "<native-func>"),
+            Value::UserFunc { .. } => write!(f, "<user-func>"),
         }
     }
 }

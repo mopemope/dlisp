@@ -1,4 +1,4 @@
-use dlisp_core::interpreter::{default_env, eval};
+use dlisp_core::interpreter::{default_env, Interpreter};
 use dlisp_core::parser::parse;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
@@ -10,6 +10,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let env = default_env();
+    let mut interpreter = Interpreter::new();
 
     println!("Welcome to dlisp v0.1.0");
     loop {
@@ -23,7 +24,7 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 match parse(&line) {
-                    Ok(ast) => match eval(ast, &mut env.clone()) {
+                    Ok(ast) => match interpreter.eval(ast, &mut env.clone()) {
                         Ok(val) => println!("=> {}", val),
                         Err(e) => println!("Error: {}", e),
                     },
