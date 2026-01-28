@@ -31,3 +31,30 @@ pub fn add(args: &[Value]) -> Result<Value, String> {
         Ok(Value::Integer(i_sum))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_integers() {
+        let args = vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)];
+        let result = add(&args);
+        assert_eq!(result, Ok(Value::Integer(6)));
+    }
+
+    #[test]
+    fn test_add_floats() {
+        let args = vec![Value::Float(1.5), Value::Float(2.5)];
+        let result = add(&args);
+        assert_eq!(result, Ok(Value::Float(4.0)));
+    }
+
+    #[test]
+    fn test_add_mixed() {
+        let args = vec![Value::Integer(1), Value::Float(2.5)];
+        let result = add(&args);
+        // 1 + 2.5 = 3.5
+        assert_eq!(result, Ok(Value::Float(3.5)));
+    }
+}

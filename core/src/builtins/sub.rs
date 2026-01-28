@@ -59,3 +59,39 @@ pub fn sub(args: &[Value]) -> Result<Value, String> {
         Ok(Value::Integer(i_acc))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sub_integers() {
+        // (- 10 3 2) => 5
+        let args = vec![Value::Integer(10), Value::Integer(3), Value::Integer(2)];
+        let result = sub(&args);
+        assert_eq!(result, Ok(Value::Integer(5)));
+    }
+
+    #[test]
+    fn test_sub_floats() {
+        // (- 10.5 2.5) => 8.0
+        let args = vec![Value::Float(10.5), Value::Float(2.5)];
+        let result = sub(&args);
+        assert_eq!(result, Ok(Value::Float(8.0)));
+    }
+
+    #[test]
+    fn test_sub_negation() {
+        // (- 5) => -5
+        let args = vec![Value::Integer(5)];
+        let result = sub(&args);
+        assert_eq!(result, Ok(Value::Integer(-5)));
+    }
+
+    #[test]
+    fn test_sub_empty_error() {
+        let args = vec![];
+        let result = sub(&args);
+        assert!(result.is_err());
+    }
+}
