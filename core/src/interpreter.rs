@@ -60,6 +60,7 @@ impl Interpreter {
         match name {
             "defun" => crate::forms::defun::defun(&mut self.jit, args, env),
             "spawn" => crate::forms::spawn::spawn(self, args, env).await,
+            "let" => crate::forms::let_expr::let_form(self, args, env).await,
             _ => Ok(None),
         }
     }
@@ -304,5 +305,63 @@ mod tests {
                 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             })
             .await;
+    }
+
+    #[tokio::test]
+    async fn test_eval_let() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (let ((x 10) (y 20)) (+ x y))
+        let let_expr = Value::List(vec![
+            Value::Symbol("let".to_string()),
+            Value::List(vec![
+                Value::List(vec![Value::Symbol("x".to_string()), Value::Integer(10)]),
+                Value::List(vec![Value::Symbol("y".to_string()), Value::Integer(20)]),
+            ]),
+            Value::List(vec![
+                Value::Symbol("+".to_string()),
+                Value::Symbol("x".to_string()),
+                Value::Symbol("y".to_string()),
+            ]),
+        ]);
+        let res = interpreter.eval(let_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(30));
+    }
+
+    #[tokio::test]
+    async fn test_eval_let_parallel_binding() {
+        let env = default_env();
+        // Define x = 100 in outer scope
+        env.borrow_mut().set("x".to_string(), Value::Integer(100));
+
+        let mut interpreter = Interpreter::new();
+        // (let ((x 1) (y x)) y)
+        // If sequential, y would be 1. If parallel, y should be 100.
+        let let_expr = Value::List(vec![
+            Value::Symbol("let".to_string()),
+            Value::List(vec![
+                Value::List(vec![Value::Symbol("x".to_string()), Value::Integer(1)]),
+                Value::List(vec![
+                    Value::Symbol("y".to_string()),
+                    Value::Symbol("x".to_string()),
+                ]),
+            ]),
+            Value::Symbol("y".to_string()),
+        ]);
+        let res = interpreter.eval(let_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(100));
+    }
+    #[tokio::test]
+    async fn test_eval_let_empty_bindings() {
+        let env = default_env();
+        let mut interpreter = Interpreter::new();
+        // (let () 1)
+        let let_expr = Value::List(vec![
+            Value::Symbol("let".to_string()),
+            Value::List(vec![]),
+            Value::Integer(1),
+        ]);
+        let res = interpreter.eval(let_expr, &mut env.clone()).await;
+        assert_eq!(res.unwrap(), Value::Integer(1));
     }
 }
