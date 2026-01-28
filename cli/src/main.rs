@@ -6,9 +6,9 @@ use std::fs;
 use std::path::PathBuf;
 
 fn get_history_path() -> Option<PathBuf> {
-    let mut path = dirs::state_dir().or_else(|| dirs::home_dir())?;
+    let mut path = dirs::state_dir().or_else(dirs::home_dir)?;
     path.push("dlisp");
-    if let Err(_) = fs::create_dir_all(&path) {
+    if fs::create_dir_all(&path).is_err() {
         return None;
     }
     path.push("history.txt");
@@ -90,7 +90,7 @@ mod tests {
         }
 
         let history_path = get_history_path();
-        
+
         // Cleanup env var just in case (though test isolation makes this tricky in parallel)
         unsafe {
             env::remove_var("XDG_STATE_HOME");
@@ -98,7 +98,7 @@ mod tests {
 
         assert!(history_path.is_some());
         let path = history_path.unwrap();
-        
+
         // expected path: $XDG_STATE_HOME/dlisp/history.txt
         let expected = temp_path.join("dlisp").join("history.txt");
         assert_eq!(path, expected);

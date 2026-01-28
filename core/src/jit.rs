@@ -110,8 +110,7 @@ impl JIT {
         let mut variables = HashMap::new();
         for (i, arg_name) in args.iter().enumerate() {
             let val = builder.block_params(entry_block)[i];
-            let var = Variable::new(i);
-            builder.declare_var(var, int);
+            let var = builder.declare_var(int);
             builder.def_var(var, val);
             variables.insert(arg_name.clone(), var);
         }
