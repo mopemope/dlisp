@@ -93,18 +93,18 @@ impl Interpreter {
                     if all_ints {
                         match args.len() {
                             0 => {
-                                let func_ptr: extern "C" fn() -> i64 =
+                                let func_ptr: extern "C" fn(*mut std::ffi::c_void) -> i64 =
                                     unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                return Ok(Value::Integer(func_ptr()));
+                                return Ok(Value::Integer(func_ptr(std::ptr::null_mut())));
                             }
                             1 => {
                                 let a1 = match args[0] {
                                     Value::Integer(i) => i,
                                     _ => 0,
                                 };
-                                let func_ptr: extern "C" fn(i64) -> i64 =
+                                let func_ptr: extern "C" fn(*mut std::ffi::c_void, i64) -> i64 =
                                     unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                return Ok(Value::Integer(func_ptr(a1)));
+                                return Ok(Value::Integer(func_ptr(std::ptr::null_mut(), a1)));
                             }
                             2 => {
                                 let a1 = match args[0] {
@@ -115,9 +115,13 @@ impl Interpreter {
                                     Value::Integer(i) => i,
                                     _ => 0,
                                 };
-                                let func_ptr: extern "C" fn(i64, i64) -> i64 =
-                                    unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                return Ok(Value::Integer(func_ptr(a1, a2)));
+                                let func_ptr: extern "C" fn(
+                                    *mut std::ffi::c_void,
+                                    i64,
+                                    i64,
+                                )
+                                    -> i64 = unsafe { std::mem::transmute(code_ptr as *const u8) };
+                                return Ok(Value::Integer(func_ptr(std::ptr::null_mut(), a1, a2)));
                             }
                             3 => {
                                 let a1 = match args[0] {
@@ -132,9 +136,19 @@ impl Interpreter {
                                     Value::Integer(i) => i,
                                     _ => 0,
                                 };
-                                let func_ptr: extern "C" fn(i64, i64, i64) -> i64 =
-                                    unsafe { std::mem::transmute(code_ptr as *const u8) };
-                                return Ok(Value::Integer(func_ptr(a1, a2, a3)));
+                                let func_ptr: extern "C" fn(
+                                    *mut std::ffi::c_void,
+                                    i64,
+                                    i64,
+                                    i64,
+                                )
+                                    -> i64 = unsafe { std::mem::transmute(code_ptr as *const u8) };
+                                return Ok(Value::Integer(func_ptr(
+                                    std::ptr::null_mut(),
+                                    a1,
+                                    a2,
+                                    a3,
+                                )));
                             }
                             _ => {}
                         }

@@ -106,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
                                 }
 
                                 let status = Command::new("cc")
+                                    .arg("-no-pie")
                                     .arg(&object_file)
                                     .arg(&lib_path)
                                     .arg("-lpthread")

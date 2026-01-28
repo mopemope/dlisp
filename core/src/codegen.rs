@@ -20,6 +20,7 @@ pub struct CodeGen {
     pub data_ctx: DataDescription,
 
     pub builtins_initialized: bool,
+    pub global_signatures: HashMap<String, Signature>,
 }
 
 pub struct Builtins {
@@ -27,6 +28,7 @@ pub struct Builtins {
     pub printf_fmt: IrValue,
     pub dlisp_spawn: FuncId,
     pub dlisp_sleep: FuncId,
+    pub malloc: FuncId,
 }
 
 impl Default for CodeGen {
@@ -36,6 +38,7 @@ impl Default for CodeGen {
             ctx: codegen::Context::new(),
             data_ctx: DataDescription::new(),
             builtins_initialized: false,
+            global_signatures: HashMap::new(),
         }
     }
 }
@@ -62,12 +65,10 @@ impl CodeGen {
         args: &[String],
         body: &[Value],
     ) -> Result<cranelift_module::FuncId, String> {
-        // Reset context for reusable
         self.module_clear_context(module);
 
         let int = module.target_config().pointer_type();
 
-        // Setup printf format string
         self.data_ctx.define(b"%ld\n\0".to_vec().into_boxed_slice());
         let fmt_id = module
             .declare_data("printf_fmt", Linkage::Local, true, false)
@@ -81,53 +82,67 @@ impl CodeGen {
         }
         self.data_ctx.clear();
 
-        // Setup printf signature
         let mut sig = module.make_signature();
-        sig.params.push(AbiParam::new(int)); // format string
-        sig.params.push(AbiParam::new(int)); // value
+        sig.params.push(AbiParam::new(int));
+        sig.params.push(AbiParam::new(int));
         sig.returns.push(AbiParam::new(types::I32));
         let printf_id = module
             .declare_function("printf", Linkage::Import, &sig)
             .map_err(|e| e.to_string())?;
 
-        // Setup dlisp_spawn signature: void dlisp_spawn(void (*)(void))
+        // dlisp_spawn(Closure*)
         let mut spawn_sig = module.make_signature();
-        spawn_sig.params.push(AbiParam::new(int)); // func_ptr
+        spawn_sig.params.push(AbiParam::new(int));
         let spawn_id = module
             .declare_function("dlisp_spawn", Linkage::Import, &spawn_sig)
             .map_err(|e| e.to_string())?;
 
-        // Setup dlisp_sleep signature: void dlisp_sleep(u64)
         let mut sleep_sig = module.make_signature();
-        sleep_sig.params.push(AbiParam::new(types::I64)); // ms
+        sleep_sig.params.push(AbiParam::new(types::I64));
         let sleep_id = module
             .declare_function("dlisp_sleep", Linkage::Import, &sleep_sig)
             .map_err(|e| e.to_string())?;
 
-        // Setup function signature
+        // malloc(size_t) -> void*
+        let mut malloc_sig = module.make_signature();
+        malloc_sig.params.push(AbiParam::new(int));
+        malloc_sig.returns.push(AbiParam::new(int));
+        let malloc_id = module
+            .declare_function("malloc", Linkage::Import, &malloc_sig)
+            .map_err(|e| e.to_string())?;
+
+        // Function Signature: (env, args...)
+        self.ctx.func.signature.params.push(AbiParam::new(int)); // env
         for _ in args {
             self.ctx.func.signature.params.push(AbiParam::new(int));
         }
         self.ctx.func.signature.returns.push(AbiParam::new(int));
 
+        // Store global signature early to avoid borrow check issues
+        let signature = self.ctx.func.signature.clone();
+        self.global_signatures.insert(name.to_string(), signature);
+
         let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
         let entry_block = builder.create_block();
         builder.append_block_params_for_function_params(entry_block);
         builder.switch_to_block(entry_block);
+        builder.seal_block(entry_block);
 
-        // Prep builtins for this function
         let printf_fmt_val = module.declare_data_in_func(fmt_id, builder.func);
         let builtins = Builtins {
             printf: printf_id,
             printf_fmt: builder.ins().global_value(int, printf_fmt_val),
             dlisp_spawn: spawn_id,
             dlisp_sleep: sleep_id,
+            malloc: malloc_id,
         };
 
-        // Map arg names to variables
+        // Param 0 is env, Param 1..N are args
+        let env_param = builder.block_params(entry_block)[0];
+
         let mut initial_scope = HashMap::new();
         for (i, arg_name) in args.iter().enumerate() {
-            let val = builder.block_params(entry_block)[i];
+            let val = builder.block_params(entry_block)[i + 1]; // +1 for env
             let var = builder.declare_var(int);
             builder.def_var(var, val);
             initial_scope.insert(arg_name.clone(), var);
@@ -141,7 +156,10 @@ impl CodeGen {
                 module,
                 builtins: &builtins,
                 scopes: vec![initial_scope],
+                captured_vars: HashMap::new(),
+                env_param: Some(env_param),
                 ptr_type: int,
+                global_signatures: &self.global_signatures,
             };
 
             for expr in body {
@@ -150,9 +168,14 @@ impl CodeGen {
         }
 
         builder.ins().return_(&[result_val]);
-
         builder.seal_all_blocks();
         builder.finalize();
+
+        println!(
+            "Declaring function: {} with {} params",
+            name,
+            self.ctx.func.signature.params.len()
+        );
 
         let id = module
             .declare_function(name, Linkage::Export, &self.ctx.func.signature)
@@ -165,7 +188,6 @@ impl CodeGen {
         Ok(id)
     }
 
-    // Generate the main entry point shim that calls dlisp_main
     pub fn compile_entry_point<M: Module>(
         &mut self,
         module: &mut M,
@@ -175,54 +197,36 @@ impl CodeGen {
 
         let int = module.target_config().pointer_type();
 
-        // Declare dlisp_main: void dlisp_main(void (*)(void))
         let mut sig = module.make_signature();
         sig.params.push(AbiParam::new(int));
         let dlisp_main_id = module
             .declare_function("dlisp_main", Linkage::Import, &sig)
             .map_err(|e| e.to_string())?;
 
-        // Declare user main (to get its address)
-        // User main signature: void -> void (or whatever we defined, currently generated as void -> void usually? or void -> int?)
-        // In module_compile_func we defined sig as params: args, returns: int.
-        // If main has 0 args, it is void -> int.
-        // dlisp_main expects void -> void?
-        // Rust fn() is technically void -> void in C ABI terms if not specified?
-        // Wait, dlisp_main signature in Rust: `fn(extern "C" fn())`.
-        // User main generated by us: extern "C" fn user_main() -> i64.
-        // It returns a value.
-        // We might need to wrap it or cast it.
-        // Or just change dlisp_main to take `extern "C" fn() -> i64`?
-        // Let's assume generic fn ptr for now or cast.
-        // In Cranelift, a function pointer is just an integer/address.
-
+        // User main: (env) -> int
         let mut user_sig = module.make_signature();
-        user_sig.returns.push(AbiParam::new(int)); // It returns a value
+        user_sig.params.push(AbiParam::new(int)); // env
+        user_sig.returns.push(AbiParam::new(int));
         let user_main_id = module
-            .declare_function(user_main_name, Linkage::Export, &user_sig) // It was exported
+            .declare_function(user_main_name, Linkage::Export, &user_sig)
             .map_err(|e| e.to_string())?;
 
-        // Define main
-        // int main() { ... }
         self.ctx
             .func
             .signature
             .returns
-            .push(AbiParam::new(types::I32)); // standard C main returns int
+            .push(AbiParam::new(types::I32));
 
         let mut builder = FunctionBuilder::new(&mut self.ctx.func, &mut self.builder_context);
         let entry = builder.create_block();
         builder.switch_to_block(entry);
 
-        // Get address of user main
         let local_user_main = module.declare_func_in_func(user_main_id, builder.func);
         let user_main_addr = builder.ins().func_addr(int, local_user_main);
 
-        // Call dlisp_main(user_main_addr)
         let local_dlisp_main = module.declare_func_in_func(dlisp_main_id, builder.func);
         builder.ins().call(local_dlisp_main, &[user_main_addr]);
 
-        // Return 0
         let ret_val = builder.ins().iconst(types::I32, 0);
         builder.ins().return_(&[ret_val]);
 
@@ -240,9 +244,103 @@ impl CodeGen {
         Ok(())
     }
 
-    // Clear context helper needs access to module
     fn module_clear_context<M: Module>(&mut self, module: &mut M) {
         module.clear_context(&mut self.ctx);
+    }
+
+    fn analyze_free_variables(body: &[Value], args: &[String]) -> Vec<String> {
+        let mut free_vars = Vec::new();
+        let mut bound_vars = std::collections::HashSet::new();
+        for arg in args {
+            bound_vars.insert(arg.clone());
+        }
+
+        for expr in body {
+            Self::find_free_vars(expr, &mut bound_vars, &mut free_vars);
+        }
+
+        // Dedup
+        free_vars.sort();
+        free_vars.dedup();
+        free_vars
+    }
+
+    fn find_free_vars(
+        expr: &Value,
+        bound: &mut std::collections::HashSet<String>,
+        free: &mut Vec<String>,
+    ) {
+        match expr {
+            Value::Symbol(s) => {
+                if !bound.contains(s) {
+                    // It might be a global function or a free variable.
+                    // For now we assume everything potentially valid is captured?
+                    // But global functions shouldn't be captured.
+                    // We can't easily distinguish without global context.
+                    // However, typically in Lisp/Scheme, if it's not bound locally, it's free.
+                    // If it turns out to be global at runtime, capturing it is harmless (just copying a pointer/value presumably?)
+                    // Or we check standard builtins?
+                    let builtins = ["+", "-", "*", "print", "sleep", "spawn", "let", "lambda"];
+                    if !builtins.contains(&s.as_str()) {
+                        free.push(s.clone());
+                    }
+                }
+            }
+            Value::List(list) => {
+                if list.is_empty() {
+                    return;
+                }
+                match &list[0] {
+                    Value::Symbol(op) if op == "let" => {
+                        // (let ((v e) ...) body)
+                        if list.len() >= 3 {
+                            // bindings
+                            let mut new_bound = bound.clone();
+                            if let Value::List(bindings) = &list[1] {
+                                for b in bindings {
+                                    if let Value::List(pair) = b {
+                                        if pair.len() == 2 {
+                                            // RHS is evaluated in current scope
+                                            Self::find_free_vars(&pair[1], bound, free);
+                                            // LHS binds in body
+                                            if let Value::Symbol(name) = &pair[0] {
+                                                new_bound.insert(name.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            // body
+                            for sub in &list[2..] {
+                                Self::find_free_vars(sub, &mut new_bound, free);
+                            }
+                        }
+                    }
+                    Value::Symbol(op) if op == "lambda" => {
+                        // (lambda (args) body)
+                        if list.len() >= 3 {
+                            let mut new_bound = bound.clone();
+                            if let Value::List(args) = &list[1] {
+                                for arg in args {
+                                    if let Value::Symbol(name) = arg {
+                                        new_bound.insert(name.clone());
+                                    }
+                                }
+                            }
+                            for sub in &list[2..] {
+                                Self::find_free_vars(sub, &mut new_bound, free);
+                            }
+                        }
+                    }
+                    _ => {
+                        for sub in list {
+                            Self::find_free_vars(sub, bound, free);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -251,7 +349,11 @@ struct FunctionTranslationContext<'a, 'func, M: Module> {
     module: &'a mut M,
     builtins: &'a Builtins,
     scopes: Vec<HashMap<String, Variable>>,
+    // Map captured var name to offset (bytes) in env struct
+    captured_vars: HashMap<String, u32>,
+    env_param: Option<IrValue>,
     ptr_type: Type,
+    global_signatures: &'a HashMap<String, Signature>,
 }
 
 impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
@@ -265,65 +367,104 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
     }
 
     fn resolve_variable(&mut self, name: &str) -> Result<IrValue, String> {
+        // 1. Local Scopes (Stack)
         for scope in self.scopes.iter().rev() {
             if let Some(var) = scope.get(name) {
                 return Ok(self.builder.use_var(*var));
             }
         }
 
-        // If not found in scopes, try to find it as a global function (e.g. for spawn)
-        // We assume 0 args for now or generic void signature just to get the address?
-        // Wait, to get address we usually need to know it exists.
-        // We can speculatively declare it with a generic signature to get its ID/address.
-        // But functions in DLisp are dynamic.
-        // If we are referring to a top-level defined function, we can declare it.
-        // Let's assume it returns pointer-sized int (our standard) and takes unknown args?
-        // Cranelift requires exact signature for calls, but for address?
-        // We can use the standard (int) -> int signature we use everywhere.
+        // 2. Captured Variables (Env)
+        if let Some(&offset) = self.captured_vars.get(name) {
+            if let Some(env) = self.env_param {
+                return Ok(self.builder.ins().load(
+                    self.ptr_type,
+                    MemFlags::new(),
+                    env,
+                    offset as i32,
+                ));
+            }
+        }
 
-        let mut sig = self.module.make_signature();
-        // We don't know the arity here easily without looking up.
-        // But since we just want the address, maybe signature doesn't matter for `func_addr`?
-        // It does matter for declaring it.
-        // For now, let's assume it's a value referencing a function we compiled or will compile.
-        // NOTE: In a real system we'd look up the function arity map.
-        // Here we just use a dummy signature (void -> void or int -> int) to get a handle.
-        // Ideally we shouldn't declare if it doesn't exist.
+        // 3. Global Function (Allocation of Closure)
+        // We assume it's a global function if not found locally.
+        // We create a Closure { func_ptr, NULL } on the heap.
+        // This is necessary because "spawn" expects a Closure*.
+        // NOTE: This leaks memory if used repeatedly.
 
-        // Strategy: Declaration with speculatively 0-arity signature.
-        sig.returns.push(AbiParam::new(self.ptr_type));
+        // Declare function (speculative signature)
+        // Global functions now take (env, args...), but we only need address here.
+        // We use (int) -> int signature for address.
+        let sig = if let Some(known_sig) = self.global_signatures.get(name) {
+            known_sig.clone()
+        } else {
+            let mut s = self.module.make_signature();
+            s.params.push(AbiParam::new(self.ptr_type)); // env
+            s.returns.push(AbiParam::new(self.ptr_type));
+            s
+        };
         let func_id = self
             .module
             .declare_function(name, Linkage::Export, &sig)
             .map_err(|e| e.to_string())?;
         let local_func = self.module.declare_func_in_func(func_id, self.builder.func);
         let func_addr = self.builder.ins().func_addr(self.ptr_type, local_func);
-        return Ok(func_addr);
 
-        // Warning: This effectively means ALL unknown symbols are treated as global function addresses.
-        // This defeats variable shadowing checks kind of, but only if they are missing.
-        // It suppresses "Undefined variable".
-        // Ideally we should verify if "name" is actually a known function.
-        // But the compiler struct (AOTCompiler) knows that, CodeGen doesn't have the list.
-        // For the MVP of spawn support, this enables getting the pointer.
+        // Allocate Closure
+        let closure_size = 16;
+        let size_val = self.builder.ins().iconst(self.ptr_type, closure_size);
+        let local_malloc = self
+            .module
+            .declare_func_in_func(self.builtins.malloc, self.builder.func);
+        let call = self.builder.ins().call(local_malloc, &[size_val]);
+        let closure_ptr = self.builder.inst_results(call)[0];
+
+        // Store func ptr at offset 0
+        self.builder
+            .ins()
+            .store(MemFlags::new(), func_addr, closure_ptr, 0);
+        // Store NULL env at offset 8
+        let null_val = self.builder.ins().iconst(self.ptr_type, 0);
+        self.builder
+            .ins()
+            .store(MemFlags::new(), null_val, closure_ptr, 8);
+
+        return Ok(closure_ptr);
+    }
+
+    fn is_variable_bound(&self, name: &str) -> bool {
+        // Check local scopes
+        for scope in self.scopes.iter().rev() {
+            if scope.contains_key(name) {
+                return true;
+            }
+        }
+        // Check captured vars (only if environment is present)
+        if self.env_param.is_some() && self.captured_vars.contains_key(name) {
+            return true;
+        }
+        false
     }
 
     fn compile_list(&mut self, list: &[Value]) -> Result<IrValue, String> {
         if list.is_empty() {
             return Ok(self.builder.ins().iconst(self.ptr_type, 0)); // nil?
         }
-        if let Value::Symbol(ref op) = list[0] {
-            // Check if 'op' is a variable (parameter) -> Indirect call
-            if self.resolve_variable(op).is_ok() {
-                return self.compile_indirect_call(op, list);
-            }
 
+        if let Value::Symbol(ref op) = list[0] {
             match op.as_str() {
                 "let" => self.compile_let(list),
                 "lambda" => self.compile_lambda(list),
                 "spawn" => self.compile_spawn(list),
                 "print" | "+" | "-" | "*" | "sleep" => self.compile_builtin(op, list),
-                _ => self.compile_function_call(op, list),
+                _ => {
+                    // Check if 'op' is a variable (parameter) -> Indirect call
+                    if self.is_variable_bound(op) {
+                        self.compile_indirect_call(op, list)
+                    } else {
+                        self.compile_function_call(op, list)
+                    }
+                }
             }
         } else {
             Err("JIT function calls not supported yet".to_string())
@@ -384,7 +525,6 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
     }
 
     fn compile_lambda(&mut self, list: &[Value]) -> Result<IrValue, String> {
-        // (lambda (args) body...)
         if list.len() < 3 {
             return Err("lambda requires args and body".to_string());
         }
@@ -405,16 +545,44 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
             }
         }
 
-        // Generate unique name
-        // Generate unique name
-        let lambda_name = format!("lambda_{}", LAMBDA_COUNTER.fetch_add(1, Ordering::Relaxed));
+        // 1. Analyze Free Variables
+        let free_vars = CodeGen::analyze_free_variables(body, &arg_names);
 
-        // Setup new context for lambda compilation
+        // 2. Allocate Environment
+        let ptr_size = 8;
+        let env_size = (free_vars.len() * ptr_size) as i64;
+
+        // Malloc env if size > 0
+        let env_ptr_val = if env_size > 0 {
+            let size_val = self.builder.ins().iconst(self.ptr_type, env_size);
+            let local_malloc = self
+                .module
+                .declare_func_in_func(self.builtins.malloc, self.builder.func);
+            let call = self.builder.ins().call(local_malloc, &[size_val]);
+            self.builder.inst_results(call)[0]
+        } else {
+            self.builder.ins().iconst(self.ptr_type, 0) // NULL
+        };
+
+        // 3. Populate Environment
+        let mut captured_offsets = HashMap::new();
+        for (i, var_name) in free_vars.iter().enumerate() {
+            let val = self.resolve_variable(var_name)?;
+            let offset = (i * ptr_size) as i32;
+            self.builder
+                .ins()
+                .store(MemFlags::new(), val, env_ptr_val, offset);
+            captured_offsets.insert(var_name.clone(), offset as u32);
+        }
+
+        // 4. Compile Lambda Function
+        let lambda_name = format!("lambda_{}", LAMBDA_COUNTER.fetch_add(1, Ordering::Relaxed));
         let mut ctx = codegen::Context::new();
         let mut builder_context = FunctionBuilderContext::new();
         let int = self.ptr_type;
 
-        // Signature
+        // Signature: (env, args...)
+        ctx.func.signature.params.push(AbiParam::new(int));
         for _ in &arg_names {
             ctx.func.signature.params.push(AbiParam::new(int));
         }
@@ -426,23 +594,24 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
             builder.append_block_params_for_function_params(entry_block);
             builder.switch_to_block(entry_block);
 
-            // Import builtins into this new function
+            // Import builtins
             let fmt_id = self
                 .module
                 .declare_data("printf_fmt", Linkage::Local, true, false)
                 .map_err(|e| e.to_string())?;
             let printf_fmt_val = self.module.declare_data_in_func(fmt_id, builder.func);
-
             let inner_builtins = Builtins {
                 printf: self.builtins.printf,
                 printf_fmt: builder.ins().global_value(int, printf_fmt_val),
                 dlisp_spawn: self.builtins.dlisp_spawn,
                 dlisp_sleep: self.builtins.dlisp_sleep,
+                malloc: self.builtins.malloc,
             };
 
+            let env_param = builder.block_params(entry_block)[0];
             let mut initial_scope = HashMap::new();
             for (i, arg_name) in arg_names.iter().enumerate() {
-                let val = builder.block_params(entry_block)[i];
+                let val = builder.block_params(entry_block)[i + 1];
                 let var = builder.declare_var(int);
                 builder.def_var(var, val);
                 initial_scope.insert(arg_name.clone(), var);
@@ -456,7 +625,10 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     module: self.module,
                     builtins: &inner_builtins,
                     scopes: vec![initial_scope],
+                    captured_vars: captured_offsets,
+                    env_param: Some(env_param),
                     ptr_type: int,
+                    global_signatures: self.global_signatures,
                 };
 
                 for expr in body {
@@ -469,21 +641,34 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
             builder.finalize();
         }
 
-        // Declare and define
         let id = self
             .module
             .declare_function(&lambda_name, Linkage::Export, &ctx.func.signature)
             .map_err(|e| e.to_string())?;
-
         self.module
             .define_function(id, &mut ctx)
             .map_err(|e| e.to_string())?;
 
-        // Get function pointer in CURRENT function
         let local_func = self.module.declare_func_in_func(id, self.builder.func);
         let func_addr = self.builder.ins().func_addr(self.ptr_type, local_func);
 
-        Ok(func_addr)
+        // 5. Create Closure Struct { func_ptr, env_ptr }
+        let closure_size = 16;
+        let size_val = self.builder.ins().iconst(self.ptr_type, closure_size);
+        let local_malloc = self
+            .module
+            .declare_func_in_func(self.builtins.malloc, self.builder.func);
+        let call = self.builder.ins().call(local_malloc, &[size_val]);
+        let closure_ptr = self.builder.inst_results(call)[0];
+
+        self.builder
+            .ins()
+            .store(MemFlags::new(), func_addr, closure_ptr, 0);
+        self.builder
+            .ins()
+            .store(MemFlags::new(), env_ptr_val, closure_ptr, 8);
+
+        Ok(closure_ptr)
     }
 
     fn compile_indirect_call(
@@ -491,9 +676,17 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         func_var_name: &str,
         list: &[Value],
     ) -> Result<IrValue, String> {
-        let func_ptr = self.resolve_variable(func_var_name)?;
+        let closure_ptr = self.resolve_variable(func_var_name)?;
 
         let mut args = Vec::new();
+        // Indirect Call: args are (env, args...)
+        // We get env from closure_ptr->env (offset 8)
+        let env_ptr = self
+            .builder
+            .ins()
+            .load(self.ptr_type, MemFlags::new(), closure_ptr, 8);
+        args.push(env_ptr);
+
         for arg in &list[1..] {
             args.push(self.compile_expr(arg)?);
         }
@@ -505,6 +698,12 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         sig.returns.push(AbiParam::new(self.ptr_type));
 
         let sig_ref = self.builder.import_signature(sig);
+
+        // Load func ptr from closure_ptr->func (offset 0)
+        let func_ptr = self
+            .builder
+            .ins()
+            .load(self.ptr_type, MemFlags::new(), closure_ptr, 0);
 
         let call = self.builder.ins().call_indirect(sig_ref, func_ptr, &args);
         let result = self.builder.inst_results(call)[0];
@@ -580,6 +779,9 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
 
     fn compile_function_call(&mut self, op: &str, list: &[Value]) -> Result<IrValue, String> {
         let mut args = Vec::new();
+        // Direct call: pass NULL env
+        args.push(self.builder.ins().iconst(self.ptr_type, 0));
+
         for arg in &list[1..] {
             args.push(self.compile_expr(arg)?);
         }
