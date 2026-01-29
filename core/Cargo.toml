@@ -21,21 +21,14 @@ cranelift-codegen = { workspace = true }
 cranelift-object = { workspace = true }
 
 # REPL
-rustyline = { workspace = true }
+
 
 # Logging/Tracing
 tracing = { workspace = true }
-tracing-subscriber = "0.3"
-
-[dependencies.tokio]
-version = "1"
-features = ["full"]
-
-[dependencies.futures]
-version = "0.3"
-
-[dependencies.async-recursion]
-version = "1"
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+async-recursion = { workspace = true }
 
 [dev-dependencies]
 dlisp_runtime = { path = "../runtime" }

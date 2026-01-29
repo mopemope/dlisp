@@ -1,21 +1,22 @@
 use crate::ast::Value;
 use chumsky::prelude::*;
 
-pub fn parser() -> impl Parser<char, Vec<Value>, Error = Simple<char>> {
-    let float = text::digits(10)
+pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Simple<'src, char>>> {
+    let float = text::int(10)
         .then(just('.'))
-        .then(text::digits(10))
+        .then(text::int(10))
         .map(|((int_part, _dot), frac_part)| format!("{}.{}", int_part, frac_part))
         .map(|s: String| Value::Float(s.parse().unwrap()));
 
-    let int = text::int(10).map(|s: String| Value::Integer(s.parse().unwrap()));
+    let int = text::int(10).map(|s: &str| Value::Integer(s.parse().unwrap()));
 
     let boolean = just("true")
         .to(Value::Bool(true))
         .or(just("false").to(Value::Bool(false)));
 
     // Lisp symbols: letters, digits, and extended characters
-    let symbol_char = filter(|c: &char| c.is_alphanumeric() || "+-*/!@$%^&_=<>?".contains(*c));
+    let symbol_char =
+        any().filter(|c: &char| c.is_alphanumeric() || "+-*/!@$%^&_=<>?".contains(*c));
 
     let symbol = symbol_char
         .repeated()
@@ -24,9 +25,8 @@ pub fn parser() -> impl Parser<char, Vec<Value>, Error = Simple<char>> {
         .map(Value::Symbol);
 
     let string = just('"')
-        .ignore_then(filter(|c| *c != '"').repeated())
+        .ignore_then(any().filter(|c| *c != '"').repeated().collect::<String>())
         .then_ignore(just('"'))
-        .collect::<String>()
         .map(Value::String);
 
     let nil = just("nil").to(Value::Nil);
@@ -36,6 +36,7 @@ pub fn parser() -> impl Parser<char, Vec<Value>, Error = Simple<char>> {
             .clone()
             .padded()
             .repeated()
+            .collect()
             .delimited_by(just('('), just(')'))
             .map(Value::List);
 
@@ -52,12 +53,13 @@ pub fn parser() -> impl Parser<char, Vec<Value>, Error = Simple<char>> {
         ))
     })
     .padded()
-    .repeated() // Allow multiple top-level expressions
+    .repeated()
+    .collect()
     .then_ignore(end())
 }
 
-pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Simple<char>>> {
-    parser().parse(src)
+pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Simple<'_, char>>> {
+    parser().parse(src).into_result()
 }
 
 #[cfg(test)]
