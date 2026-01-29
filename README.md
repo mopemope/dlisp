@@ -49,26 +49,26 @@ cargo build --workspace
 ### Run REPL
 Start the interactive Read-Eval-Print Loop:
 ```bash
-cargo run --bin cli
+cargo run --bin dlisp
 ```
 
 ### Run Script
 Execute a Lisp script file:
 ```bash
-cargo run --bin cli -- path/to/script.lisp
+cargo run --bin dlisp -- path/to/script.lisp
 ```
 
 ### Compile to Native Executable
 Compile a Lisp script into a standalone native executable:
 ```bash
-cargo run --bin cli compile path/to/script.lisp -o my_app
+cargo run --bin dlisp compile path/to/script.lisp -o my_app
 ./my_app
 ```
 
 ## Command-line Options
 
 ```text
-doge-lisp [FILE] [COMMAND]
+dlisp [FILE] [COMMAND]
 
 Arguments:
   [FILE]  Optional script file to execute if no subcommand is given
@@ -94,7 +94,7 @@ Compile options:
 
 You can control logging levels via the `RUST_LOG` environment variable:
 ```bash
-RUST_LOG=debug cargo run --bin cli
+RUST_LOG=debug cargo run --bin dlisp
 ```
 
 ## Quick Examples

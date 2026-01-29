@@ -14,7 +14,7 @@ members = [
     "stdlib",
     "runtime"
 ]
-default-members = ["cli"]
+# default-members = ["dlisp"]
 
 [workspace.dependencies]
 anyhow = "1.0"
