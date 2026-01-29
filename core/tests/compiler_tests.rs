@@ -176,12 +176,12 @@ async fn test_jit_mutual_recursion() {
     for val in vals {
         result = interpreter.eval(val, &mut env).await.unwrap();
     }
-    
+
     // 1 is truthy in our dummy logical context for now
     assert_eq!(result, Value::Integer(1));
-    
+
     let code_odd = "(is_odd 10)";
-     let vals_odd = parse(code_odd).unwrap();
+    let vals_odd = parse(code_odd).unwrap();
     let mut result_odd = Value::Nil;
     for val in vals_odd {
         result_odd = interpreter.eval(val, &mut env).await.unwrap();
