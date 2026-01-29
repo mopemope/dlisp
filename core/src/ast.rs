@@ -36,7 +36,7 @@ impl fmt::Display for Value {
             Value::Float(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Symbol(s) => write!(f, "{}", s),
-            Value::String(s) => write!(f, "\"{}\"", s), // Simple escaping for now
+            Value::String(s) => write!(f, "{}", s),
             Value::List(l) => {
                 write!(f, "(")?;
                 for (i, v) in l.iter().enumerate() {

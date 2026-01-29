@@ -9,6 +9,11 @@ use value::{DlispValue, ListData, ValueType};
 unsafe extern "C" {
     pub fn GC_init();
     pub fn GC_malloc(size: usize) -> *mut c_void;
+    pub fn GC_call_with_stack_base(
+        func: extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void,
+        arg: *mut c_void,
+    ) -> *mut c_void;
+    pub fn GC_allow_register_threads();
 }
 
 static GC_INIT_ONCE: std::sync::Once = std::sync::Once::new();
@@ -19,6 +24,7 @@ static GC_INIT_ONCE: std::sync::Once = std::sync::Once::new();
 pub extern "C" fn dlisp_gc_init() {
     GC_INIT_ONCE.call_once(|| unsafe {
         GC_init();
+        GC_allow_register_threads();
     });
 }
 
@@ -449,6 +455,27 @@ pub unsafe extern "C" fn dlisp_is_truthy(val: *mut DlispValue) -> i32 {
 
 // --- Main & Async ---
 
+// Wrapper callbacks for GC_call_with_stack_base
+
+extern "C" fn run_user_main_wrapper(_sb: *mut c_void, arg: *mut c_void) -> *mut c_void {
+    unsafe {
+        // arg is user_main_ptr cast to void*
+        // transmute back to fn
+        let user_main_ptr: extern "C" fn(*mut c_void) -> i64 = std::mem::transmute(arg);
+        user_main_ptr(std::ptr::null_mut());
+        std::ptr::null_mut()
+    }
+}
+
+extern "C" fn run_closure_wrapper(_sb: *mut c_void, arg: *mut c_void) -> *mut c_void {
+    unsafe {
+        let closure_ptr = arg as *mut Closure;
+        let closure = &*closure_ptr;
+        (closure.func)(closure.env);
+        std::ptr::null_mut()
+    }
+}
+
 /// # Safety
 /// This function is unsafe because it executes an arbitrary function pointer.
 /// The caller must ensure that `user_main_ptr` is a valid function pointer.
@@ -461,8 +488,8 @@ pub unsafe extern "C" fn dlisp_main(user_main_ptr: extern "C" fn(*mut c_void) ->
     rt.block_on(async {
         // Run the user's main function
         // Pass NULL as env
-        let handle = tokio::task::spawn_blocking(move || {
-            user_main_ptr(std::ptr::null_mut());
+        let handle = tokio::task::spawn_blocking(move || unsafe {
+            GC_call_with_stack_base(run_user_main_wrapper, user_main_ptr as *mut c_void);
         });
 
         handle.await.unwrap();
@@ -481,17 +508,24 @@ pub struct Closure {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_spawn(closure_ptr: *mut Closure) {
     // Safety: We assume closure_ptr is valid.
-    // We cast to usize to pass across thread boundary safely.
-    let ptr_val = closure_ptr as usize;
+    let closure = unsafe { &*closure_ptr };
+    let func = closure.func;
+    let env = closure.env;
+    let func_ptr_val = func as usize;
+    let env_ptr_val = env as usize;
 
     tokio::task::spawn_blocking(move || {
-        let closure_ptr = ptr_val as *mut Closure;
-        let closure = unsafe { &*closure_ptr };
-        let func = closure.func;
-        let env = closure.env;
+        let func: extern "C" fn(*mut c_void) -> i64 = unsafe { std::mem::transmute(func_ptr_val) };
+        let env = env_ptr_val as *mut c_void;
 
-        // Call it with env
-        func(env);
+        // Construct a temporary closure on stack to pass to wrapper
+        let local_closure = Closure { func, env };
+        let local_closure_ptr = &local_closure as *const _ as *mut c_void;
+
+        unsafe {
+            let res = GC_call_with_stack_base(run_closure_wrapper, local_closure_ptr);
+            if res.is_null() {}
+        }
     });
 }
 
