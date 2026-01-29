@@ -1,4 +1,4 @@
-# dlisp
+# doge-lisp
 
 A JIT-compiling Lisp interpreter written in Rust.
 
@@ -10,18 +10,18 @@ A JIT-compiling Lisp interpreter written in Rust.
 The project leverages the following key libraries:
 
 ### Core Code Generation & JIT
-- **[Cranelift](https://cranelift.dev)** (v0.128.1): Used for Just-In-Time compilation of Lisp code to native machine code.
+- **[Cranelift](https://cranelift.dev)** : Used for Just-In-Time compilation of Lisp code to native machine code.
   - `cranelift`: Core code generator.
   - `cranelift-jit`: JIT execution engine.
   - `cranelift-module`: Module management for JIT.
   - `cranelift-frontend`: IR construction.
 
 ### Parsing
-- **[Chumsky](https://github.com/zesterer/chumsky)** (v0.9): A parser combinator library used for parsing Lisp syntax.
+- **[Chumsky](https://github.com/zesterer/chumsky)** : A parser combinator library used for parsing Lisp syntax.
 
 ### CLI & Interaction
-- **[Rustyline](https://github.com/kkawakam/rustyline)** (v14.0): Provides a readline implementation for the REPL with history support.
-- **[Dirs](https://github.com/dirs-dev/dirs-rs)** (v5.0): Used to handle XDG-compliant path resolution for history and logs.
+- **[Rustyline](https://github.com/kkawakam/rustyline)** : Provides a readline implementation for the REPL with history support.
+- **[Dirs](https://github.com/dirs-dev/dirs-rs)** : Used to handle XDG-compliant path resolution for history and logs.
 
 ### Logging & Utilities
 - **[Tracing](https://github.com/tokio-rs/tracing)**: Framework for instrumenting Rust programs to collect structured, event-based diagnostic information.
@@ -29,7 +29,7 @@ The project leverages the following key libraries:
 
 ## System Requirements
 
-To build and run `dlisp`, you need the following dependencies installed on your system:
+To build and run `doge-lisp`, you need the following dependencies installed on your system:
 
 - **Rust**: Latest stable version (via rustup).
 - **Boehm GC**: `libgc-dev` (Debian/Ubuntu) or `bdwgc` (others).
@@ -68,7 +68,7 @@ cargo run --bin cli compile path/to/script.lisp -o my_app
 ## Command-line Options
 
 ```text
-dlisp [FILE] [COMMAND]
+doge-lisp [FILE] [COMMAND]
 
 Arguments:
   [FILE]  Optional script file to execute if no subcommand is given
