@@ -11,17 +11,10 @@ pub fn compile_spawn<M: Module>(
         return Err("spawn requires exactly one argument (function call)".to_string());
     }
 
-    // We need to wrap the body in a lambda: (lambda () body)
-    // list[1] is the body.
-    let body = list[1].clone();
-
-    // Construct (lambda () body)
-    let lambda_sym = Value::Symbol("lambda".to_string());
-    let args_list = Value::List(vec![]); // Empty args
-    let synthetic_lambda = vec![lambda_sym, args_list, body];
-
-    // Compile the lambda to get a closure_ptr
-    let closure_ptr = crate::codegen::forms::lambda::compile_lambda(ctx, &synthetic_lambda)?;
+    // Compile the argument to get a closure_ptr (or function logic)
+    // Interpreter expects a function and runs it.
+    // So we evaluate the argument, which should yield a Closure* (via resolve_variable or lambda).
+    let closure_ptr = ctx.compile_expr(&list[1])?;
 
     // Call dlisp_spawn(closure_ptr)
     let local_spawn = ctx

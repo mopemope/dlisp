@@ -525,8 +525,7 @@ pub unsafe extern "C" fn dlisp_spawn(closure_ptr: *mut Closure) {
         let local_closure_ptr = &local_closure as *const _ as *mut c_void;
 
         unsafe {
-            let res = GC_call_with_stack_base(run_closure_wrapper, local_closure_ptr);
-            if res.is_null() {}
+            let _res = GC_call_with_stack_base(run_closure_wrapper, local_closure_ptr);
         }
     });
 }
