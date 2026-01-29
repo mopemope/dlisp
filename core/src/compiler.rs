@@ -4,16 +4,59 @@ use cranelift::prelude::{Configurable, settings};
 use cranelift_module::default_libcall_names;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
+pub enum OptimizationLevel {
+    None,
+    Speed,
+    SpeedAndSize,
+}
+
+pub struct CompilerOptions {
+    pub optimization_level: OptimizationLevel,
+    pub enable_verifier: bool,
+}
+
+impl Default for CompilerOptions {
+    fn default() -> Self {
+        Self {
+            optimization_level: OptimizationLevel::None,
+            enable_verifier: true,
+        }
+    }
+}
+
 pub struct AOTCompiler {
     codegen: CodeGen,
     module: ObjectModule,
 }
 
-impl Default for AOTCompiler {
-    fn default() -> Self {
+impl AOTCompiler {
+    pub fn new() -> Self {
+        Self::with_options(CompilerOptions::default())
+    }
+
+    pub fn with_options(options: CompilerOptions) -> Self {
         let mut flag_builder = settings::builder();
+
         // Enable verifier
-        flag_builder.set("enable_verifier", "true").unwrap();
+        if options.enable_verifier {
+            flag_builder.set("enable_verifier", "true").unwrap();
+        } else {
+            flag_builder.set("enable_verifier", "false").unwrap();
+        }
+
+        // Optimization level
+        match options.optimization_level {
+            OptimizationLevel::None => {
+                flag_builder.set("opt_level", "none").unwrap();
+            }
+            OptimizationLevel::Speed => {
+                flag_builder.set("opt_level", "speed").unwrap();
+            }
+            OptimizationLevel::SpeedAndSize => {
+                flag_builder.set("opt_level", "speed_and_size").unwrap();
+            }
+        }
+
         // use default ISA
         let isa_builder = cranelift_native::builder().expect("host machine is not supported");
         let isa = isa_builder
@@ -28,12 +71,6 @@ impl Default for AOTCompiler {
             codegen: CodeGen::new(),
             module,
         }
-    }
-}
-
-impl AOTCompiler {
-    pub fn new() -> Self {
-        Self::default()
     }
 
     pub fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
@@ -86,5 +123,11 @@ impl AOTCompiler {
         let product = self.module.finish();
         let bytes = product.emit().map_err(|e| e.to_string())?;
         Ok(bytes)
+    }
+}
+
+impl Default for AOTCompiler {
+    fn default() -> Self {
+        Self::with_options(CompilerOptions::default())
     }
 }

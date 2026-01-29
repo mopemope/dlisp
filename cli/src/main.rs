@@ -30,6 +30,12 @@ enum Commands {
         /// Output filename
         #[arg(short, long)]
         output: Option<PathBuf>,
+        /// Enable optimization (speed)
+        #[arg(short = 'O', long = "optimize")]
+        optimize: bool,
+        /// Release mode (speed_and_size optimization, verifier disabled)
+        #[arg(long = "release")]
+        release: bool,
     },
 }
 
@@ -41,8 +47,13 @@ async fn main() -> anyhow::Result<()> {
 
     if let Some(cmd) = args.command {
         match cmd {
-            Commands::Compile { file, output } => {
-                compile::compile_file(file, output)?;
+            Commands::Compile {
+                file,
+                output,
+                optimize,
+                release,
+            } => {
+                compile::compile_file(file, output, optimize, release)?;
             }
         }
         return Ok(());

@@ -1,15 +1,27 @@
-use dlisp_core::compiler::AOTCompiler;
+use dlisp_core::compiler::{AOTCompiler, CompilerOptions, OptimizationLevel};
 use dlisp_core::parser::parse;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
 
-pub fn compile_file(file: PathBuf, output: Option<PathBuf>) -> anyhow::Result<()> {
+pub fn compile_file(
+    file: PathBuf,
+    output: Option<PathBuf>,
+    optimize: bool,
+    release: bool,
+) -> anyhow::Result<()> {
     let content = fs::read_to_string(&file)?;
     match parse(&content) {
         Ok(vals) => {
-            let compiler = AOTCompiler::new();
+            let mut options = CompilerOptions::default();
+            if release {
+                options.optimization_level = OptimizationLevel::SpeedAndSize;
+                options.enable_verifier = false;
+            } else if optimize {
+                options.optimization_level = OptimizationLevel::Speed;
+            }
+            let compiler = AOTCompiler::with_options(options);
             match compiler.compile(vals) {
                 Ok(bytes) => {
                     let object_file = file.with_extension("o");
