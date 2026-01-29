@@ -267,6 +267,9 @@ pub unsafe extern "C" fn dlisp_add(a: *mut DlispValue, b: *mut DlispValue) -> *m
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_sub(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
@@ -291,6 +294,9 @@ pub unsafe extern "C" fn dlisp_sub(a: *mut DlispValue, b: *mut DlispValue) -> *m
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_mul(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
@@ -315,6 +321,9 @@ pub unsafe extern "C" fn dlisp_mul(a: *mut DlispValue, b: *mut DlispValue) -> *m
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_gt(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
@@ -341,6 +350,9 @@ pub unsafe extern "C" fn dlisp_gt(a: *mut DlispValue, b: *mut DlispValue) -> *mu
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_lt(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
@@ -367,6 +379,9 @@ pub unsafe extern "C" fn dlisp_lt(a: *mut DlispValue, b: *mut DlispValue) -> *mu
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_eq(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
