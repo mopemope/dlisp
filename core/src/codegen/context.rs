@@ -1,31 +1,13 @@
 use crate::ast::Value;
 use cranelift::prelude::{Value as IrValue, *};
-use cranelift_module::{FuncId, Linkage, Module};
+use cranelift_module::{Linkage, Module};
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 pub struct Builtins {
-    pub printf: FuncId,
+    pub funcs: crate::codegen::builtins::BuiltinDefinitions,
     pub printf_fmt: IrValue,
-    pub dlisp_spawn: FuncId,
-    pub dlisp_sleep: FuncId,
-    pub gc_malloc: FuncId,
-    pub dlisp_make_int: FuncId,
-    pub dlisp_make_string: FuncId,
-    pub dlisp_make_symbol: FuncId,
-    pub dlisp_make_cons: FuncId,
-    pub dlisp_make_float: FuncId,
-    pub dlisp_make_bool: FuncId,
-    pub dlisp_make_nil: FuncId,
-    pub dlisp_car: FuncId,
-    pub dlisp_cdr: FuncId,
-    pub dlisp_print: FuncId,
-    pub dlisp_add: FuncId,
-    pub dlisp_sub: FuncId,
-    pub dlisp_mul: FuncId,
-    pub dlisp_gt: FuncId,
-    pub dlisp_is_truthy: FuncId,
 }
 
 pub struct FunctionTranslationContext<'a, 'func, M: Module> {
@@ -47,7 +29,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 let val = self.builder.ins().iconst(types::I64, *n);
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_int, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_int, self.builder.func);
                 let call = self.builder.ins().call(func, &[val]);
                 Ok(self.builder.inst_results(call)[0])
             }
@@ -101,7 +83,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
 
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_string, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_string, self.builder.func);
                 let call = self.builder.ins().call(func, &[ptr]);
                 Ok(self.builder.inst_results(call)[0])
             }
@@ -109,7 +91,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 let val = self.builder.ins().f64const(*f);
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_float, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_float, self.builder.func);
                 let call = self.builder.ins().call(func, &[val]);
                 Ok(self.builder.inst_results(call)[0])
             }
@@ -117,14 +99,14 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 let val = self.builder.ins().iconst(types::I8, if *b { 1 } else { 0 });
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_bool, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_bool, self.builder.func);
                 let call = self.builder.ins().call(func, &[val]);
                 Ok(self.builder.inst_results(call)[0])
             }
             Value::Nil => {
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_nil, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_nil, self.builder.func);
                 let call = self.builder.ins().call(func, &[]);
                 Ok(self.builder.inst_results(call)[0])
             }
@@ -176,7 +158,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         let size_val = self.builder.ins().iconst(self.ptr_type, closure_size);
         let local_malloc = self
             .module
-            .declare_func_in_func(self.builtins.gc_malloc, self.builder.func);
+            .declare_func_in_func(self.builtins.funcs.gc_malloc, self.builder.func);
         let call = self.builder.ins().call(local_malloc, &[size_val]);
         let closure_ptr = self.builder.inst_results(call)[0];
 
@@ -306,7 +288,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
 
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_cons, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_cons, self.builder.func);
                 let call = self.builder.ins().call(func, &[car_val, cdr_val]);
                 Ok(self.builder.inst_results(call)[0])
             }
@@ -337,7 +319,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
 
                 let func = self
                     .module
-                    .declare_func_in_func(self.builtins.dlisp_make_symbol, self.builder.func);
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_symbol, self.builder.func);
                 let call = self.builder.ins().call(func, &[ptr]);
                 Ok(self.builder.inst_results(call)[0])
             }

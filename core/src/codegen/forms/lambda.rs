@@ -44,7 +44,7 @@ pub fn compile_lambda<M: Module>(
         let size_val = ctx.builder.ins().iconst(ctx.ptr_type, env_size);
         let local_malloc = ctx
             .module
-            .declare_func_in_func(ctx.builtins.gc_malloc, ctx.builder.func);
+            .declare_func_in_func(ctx.builtins.funcs.gc_malloc, ctx.builder.func);
         let call = ctx.builder.ins().call(local_malloc, &[size_val]);
         ctx.builder.inst_results(call)[0]
     } else {
@@ -88,26 +88,8 @@ pub fn compile_lambda<M: Module>(
             .map_err(|e| e.to_string())?;
         let printf_fmt_val = ctx.module.declare_data_in_func(fmt_id, builder.func);
         let inner_builtins = Builtins {
-            printf: ctx.builtins.printf,
+            funcs: ctx.builtins.funcs,
             printf_fmt: builder.ins().global_value(int, printf_fmt_val),
-            dlisp_spawn: ctx.builtins.dlisp_spawn,
-            dlisp_sleep: ctx.builtins.dlisp_sleep,
-            gc_malloc: ctx.builtins.gc_malloc,
-            dlisp_make_int: ctx.builtins.dlisp_make_int,
-            dlisp_make_string: ctx.builtins.dlisp_make_string,
-            dlisp_make_symbol: ctx.builtins.dlisp_make_symbol,
-            dlisp_make_cons: ctx.builtins.dlisp_make_cons,
-            dlisp_make_float: ctx.builtins.dlisp_make_float,
-            dlisp_make_bool: ctx.builtins.dlisp_make_bool,
-            dlisp_make_nil: ctx.builtins.dlisp_make_nil,
-            dlisp_car: ctx.builtins.dlisp_car,
-            dlisp_cdr: ctx.builtins.dlisp_cdr,
-            dlisp_print: ctx.builtins.dlisp_print,
-            dlisp_add: ctx.builtins.dlisp_add,
-            dlisp_sub: ctx.builtins.dlisp_sub,
-            dlisp_mul: ctx.builtins.dlisp_mul,
-            dlisp_gt: ctx.builtins.dlisp_gt,
-            dlisp_is_truthy: ctx.builtins.dlisp_is_truthy,
         };
 
         let env_param = builder.block_params(entry_block)[0];
@@ -159,7 +141,7 @@ pub fn compile_lambda<M: Module>(
     let size_val = ctx.builder.ins().iconst(ctx.ptr_type, closure_size);
     let local_malloc = ctx
         .module
-        .declare_func_in_func(ctx.builtins.gc_malloc, ctx.builder.func);
+        .declare_func_in_func(ctx.builtins.funcs.gc_malloc, ctx.builder.func);
     let call = ctx.builder.ins().call(local_malloc, &[size_val]);
     let closure_ptr = ctx.builder.inst_results(call)[0];
 

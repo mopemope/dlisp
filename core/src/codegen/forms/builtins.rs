@@ -17,7 +17,7 @@ pub fn compile_builtin<M: Module>(
 
             let local_sleep = ctx
                 .module
-                .declare_func_in_func(ctx.builtins.dlisp_sleep, ctx.builder.func);
+                .declare_func_in_func(ctx.builtins.funcs.dlisp_sleep, ctx.builder.func);
 
             let call = ctx.builder.ins().call(local_sleep, &[ms_val]);
             Ok(ctx.builder.inst_results(call)[0])
@@ -30,7 +30,7 @@ pub fn compile_builtin<M: Module>(
 
             let local_print = ctx
                 .module
-                .declare_func_in_func(ctx.builtins.dlisp_print, ctx.builder.func);
+                .declare_func_in_func(ctx.builtins.funcs.dlisp_print, ctx.builder.func);
 
             ctx.builder.ins().call(local_print, &[arg_val]);
             Ok(arg_val)
@@ -42,7 +42,7 @@ pub fn compile_builtin<M: Module>(
             let val = ctx.compile_expr(&list[1])?;
             let func = ctx
                 .module
-                .declare_func_in_func(ctx.builtins.dlisp_car, ctx.builder.func);
+                .declare_func_in_func(ctx.builtins.funcs.dlisp_car, ctx.builder.func);
             let call = ctx.builder.ins().call(func, &[val]);
             Ok(ctx.builder.inst_results(call)[0])
         }
@@ -53,20 +53,22 @@ pub fn compile_builtin<M: Module>(
             let val = ctx.compile_expr(&list[1])?;
             let func = ctx
                 .module
-                .declare_func_in_func(ctx.builtins.dlisp_cdr, ctx.builder.func);
+                .declare_func_in_func(ctx.builtins.funcs.dlisp_cdr, ctx.builder.func);
             let call = ctx.builder.ins().call(func, &[val]);
             Ok(ctx.builder.inst_results(call)[0])
         }
-        "+" | "-" | "*" | ">" => {
+        "+" | "-" | "*" | ">" | "<" | "=" => {
             if list.len() == 3 {
                 let lhs = ctx.compile_expr(&list[1])?;
                 let rhs = ctx.compile_expr(&list[2])?;
 
                 let func_id = match op {
-                    "+" => ctx.builtins.dlisp_add,
-                    "-" => ctx.builtins.dlisp_sub,
-                    "*" => ctx.builtins.dlisp_mul,
-                    ">" => ctx.builtins.dlisp_gt,
+                    "+" => ctx.builtins.funcs.dlisp_add,
+                    "-" => ctx.builtins.funcs.dlisp_sub,
+                    "*" => ctx.builtins.funcs.dlisp_mul,
+                    ">" => ctx.builtins.funcs.dlisp_gt,
+                    "<" => ctx.builtins.funcs.dlisp_lt,
+                    "=" => ctx.builtins.funcs.dlisp_eq,
                     _ => unreachable!(),
                 };
 

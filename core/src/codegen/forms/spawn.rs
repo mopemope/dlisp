@@ -26,7 +26,7 @@ pub fn compile_spawn<M: Module>(
     // Call dlisp_spawn(closure_ptr)
     let local_spawn = ctx
         .module
-        .declare_func_in_func(ctx.builtins.dlisp_spawn, ctx.builder.func);
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_spawn, ctx.builder.func);
 
     ctx.builder.ins().call(local_spawn, &[closure_ptr]);
 

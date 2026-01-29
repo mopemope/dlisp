@@ -16,7 +16,7 @@ pub fn compile_if<M: Module>(
     // Check truthiness
     let local_truthy = ctx
         .module
-        .declare_func_in_func(ctx.builtins.dlisp_is_truthy, ctx.builder.func);
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_is_truthy, ctx.builder.func);
     let truthy_call = ctx.builder.ins().call(local_truthy, &[cond_val]);
     let truthy_res = ctx.builder.inst_results(truthy_call)[0];
 
