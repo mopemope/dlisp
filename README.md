@@ -122,8 +122,11 @@ user> (spawn async-task)
 ### Data Types
 - **Integers**: `1`, `42`, `-10`
 - **Floats**: `3.14`, `-0.5`
+- **Booleans**: `true`, `false`
+- **Strings**: `"hello world"`, `"foo"`
 - **Symbols**: `x`, `foo-bar`, `+`
 - **Lists**: `(1 2 3)`, `(print "hello")`
+- **Nil**: `nil`
 
 ### Special Forms
 - **`defun`**: Define global functions.
@@ -134,7 +137,7 @@ user> (spawn async-task)
 
 ### Built-in Functions
 - **Arithmetic**: `+`, `-`, `*`
-- **Comparison**: `>`
+- **Comparison**: `>`, `<`, `=`
 - **I/O**: `print`
 - **System**: `sleep`
 

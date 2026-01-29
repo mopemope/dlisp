@@ -334,13 +334,71 @@ pub unsafe extern "C" fn dlisp_gt(a: *mut DlispValue, b: *mut DlispValue) -> *mu
         };
 
         if result {
-            dlisp_make_bool(true) // Return true instead of 1
+            dlisp_make_bool(true)
         } else {
-            dlisp_make_bool(false) // Return false instead of 0/nil? 
-            // Phase 2 used 0 (nil-like) for false.
-            // But now we have Bool. Strict lisp often uses Nil for false.
-            // My interpreter parser uses Bool(false).
-            // Let's stick to Bool(false) which is more consistent with new type system.
+            dlisp_make_bool(false)
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_lt(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        let result = match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => (*a).payload.int_val < (*b).payload.int_val,
+            (ValueType::Float, ValueType::Float) => (*a).payload.float_val < (*b).payload.float_val,
+            (ValueType::Int, ValueType::Float) => {
+                ((*a).payload.int_val as f64) < (*b).payload.float_val
+            }
+            (ValueType::Float, ValueType::Int) => {
+                (*a).payload.float_val < ((*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: < requires numbers");
+                std::process::abort();
+            }
+        };
+
+        if result {
+            dlisp_make_bool(true)
+        } else {
+            dlisp_make_bool(false)
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_eq(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        let result = match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => (*a).payload.int_val == (*b).payload.int_val,
+            (ValueType::Float, ValueType::Float) => {
+                ((*a).payload.float_val - (*b).payload.float_val).abs() < f64::EPSILON
+            }
+            (ValueType::Int, ValueType::Float) => {
+                ((*a).payload.int_val as f64 - (*b).payload.float_val).abs() < f64::EPSILON
+            }
+            (ValueType::Float, ValueType::Int) => {
+                ((*a).payload.float_val - (*b).payload.int_val as f64).abs() < f64::EPSILON
+            }
+            (ValueType::Symbol, ValueType::Symbol) => {
+                let s1 = CStr::from_ptr((*a).payload.str_val);
+                let s2 = CStr::from_ptr((*b).payload.str_val);
+                s1 == s2
+            }
+            (ValueType::String, ValueType::String) => {
+                let s1 = CStr::from_ptr((*a).payload.str_val);
+                let s2 = CStr::from_ptr((*b).payload.str_val);
+                s1 == s2
+            }
+            (ValueType::Nil, ValueType::Nil) => true,
+            _ => false,
+        };
+
+        if result {
+            dlisp_make_bool(true)
+        } else {
+            dlisp_make_bool(false)
         }
     }
 }
