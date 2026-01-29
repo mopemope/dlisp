@@ -1,4 +1,5 @@
 use std::ffi::{CStr, c_char, c_void};
+use std::io::Write;
 use tokio::runtime::Runtime;
 
 pub mod value;
@@ -168,6 +169,7 @@ pub unsafe extern "C" fn dlisp_print(val: *mut DlispValue) {
     unsafe {
         dlisp_print_value(val);
         println!(); // Newline for the main print
+        let _ = std::io::stdout().flush();
     }
 }
 

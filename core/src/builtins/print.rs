@@ -1,4 +1,5 @@
 use crate::ast::Value;
+use std::io::Write;
 
 pub fn print(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
@@ -10,6 +11,7 @@ pub fn print(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<
             print!("{}", arg);
         }
         println!();
+        let _ = std::io::stdout().flush();
         Ok(Value::Nil)
     })
 }
