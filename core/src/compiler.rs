@@ -39,6 +39,7 @@ impl AOTCompiler {
     pub fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
         let mut has_main = false;
 
+        #[allow(clippy::collapsible_if)]
         for expr in ast {
             if let Value::List(ref l) = expr {
                 if let Some(Value::Symbol(s)) = l.first() {

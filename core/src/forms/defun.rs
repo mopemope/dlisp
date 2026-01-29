@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub fn defun(
-    jit: &mut JIT,
+    _jit: &mut JIT,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
 ) -> Result<Option<Value>, String> {
@@ -29,10 +29,13 @@ pub fn defun(
     }
     let body = args[2..].to_vec();
 
+    /* JIT compilation in the interpreter is currently disabled due to ABI mismatch with the new boxed value strategy.
     let jit_code = match jit.compile(&func_name, &arg_names, &body) {
         Ok(code) => Some(code as usize),
         Err(_) => None,
     };
+    */
+    let jit_code = None;
 
     let func = Value::UserFunc {
         args: arg_names,

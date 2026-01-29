@@ -93,6 +93,16 @@ pub fn compile_lambda<M: Module>(
             dlisp_spawn: ctx.builtins.dlisp_spawn,
             dlisp_sleep: ctx.builtins.dlisp_sleep,
             gc_malloc: ctx.builtins.gc_malloc,
+            dlisp_make_int: ctx.builtins.dlisp_make_int,
+            dlisp_make_string: ctx.builtins.dlisp_make_string,
+            dlisp_make_symbol: ctx.builtins.dlisp_make_symbol,
+            dlisp_make_cons: ctx.builtins.dlisp_make_cons,
+            dlisp_print: ctx.builtins.dlisp_print,
+            dlisp_add: ctx.builtins.dlisp_add,
+            dlisp_sub: ctx.builtins.dlisp_sub,
+            dlisp_mul: ctx.builtins.dlisp_mul,
+            dlisp_gt: ctx.builtins.dlisp_gt,
+            dlisp_is_truthy: ctx.builtins.dlisp_is_truthy,
         };
 
         let env_param = builder.block_params(entry_block)[0];
@@ -201,6 +211,7 @@ fn find_free_vars(
                         let mut new_bound = bound.clone();
                         if let Value::List(bindings) = &list[1] {
                             for b in bindings {
+                                #[allow(clippy::collapsible_if)]
                                 if let Value::List(pair) = b {
                                     if pair.len() == 2 {
                                         // RHS is evaluated in current scope

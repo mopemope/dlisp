@@ -511,6 +511,7 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
+ "dlisp_runtime",
  "futures",
  "rustyline",
  "thiserror 2.0.18",

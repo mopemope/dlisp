@@ -13,6 +13,13 @@ pub fn compile_if<M: Module>(
 
     let cond_val = ctx.compile_expr(&list[1])?;
 
+    // Check truthiness
+    let local_truthy = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.dlisp_is_truthy, ctx.builder.func);
+    let truthy_call = ctx.builder.ins().call(local_truthy, &[cond_val]);
+    let truthy_res = ctx.builder.inst_results(truthy_call)[0];
+
     let then_block = ctx.builder.create_block();
     let else_block = ctx.builder.create_block();
     let merge_block = ctx.builder.create_block();
@@ -25,7 +32,7 @@ pub fn compile_if<M: Module>(
     // Branch
     ctx.builder
         .ins()
-        .brif(cond_val, then_block, &[], else_block, &[]);
+        .brif(truthy_res, then_block, &[], else_block, &[]);
 
     // Then Block
     ctx.builder.switch_to_block(then_block);

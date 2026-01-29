@@ -33,16 +33,21 @@ pub fn parser() -> impl Parser<char, Vec<Value>, Error = Simple<char>> {
 
     recursive(|expr| {
         let list = expr
+            .clone()
             .padded()
             .repeated()
             .delimited_by(just('('), just(')'))
             .map(Value::List);
 
+        let quoted = just('\'')
+            .ignore_then(expr)
+            .map(|v| Value::List(vec![Value::Symbol("quote".to_string()), v]));
+
         // Order matters: float before int, boolean/nil before symbol if strictly overlapping,
         // but here true/false/nil are specific symbols technically.
         // We put specific keywords first.
         choice((
-            float, int, boolean, nil, string, list,
+            float, int, boolean, nil, string, list, quoted,
             symbol, // symbol is last catch-all for identifiers
         ))
     })

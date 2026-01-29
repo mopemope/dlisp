@@ -26,6 +26,7 @@ pub async fn apply(
                 ));
             }
 
+            #[allow(clippy::collapsible_if)]
             if let Some(code_ptr) = jit_code {
                 if let Some(result) =
                     unsafe { crate::jit_runner::run_jit_function(code_ptr as *const u8, &args) }

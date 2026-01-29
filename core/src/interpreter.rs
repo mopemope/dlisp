@@ -12,6 +12,12 @@ pub struct Interpreter {
     pub jit: JIT,
 }
 
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Interpreter {
     pub fn new() -> Self {
         Self { jit: JIT::new() }
@@ -34,6 +40,7 @@ impl Interpreter {
                 }
 
                 // Try special forms first
+                #[allow(clippy::collapsible_if)]
                 if let Value::Symbol(ref s) = list[0] {
                     if let Some(result) = self.eval_special_form(s, &list[1..], env).await? {
                         return Ok(result);

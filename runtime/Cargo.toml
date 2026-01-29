@@ -5,7 +5,7 @@ edition = "2024"
 
 [lib]
 name = "dlisp_runtime"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "rlib"]
 
 [dependencies]
 tokio = { version = "1.43", features = ["full", "rt-multi-thread"] }
