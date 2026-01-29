@@ -206,7 +206,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     }
                     self.compile_quoted_value(&list[1])
                 }
-                "print" | "+" | "-" | "*" | "sleep" | ">" | "car" | "cdr" => {
+                "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr" => {
                     crate::codegen::forms::builtins::compile_builtin(self, op, list)
                 }
                 _ => {
