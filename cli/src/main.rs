@@ -4,6 +4,7 @@ mod repl;
 
 use clap::{Parser, Subcommand};
 use config::setup_logging;
+use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{default_env, Interpreter};
 use dlisp_core::parser::parse;
 use std::fs;
@@ -76,6 +77,19 @@ async fn main() -> anyhow::Result<()> {
                                 std::process::exit(1);
                             }
                         }
+
+                        // Check for main entry point
+                        let main_val = env.borrow().get("main");
+                        if let Some(main_val) = main_val {
+                            if let Value::UserFunc { .. } = main_val {
+                                if let Err(e) = interpreter.apply(main_val, vec![], &mut env).await
+                                {
+                                    eprintln!("\x1b[31mError in main:\x1b[0m {}", e);
+                                    std::process::exit(1);
+                                }
+                            }
+                        }
+
                         Ok(())
                     }
                     Err(e) => {

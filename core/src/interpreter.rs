@@ -79,7 +79,7 @@ impl Interpreter {
         }
     }
 
-    async fn apply(
+    pub async fn apply(
         &mut self,
         func: Value,
         args: Vec<Value>,
