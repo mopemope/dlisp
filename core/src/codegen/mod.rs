@@ -141,11 +141,50 @@ impl CodeGen {
             .declare_function("dlisp_make_cons", Linkage::Import, &make_cons_sig)
             .map_err(|e| e.to_string())?;
 
+        // dlisp_make_float(f64) -> DlispValue*
+        let mut make_float_sig = module.make_signature();
+        make_float_sig.params.push(AbiParam::new(types::F64));
+        make_float_sig.returns.push(AbiParam::new(int));
+        let make_float_id = module
+            .declare_function("dlisp_make_float", Linkage::Import, &make_float_sig)
+            .map_err(|e| e.to_string())?;
+
+        // dlisp_make_bool(bool) -> DlispValue*
+        let mut make_bool_sig = module.make_signature();
+        make_bool_sig.params.push(AbiParam::new(types::I8)); // bool as i8
+        make_bool_sig.returns.push(AbiParam::new(int));
+        let make_bool_id = module
+            .declare_function("dlisp_make_bool", Linkage::Import, &make_bool_sig)
+            .map_err(|e| e.to_string())?;
+
+        // dlisp_make_nil() -> DlispValue*
+        let mut make_nil_sig = module.make_signature();
+        make_nil_sig.returns.push(AbiParam::new(int));
+        let make_nil_id = module
+            .declare_function("dlisp_make_nil", Linkage::Import, &make_nil_sig)
+            .map_err(|e| e.to_string())?;
+
         // dlisp_print(DlispValue*)
         let mut print_sig = module.make_signature();
         print_sig.params.push(AbiParam::new(int));
         let print_id = module
             .declare_function("dlisp_print", Linkage::Import, &print_sig)
+            .map_err(|e| e.to_string())?;
+
+        // dlisp_car(DlispValue*) -> DlispValue*
+        let mut car_sig = module.make_signature();
+        car_sig.params.push(AbiParam::new(int));
+        car_sig.returns.push(AbiParam::new(int));
+        let car_id = module
+            .declare_function("dlisp_car", Linkage::Import, &car_sig)
+            .map_err(|e| e.to_string())?;
+
+        // dlisp_cdr(DlispValue*) -> DlispValue*
+        let mut cdr_sig = module.make_signature();
+        cdr_sig.params.push(AbiParam::new(int));
+        cdr_sig.returns.push(AbiParam::new(int));
+        let cdr_id = module
+            .declare_function("dlisp_cdr", Linkage::Import, &cdr_sig)
             .map_err(|e| e.to_string())?;
 
         // dlisp_add(DlispValue*, DlispValue*) -> DlispValue*
@@ -220,6 +259,11 @@ impl CodeGen {
             dlisp_make_string: make_string_id,
             dlisp_make_symbol: make_symbol_id,
             dlisp_make_cons: make_cons_id,
+            dlisp_make_float: make_float_id,
+            dlisp_make_bool: make_bool_id,
+            dlisp_make_nil: make_nil_id,
+            dlisp_car: car_id,
+            dlisp_cdr: cdr_id,
             dlisp_print: print_id,
             dlisp_add: add_id,
             dlisp_sub: sub_id,

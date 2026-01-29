@@ -35,6 +35,28 @@ pub fn compile_builtin<M: Module>(
             ctx.builder.ins().call(local_print, &[arg_val]);
             Ok(arg_val)
         }
+        "car" => {
+            if list.len() != 2 {
+                return Err("car requires 1 arg".to_string());
+            }
+            let val = ctx.compile_expr(&list[1])?;
+            let func = ctx
+                .module
+                .declare_func_in_func(ctx.builtins.dlisp_car, ctx.builder.func);
+            let call = ctx.builder.ins().call(func, &[val]);
+            Ok(ctx.builder.inst_results(call)[0])
+        }
+        "cdr" => {
+            if list.len() != 2 {
+                return Err("cdr requires 1 arg".to_string());
+            }
+            let val = ctx.compile_expr(&list[1])?;
+            let func = ctx
+                .module
+                .declare_func_in_func(ctx.builtins.dlisp_cdr, ctx.builder.func);
+            let call = ctx.builder.ins().call(func, &[val]);
+            Ok(ctx.builder.inst_results(call)[0])
+        }
         "+" | "-" | "*" | ">" => {
             if list.len() == 3 {
                 let lhs = ctx.compile_expr(&list[1])?;

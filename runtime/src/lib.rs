@@ -83,6 +83,75 @@ pub unsafe extern "C" fn dlisp_make_cons(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn dlisp_make_float(val: f64) -> *mut DlispValue {
+    unsafe {
+        let ptr = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        *ptr = DlispValue::new_float(val);
+        ptr
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn dlisp_make_bool(val: bool) -> *mut DlispValue {
+    unsafe {
+        let ptr = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        *ptr = DlispValue::new_bool(val);
+        ptr
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn dlisp_make_nil() -> *mut DlispValue {
+    unsafe {
+        let ptr = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        *ptr = DlispValue::new_nil();
+        ptr
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `list` points to a valid `DlispValue` struct.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_car(list: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if list.is_null() {
+            return dlisp_make_nil();
+        }
+        let val = *list;
+        if val.type_ != ValueType::List {
+            if val.type_ == ValueType::Nil {
+                return dlisp_make_nil();
+            }
+            return dlisp_make_nil();
+        }
+        let list_data = *val.payload.list_val;
+        list_data.car
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `list` points to a valid `DlispValue` struct.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_cdr(list: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if list.is_null() {
+            return dlisp_make_nil();
+        }
+        let val = *list;
+        if val.type_ != ValueType::List {
+            if val.type_ == ValueType::Nil {
+                return dlisp_make_nil();
+            }
+            return dlisp_make_nil();
+        }
+        let list_data = *val.payload.list_val;
+        list_data.cdr
+    }
+}
+
 // --- Basic Operations ---
 
 /// # Safety
@@ -112,6 +181,15 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
         match (*val).type_ {
             ValueType::Int => {
                 print!("{}", (*val).payload.int_val);
+            }
+            ValueType::Float => {
+                print!("{}", (*val).payload.float_val);
+            }
+            ValueType::Bool => {
+                print!("{}", (*val).payload.bool_val);
+            }
+            ValueType::Nil => {
+                print!("nil");
             }
             ValueType::String => {
                 let c_str = CStr::from_ptr((*val).payload.str_val);
@@ -168,56 +246,101 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_add(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
-        if (*a).type_ != ValueType::Int || (*b).type_ != ValueType::Int {
-            eprintln!("Type Error: + requires integers");
-            std::process::abort();
+        match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => {
+                dlisp_make_int((*a).payload.int_val + (*b).payload.int_val)
+            }
+            (ValueType::Float, ValueType::Float) => {
+                dlisp_make_float((*a).payload.float_val + (*b).payload.float_val)
+            }
+            (ValueType::Int, ValueType::Float) => {
+                dlisp_make_float((*a).payload.int_val as f64 + (*b).payload.float_val)
+            }
+            (ValueType::Float, ValueType::Int) => {
+                dlisp_make_float((*a).payload.float_val + (*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: + requires numbers");
+                std::process::abort();
+            }
         }
-        dlisp_make_int((*a).payload.int_val + (*b).payload.int_val)
     }
 }
 
-/// # Safety
-/// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_sub(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
-        if (*a).type_ != ValueType::Int || (*b).type_ != ValueType::Int {
-            eprintln!("Type Error: - requires integers");
-            std::process::abort();
+        match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => {
+                dlisp_make_int((*a).payload.int_val - (*b).payload.int_val)
+            }
+            (ValueType::Float, ValueType::Float) => {
+                dlisp_make_float((*a).payload.float_val - (*b).payload.float_val)
+            }
+            (ValueType::Int, ValueType::Float) => {
+                dlisp_make_float((*a).payload.int_val as f64 - (*b).payload.float_val)
+            }
+            (ValueType::Float, ValueType::Int) => {
+                dlisp_make_float((*a).payload.float_val - (*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: - requires numbers");
+                std::process::abort();
+            }
         }
-        dlisp_make_int((*a).payload.int_val - (*b).payload.int_val)
     }
 }
 
-/// # Safety
-/// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_mul(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
-        if (*a).type_ != ValueType::Int || (*b).type_ != ValueType::Int {
-            eprintln!("Type Error: * requires integers");
-            std::process::abort();
+        match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => {
+                dlisp_make_int((*a).payload.int_val * (*b).payload.int_val)
+            }
+            (ValueType::Float, ValueType::Float) => {
+                dlisp_make_float((*a).payload.float_val * (*b).payload.float_val)
+            }
+            (ValueType::Int, ValueType::Float) => {
+                dlisp_make_float((*a).payload.int_val as f64 * (*b).payload.float_val)
+            }
+            (ValueType::Float, ValueType::Int) => {
+                dlisp_make_float((*a).payload.float_val * (*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: * requires numbers");
+                std::process::abort();
+            }
         }
-        dlisp_make_int((*a).payload.int_val * (*b).payload.int_val)
     }
 }
 
-/// # Safety
-/// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_gt(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
     unsafe {
-        if (*a).type_ != ValueType::Int || (*b).type_ != ValueType::Int {
-            eprintln!("Type Error: > requires integers");
-            std::process::abort();
-        }
-        if (*a).payload.int_val > (*b).payload.int_val {
-            dlisp_make_int(1)
+        let result = match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => (*a).payload.int_val > (*b).payload.int_val,
+            (ValueType::Float, ValueType::Float) => (*a).payload.float_val > (*b).payload.float_val,
+            (ValueType::Int, ValueType::Float) => {
+                ((*a).payload.int_val as f64) > (*b).payload.float_val
+            }
+            (ValueType::Float, ValueType::Int) => {
+                (*a).payload.float_val > ((*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: > requires numbers");
+                std::process::abort();
+            }
+        };
+
+        if result {
+            dlisp_make_bool(true) // Return true instead of 1
         } else {
-            dlisp_make_int(0) // nil-like
+            dlisp_make_bool(false) // Return false instead of 0/nil? 
+            // Phase 2 used 0 (nil-like) for false.
+            // But now we have Bool. Strict lisp often uses Nil for false.
+            // My interpreter parser uses Bool(false).
+            // Let's stick to Bool(false) which is more consistent with new type system.
         }
     }
 }
@@ -232,11 +355,23 @@ pub unsafe extern "C" fn dlisp_is_truthy(val: *mut DlispValue) -> i32 {
         return 0;
     }
     unsafe {
-        if (*val).type_ == ValueType::Int && (*val).payload.int_val == 0 {
+        if (*val).type_ == ValueType::Nil {
             return 0;
         }
+        if (*val).type_ == ValueType::Bool {
+            return if (*val).payload.bool_val { 1 } else { 0 };
+        }
+        if (*val).type_ == ValueType::Int {
+            // Historical/Compatibility: 0 is falsey?
+            // Strict Lisp: only nil is false (and maybe false).
+            // Let's keep 0 as falsey for now if we relied on it, but ideally we move to Bool/Nil.
+            // For backwards compat with Phase 2 implementation where 0 was false.
+            if (*val).payload.int_val == 0 {
+                return 0;
+            }
+        }
+        1
     }
-    1
 }
 
 // --- Main & Async ---

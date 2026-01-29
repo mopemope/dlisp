@@ -17,9 +17,14 @@ impl Default for JIT {
         // We resolve these dynamically to avoid a hard dependency on the runtime crate in the core library.
         let symbols = [
             "dlisp_make_int",
+            "dlisp_make_float",
+            "dlisp_make_bool",
+            "dlisp_make_nil",
             "dlisp_make_string",
             "dlisp_make_symbol",
             "dlisp_make_cons",
+            "dlisp_car",
+            "dlisp_cdr",
             "dlisp_print",
             "dlisp_add",
             "dlisp_sub",

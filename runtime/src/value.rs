@@ -4,6 +4,9 @@ use std::ffi::c_void;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
     Int,
+    Float,
+    Bool,
+    Nil,
     String,
     List,
     Symbol,
@@ -15,6 +18,8 @@ pub enum ValueType {
 #[derive(Copy, Clone)]
 pub union ValuePayload {
     pub int_val: i64,
+    pub float_val: f64,
+    pub bool_val: bool,
     pub str_val: *mut i8, // C-string
     pub list_val: *mut ListData,
     pub ptr_val: *mut c_void,
@@ -53,6 +58,27 @@ impl DlispValue {
         Self {
             type_: ValueType::Symbol,
             payload: ValuePayload { str_val: s },
+        }
+    }
+
+    pub fn new_float(val: f64) -> Self {
+        Self {
+            type_: ValueType::Float,
+            payload: ValuePayload { float_val: val },
+        }
+    }
+
+    pub fn new_bool(val: bool) -> Self {
+        Self {
+            type_: ValueType::Bool,
+            payload: ValuePayload { bool_val: val },
+        }
+    }
+
+    pub fn new_nil() -> Self {
+        Self {
+            type_: ValueType::Nil,
+            payload: ValuePayload { int_val: 0 }, // Payload doesn't matter for Nil
         }
     }
 }

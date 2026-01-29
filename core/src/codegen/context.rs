@@ -15,6 +15,11 @@ pub struct Builtins {
     pub dlisp_make_string: FuncId,
     pub dlisp_make_symbol: FuncId,
     pub dlisp_make_cons: FuncId,
+    pub dlisp_make_float: FuncId,
+    pub dlisp_make_bool: FuncId,
+    pub dlisp_make_nil: FuncId,
+    pub dlisp_car: FuncId,
+    pub dlisp_cdr: FuncId,
     pub dlisp_print: FuncId,
     pub dlisp_add: FuncId,
     pub dlisp_sub: FuncId,
@@ -98,6 +103,29 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     .module
                     .declare_func_in_func(self.builtins.dlisp_make_string, self.builder.func);
                 let call = self.builder.ins().call(func, &[ptr]);
+                Ok(self.builder.inst_results(call)[0])
+            }
+            Value::Float(f) => {
+                let val = self.builder.ins().f64const(*f);
+                let func = self
+                    .module
+                    .declare_func_in_func(self.builtins.dlisp_make_float, self.builder.func);
+                let call = self.builder.ins().call(func, &[val]);
+                Ok(self.builder.inst_results(call)[0])
+            }
+            Value::Bool(b) => {
+                let val = self.builder.ins().iconst(types::I8, if *b { 1 } else { 0 });
+                let func = self
+                    .module
+                    .declare_func_in_func(self.builtins.dlisp_make_bool, self.builder.func);
+                let call = self.builder.ins().call(func, &[val]);
+                Ok(self.builder.inst_results(call)[0])
+            }
+            Value::Nil => {
+                let func = self
+                    .module
+                    .declare_func_in_func(self.builtins.dlisp_make_nil, self.builder.func);
+                let call = self.builder.ins().call(func, &[]);
                 Ok(self.builder.inst_results(call)[0])
             }
             Value::Symbol(s) => self.resolve_variable(s),
@@ -196,7 +224,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     }
                     self.compile_quoted_value(&list[1])
                 }
-                "print" | "+" | "-" | "*" | "sleep" | ">" => {
+                "print" | "+" | "-" | "*" | "sleep" | ">" | "car" | "cdr" => {
                     crate::codegen::forms::builtins::compile_builtin(self, op, list)
                 }
                 _ => {
