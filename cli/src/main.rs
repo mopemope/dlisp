@@ -188,7 +188,7 @@ async fn run_repl() -> anyhow::Result<()> {
 
     println!("Welcome to dlisp v0.1.0");
     loop {
-        let readline = rl.readline("user> ");
+        let readline = rl.readline("🐕️> ");
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str())?;
