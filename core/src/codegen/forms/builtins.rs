@@ -9,6 +9,7 @@ enum BuiltinCategory {
     Unary { returns_arg: bool },
     BinaryComparison,
     VariadicArithmetic,
+    IO,
 }
 
 pub fn compile_builtin<M: Module>(
@@ -57,6 +58,7 @@ pub fn compile_builtin<M: Module>(
             BuiltinCategory::BinaryComparison,
             ctx.builtins.funcs.dlisp_eq,
         ),
+        "read-file" => (BuiltinCategory::IO, ctx.builtins.funcs.dlisp_read_file),
         _ => unreachable!("Unknown builtin: {}", op),
     };
 
@@ -66,6 +68,7 @@ pub fn compile_builtin<M: Module>(
         }
         BuiltinCategory::BinaryComparison => compile_binary_comparison(ctx, op, list, func_id),
         BuiltinCategory::VariadicArithmetic => compile_variadic_arithmetic(ctx, op, list, func_id),
+        BuiltinCategory::IO => compile_io(ctx, op, list, func_id),
     }
 }
 
@@ -145,4 +148,21 @@ fn compile_variadic_arithmetic<M: Module>(
         }
         Ok(acc)
     }
+}
+
+fn compile_io<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    // Basic IO compilation is similar to Unary for now, assuming (op arg) signature
+    // Future IO might take multiple args
+    if list.len() != 2 {
+        return Err(format!("{} requires exactly 1 argument", op));
+    }
+    let arg_val = ctx.compile_expr(&list[1])?;
+    let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
+    let call = ctx.builder.ins().call(local_func, &[arg_val]);
+    Ok(ctx.builder.inst_results(call)[0])
 }

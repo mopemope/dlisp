@@ -206,9 +206,8 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     }
                     self.compile_quoted_value(&list[1])
                 }
-                "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr" => {
-                    crate::codegen::forms::builtins::compile_builtin(self, op, list)
-                }
+                "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr"
+                | "read-file" => crate::codegen::forms::builtins::compile_builtin(self, op, list),
                 _ => {
                     // Check if 'op' is a variable (parameter) -> Indirect call
                     if self.is_variable_bound(op) {

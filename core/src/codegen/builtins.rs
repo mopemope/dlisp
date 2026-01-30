@@ -24,6 +24,7 @@ pub struct BuiltinDefinitions {
     pub dlisp_is_truthy: FuncId,
     pub dlisp_lt: FuncId,
     pub dlisp_eq: FuncId,
+    pub dlisp_read_file: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -200,6 +201,14 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_is_truthy", Linkage::Import, &truthy_sig)
         .map_err(|e| e.to_string())?;
 
+    // dlisp_read_file(DlispValue*) -> DlispValue*
+    let mut read_file_sig = module.make_signature();
+    read_file_sig.params.push(AbiParam::new(int));
+    read_file_sig.returns.push(AbiParam::new(int));
+    let read_file_id = module
+        .declare_function("dlisp_read_file", Linkage::Import, &read_file_sig)
+        .map_err(|e| e.to_string())?;
+
     Ok(BuiltinDefinitions {
         printf: printf_id,
         dlisp_spawn: spawn_id,
@@ -222,5 +231,6 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_is_truthy: truthy_id,
         dlisp_lt: lt_id,
         dlisp_eq: eq_id,
+        dlisp_read_file: read_file_id,
     })
 }
