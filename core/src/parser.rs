@@ -31,6 +31,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
 
     let nil = just("nil").to(Value::Nil);
 
+    let comment = just(';')
+        .ignore_then(any().filter(|c| *c != '\n').repeated())
+        .padded();
+
     recursive(|expr| {
         let list = expr
             .clone()
@@ -51,7 +55,9 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
             float, int, boolean, nil, string, list, quoted,
             symbol, // symbol is last catch-all for identifiers
         ))
+        .padded_by(comment.repeated()) // parsing comments trailing/surrounding values
     })
+    .padded_by(comment.repeated())
     .padded()
     .repeated()
     .collect()
