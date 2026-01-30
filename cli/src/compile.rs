@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
 
-pub fn compile_file(
+pub async fn compile_file(
     file: PathBuf,
     output: Option<PathBuf>,
     optimize: bool,
@@ -22,7 +22,7 @@ pub fn compile_file(
                 options.optimization_level = OptimizationLevel::Speed;
             }
             let compiler = AOTCompiler::with_options(options);
-            match compiler.compile(vals) {
+            match compiler.compile(vals).await {
                 Ok(bytes) => {
                     let object_file = file.with_extension("o");
                     fs::write(&object_file, bytes)?;

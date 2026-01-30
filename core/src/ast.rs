@@ -21,6 +21,10 @@ pub enum Value {
         jit_code: Option<usize>,
         env: Option<Rc<RefCell<crate::environment::Environment>>>,
     },
+    Macro {
+        args: Vec<String>,
+        body: Vec<Value>,
+    },
     List(Vec<Value>),
     Nil,
 }
@@ -50,6 +54,7 @@ impl fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::NativeFunc(_) => write!(f, "<native-func>"),
             Value::UserFunc { .. } => write!(f, "<user-func>"),
+            Value::Macro { .. } => write!(f, "<macro>"),
         }
     }
 }

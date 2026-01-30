@@ -87,8 +87,8 @@ async fn test_multiple_functions() {
     }
 }
 
-#[test]
-fn test_aot_multiple_functions() {
+#[tokio::test]
+async fn test_aot_multiple_functions() {
     use dlisp_core::compiler::AOTCompiler;
 
     let code = "
@@ -101,7 +101,7 @@ fn test_aot_multiple_functions() {
 
     let vals = parse(code).unwrap();
     let compiler = AOTCompiler::new();
-    compiler.compile(vals).expect("Compilation failed");
+    compiler.compile(vals).await.expect("Compilation failed");
 }
 
 #[tokio::test]

@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
                 optimize,
                 release,
             } => {
-                compile::compile_file(file, output, optimize, release)?;
+                compile::compile_file(file, output, optimize, release).await?;
             }
         }
         return Ok(());

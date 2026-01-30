@@ -5,6 +5,7 @@ pub mod add;
 pub mod eq;
 pub mod gt;
 pub mod io;
+pub mod list;
 pub mod lt;
 pub mod mul;
 pub mod print;
@@ -21,4 +22,5 @@ pub fn install(env: &mut Environment) {
     env.set("print".to_string(), Value::NativeFunc(print::print));
     env.set("sleep".to_string(), Value::NativeFunc(sleep::sleep_fn));
     env.set("read-file".to_string(), Value::NativeFunc(io::read_file));
+    env.set("list".to_string(), Value::NativeFunc(list::list));
 }

@@ -35,7 +35,10 @@ impl Interpreter {
         val: Value,
         env: &mut Rc<RefCell<Environment>>,
     ) -> Result<Value, String> {
-        match val {
+        // Expand macros first
+        let expanded = self.expand(val, env).await?;
+
+        match expanded {
             Value::Symbol(s) => env
                 .borrow()
                 .get(&s)
@@ -48,6 +51,16 @@ impl Interpreter {
                 // Try special forms first
                 #[allow(clippy::collapsible_if)]
                 if let Value::Symbol(ref s) = list[0] {
+                    if s == "defmacro" {
+                        let macro_val = crate::macros::construct_macro(&list[1..])?;
+                        let name = match &list[1] {
+                            Value::Symbol(n) => n.clone(),
+                            _ => unreachable!(),
+                        };
+                        env.borrow_mut().set(name.clone(), macro_val); // Store macro in env
+                        return Ok(Value::Symbol(name));
+                    }
+
                     if let Some(result) = self.eval_special_form(s, &list[1..], env).await? {
                         return Ok(result);
                     }
@@ -62,7 +75,149 @@ impl Interpreter {
 
                 self.apply(func_val, args, env).await
             }
-            _ => Ok(val), // Self-evaluating
+            _ => Ok(expanded), // Self-evaluating
+        }
+    }
+
+    #[async_recursion(?Send)]
+    pub async fn expand(
+        &mut self,
+        val: Value,
+        env: &mut Rc<RefCell<Environment>>,
+    ) -> Result<Value, String> {
+        match val {
+            Value::List(ref list) => {
+                if list.is_empty() {
+                    return Ok(val);
+                }
+
+                if let Value::Symbol(ref s) = list[0] {
+                    // Check for special forms that need custom expansion handling
+                    match s.as_str() {
+                        "quote" => return Ok(val),
+                        "let" => {
+                            // (let bindings body...)
+                            // bindings: ((var val) ...)
+                            // We must NOT expand the bindings list itself as a macro call, but we MUST expand the 'val's inside it.
+                            if list.len() < 2 {
+                                return Ok(val); // Malformed, just return
+                            }
+
+                            let mut new_list = Vec::new();
+                            new_list.push(list[0].clone()); // 'let'
+
+                            // Handle bindings
+                            match &list[1] {
+                                Value::List(bindings) => {
+                                    let mut new_bindings = Vec::new();
+                                    for b in bindings {
+                                        if let Value::List(pair) = b {
+                                            if pair.len() == 2 {
+                                                // (var val) -> expand val only
+                                                let val_expanded =
+                                                    self.expand(pair[1].clone(), env).await?;
+                                                new_bindings.push(Value::List(vec![
+                                                    pair[0].clone(),
+                                                    val_expanded,
+                                                ]));
+                                            } else {
+                                                // Malformed binding, just push as is (or expand recursively if it's weird)
+                                                new_bindings
+                                                    .push(self.expand(b.clone(), env).await?);
+                                            }
+                                        } else {
+                                            new_bindings.push(b.clone());
+                                        }
+                                    }
+                                    new_list.push(Value::List(new_bindings));
+                                }
+                                _ => new_list.push(list[1].clone()), // Malformed bindings, keep as is
+                            }
+
+                            // Expand body
+                            for item in list.iter().skip(2) {
+                                new_list.push(self.expand(item.clone(), env).await?);
+                            }
+
+                            return Ok(Value::List(new_list));
+                        }
+                        "defun" | "defmacro" => {
+                            // (defun name args body...)
+                            // Args list should NOT be expanded
+                            if list.len() < 3 {
+                                return Ok(val);
+                            }
+                            let mut new_list = Vec::new();
+                            new_list.push(list[0].clone()); // defun
+                            new_list.push(list[1].clone()); // name
+                            new_list.push(list[2].clone()); // args (unexpanded)
+
+                            // Expand body
+                            for item in list.iter().skip(3) {
+                                new_list.push(self.expand(item.clone(), env).await?);
+                            }
+                            return Ok(Value::List(new_list));
+                        }
+                        "lambda" => {
+                            // (lambda args body...)
+                            if list.len() < 2 {
+                                return Ok(val);
+                            }
+                            let mut new_list = Vec::new();
+                            new_list.push(list[0].clone()); // lambda
+                            new_list.push(list[1].clone()); // args (unexpanded)
+
+                            // Expand body
+                            for item in list.iter().skip(2) {
+                                new_list.push(self.expand(item.clone(), env).await?);
+                            }
+                            return Ok(Value::List(new_list));
+                        }
+                        _ => {} // Fall through to macro check or default expansion
+                    }
+
+                    // Check environment for macro definition
+                    let resolved_opt = env.borrow().get(s);
+                    if let Some(Value::Macro { args, body }) = resolved_opt {
+                        // It IS a macro!
+                        let macro_args_vals = list[1..].to_vec(); // Unevaluated args
+
+                        if macro_args_vals.len() != args.len() {
+                            return Err(format!(
+                                "Macro {} expects {} arguments, got {}",
+                                s,
+                                args.len(),
+                                macro_args_vals.len()
+                            ));
+                        }
+
+                        // Execute macro body
+                        // Create macro environment
+                        let mut macro_env = Environment::new(Some(env.clone()));
+                        for (name, val) in args.iter().zip(macro_args_vals.iter()) {
+                            macro_env.set(name.clone(), val.clone());
+                        }
+                        let mut macro_env_rc = Rc::new(RefCell::new(macro_env));
+
+                        // Eval body
+                        let mut result = Value::Nil;
+                        for stmt in body {
+                            result = self.eval(stmt.clone(), &mut macro_env_rc).await?;
+                        }
+
+                        // Recursive expand the RESULT
+                        return self.expand(result, env).await;
+                    }
+                }
+
+                // Recursively expand list elements (default case)
+                let mut new_list = Vec::new();
+                for item in list {
+                    new_list.push(self.expand(item.clone(), env).await?);
+                }
+                Ok(Value::List(new_list))
+            }
+            _ => Ok(val),
         }
     }
 

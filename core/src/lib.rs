@@ -9,4 +9,5 @@ pub mod forms;
 pub mod interpreter;
 pub mod jit;
 pub mod jit_runner;
+pub mod macros;
 pub mod parser;

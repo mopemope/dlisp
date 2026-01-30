@@ -1,8 +1,12 @@
 use crate::ast::Value;
 use crate::codegen::CodeGen;
+use crate::environment::Environment;
+use crate::interpreter::{Interpreter, default_env};
 use cranelift::prelude::{Configurable, settings};
 use cranelift_module::default_libcall_names;
 use cranelift_object::{ObjectBuilder, ObjectModule};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub enum OptimizationLevel {
     None,
@@ -27,6 +31,8 @@ impl Default for CompilerOptions {
 pub struct AOTCompiler {
     codegen: CodeGen,
     module: ObjectModule,
+    interpreter: Interpreter,
+    env: Rc<RefCell<Environment>>,
 }
 
 impl AOTCompiler {
@@ -70,15 +76,38 @@ impl AOTCompiler {
         Self {
             codegen: CodeGen::new(),
             module,
+            interpreter: Interpreter::new(),
+            env: default_env(),
         }
     }
 
-    pub fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
+    pub async fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
         let mut has_main = false;
 
         #[allow(clippy::collapsible_if)]
         for expr in ast {
-            if let Value::List(ref l) = expr {
+            // Expand macros first!
+            let expanded = self
+                .interpreter
+                .expand(expr, &mut self.env)
+                .await
+                .map_err(|e| format!("Macro expansion error: {}", e))?;
+
+            // If it's a defmacro, we EVALUATE it in the compiler's interpreter so subsequent code can use it.
+            // But we do NOT emit code for it (macros are compile-time).
+            if let Value::List(ref l) = expanded {
+                if let Some(Value::Symbol(s)) = l.first() {
+                    if s == "defmacro" {
+                        self.interpreter
+                            .eval(expanded, &mut self.env)
+                            .await
+                            .map_err(|e| format!("Macro definition error: {}", e))?;
+                        continue;
+                    }
+                }
+            }
+
+            if let Value::List(ref l) = expanded {
                 if let Some(Value::Symbol(s)) = l.first() {
                     if s == "defun" {
                         // (defun name (args) body...)
