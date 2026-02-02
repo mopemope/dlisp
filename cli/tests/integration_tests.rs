@@ -89,3 +89,38 @@ fn test_spawn_lisp() {
         .stdout(predicate::str::contains("Task 2 finished"))
         .stdout(predicate::str::contains("Main done."));
 }
+
+#[test]
+fn test_error_lisp() {
+    let mut cmd = dlisp_cmd();
+    let path = get_example_path("error.lisp");
+
+    cmd.arg(path).assert().failure().code(1);
+}
+
+#[test]
+fn test_compile_error() {
+    let mut cmd = dlisp_cmd();
+    let path = get_example_path("error.lisp");
+
+    // We expect compilation to fail because of undefined function or similar issues
+    // caught during compilation phase if the compiler supports it, or maybe it succeeds
+    // and runtime fails.
+    // If the compiler is simple and allows any symbol as function call, it might succeed compilation.
+    // But let's check `AOTCompiler` behavior or just try running it first.
+    // Actually, let's verify if `dlisp compile` fails on `error.lisp` first manually.
+    cmd.arg("compile").arg(path).assert().failure().code(1);
+}
+
+#[test]
+fn test_syntax_error() {
+    let path = get_example_path("syntax_error.lisp");
+
+    // Interpreter
+    let mut cmd = dlisp_cmd();
+    cmd.arg(path.clone()).assert().failure().code(1);
+
+    // Compiler
+    let mut cmd = dlisp_cmd();
+    cmd.arg("compile").arg(path).assert().failure().code(1);
+}
