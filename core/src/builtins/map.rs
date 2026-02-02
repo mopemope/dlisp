@@ -3,7 +3,7 @@ use futures::future::{self, LocalBoxFuture};
 use std::collections::HashMap;
 
 pub fn hash_map(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
-    if args.len() % 2 != 0 {
+    if !args.len().is_multiple_of(2) {
         return Box::pin(future::ready(Err(
             "hash-map requires an even number of arguments".to_string(),
         )));
@@ -38,10 +38,11 @@ pub fn get(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
             } else {
                 &Value::Nil
             };
-            if let Value::Integer(i) = args[1] {
-                if i >= 0 && i < v.len() as i64 {
-                    return Box::pin(future::ready(Ok(v[i as usize].clone())));
-                }
+            if let Value::Integer(i) = args[1]
+                && i >= 0
+                && i < v.len() as i64
+            {
+                return Box::pin(future::ready(Ok(v[i as usize].clone())));
             }
             Box::pin(future::ready(Ok(default.clone())))
         }
@@ -58,7 +59,7 @@ pub fn get(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
 }
 
 pub fn assoc(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
-    if args.len() < 3 || (args.len() - 1) % 2 != 0 {
+    if args.len() < 3 || !(args.len() - 1).is_multiple_of(2) {
         return Box::pin(future::ready(Err(
             "assoc requires a map and even number of key/value pairs".to_string(),
         )));

@@ -110,6 +110,18 @@ impl SpecialForm for LambdaForm {
     }
 }
 
+pub struct DefVarForm;
+impl SpecialForm for DefVarForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::defvar::defvar(interpreter, args, env))
+    }
+}
+
 pub struct QuoteForm;
 impl SpecialForm for QuoteForm {
     fn call<'a>(
@@ -129,6 +141,7 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("let", LetForm);
     reg.register("spawn", SpawnForm);
     reg.register("lambda", LambdaForm);
+    reg.register("defvar", DefVarForm);
     reg.register("quote", QuoteForm);
     reg
 }

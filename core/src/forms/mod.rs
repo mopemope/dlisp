@@ -1,4 +1,5 @@
 pub mod defun;
+pub mod defvar;
 pub mod if_expr;
 pub mod lambda;
 pub mod let_expr;
