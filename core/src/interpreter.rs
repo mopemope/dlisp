@@ -75,6 +75,13 @@ impl Interpreter {
 
                 self.apply(func_val, args, env).await
             }
+            Value::Vector(vec) => {
+                let mut new_vec = Vec::new();
+                for item in vec {
+                    new_vec.push(self.eval(item, env).await?);
+                }
+                Ok(Value::Vector(new_vec))
+            }
             _ => Ok(expanded), // Self-evaluating
         }
     }
@@ -216,6 +223,13 @@ impl Interpreter {
                     new_list.push(self.expand(item.clone(), env).await?);
                 }
                 Ok(Value::List(new_list))
+            }
+            Value::Vector(vec) => {
+                let mut new_vec = Vec::new();
+                for item in vec {
+                    new_vec.push(self.expand(item.clone(), env).await?);
+                }
+                Ok(Value::Vector(new_vec))
             }
             _ => Ok(val),
         }

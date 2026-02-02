@@ -117,6 +117,8 @@ pub extern "C" fn dlisp_make_nil() -> *mut DlispValue {
     }
 }
 
+pub mod vectors;
+
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `list` points to a valid `DlispValue` struct.
@@ -237,6 +239,22 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
             ValueType::Symbol => {
                 let c_str = CStr::from_ptr((*val).payload.str_val);
                 print!("{}", c_str.to_string_lossy());
+            }
+            ValueType::Vector => {
+                print!("[");
+                let vec_data = (*val).payload.vector_val;
+                if !vec_data.is_null() {
+                    let len = (*vec_data).len;
+                    let data = (*vec_data).data;
+                    for i in 0..len {
+                        if i > 0 {
+                            print!(" ");
+                        }
+                        let elem = *data.add(i);
+                        dlisp_print_value(elem);
+                    }
+                }
+                print!("]");
             }
             ValueType::Closure => {
                 print!("<closure>");

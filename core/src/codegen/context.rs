@@ -112,6 +112,25 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
             }
             Value::Symbol(s) => self.resolve_variable(s),
             Value::List(list) => self.compile_list(list),
+            Value::Vector(vec) => {
+                let capacity = vec.len();
+                let cap_val = self.builder.ins().iconst(self.ptr_type, capacity as i64);
+                let func = self
+                    .module
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_vector, self.builder.func);
+                let call = self.builder.ins().call(func, &[cap_val]);
+                let vec_ptr = self.builder.inst_results(call)[0];
+
+                for item in vec {
+                    let val = self.compile_expr(item)?;
+                    let push_func = self.module.declare_func_in_func(
+                        self.builtins.funcs.dlisp_vector_push,
+                        self.builder.func,
+                    );
+                    self.builder.ins().call(push_func, &[vec_ptr, val]);
+                }
+                Ok(vec_ptr)
+            }
             _ => Err(format!("Unsupported Value type for JIT: {:?}", val)),
         }
     }
@@ -207,7 +226,9 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     self.compile_quoted_value(&list[1])
                 }
                 "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr"
-                | "read-file" => crate::codegen::forms::builtins::compile_builtin(self, op, list),
+                | "read-file" | "vector" | "nth" | "count" | "conj" => {
+                    crate::codegen::forms::builtins::compile_builtin(self, op, list)
+                }
                 _ => {
                     // Check if 'op' is a variable (parameter) -> Indirect call
                     if self.is_variable_bound(op) {

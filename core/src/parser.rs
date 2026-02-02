@@ -44,6 +44,14 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
             .delimited_by(just('('), just(')'))
             .map(Value::List);
 
+        let vector = expr
+            .clone()
+            .padded()
+            .repeated()
+            .collect()
+            .delimited_by(just('['), just(']'))
+            .map(Value::Vector);
+
         let quoted = just('\'')
             .ignore_then(expr)
             .map(|v| Value::List(vec![Value::Symbol("quote".to_string()), v]));
@@ -52,7 +60,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
         // but here true/false/nil are specific symbols technically.
         // We put specific keywords first.
         choice((
-            float, int, boolean, nil, string, list, quoted,
+            float, int, boolean, nil, string, list, vector, quoted,
             symbol, // symbol is last catch-all for identifiers
         ))
         .padded_by(comment.repeated()) // parsing comments trailing/surrounding values
@@ -108,6 +116,42 @@ mod tests {
             assert_eq!(v[0], Value::Symbol("+".to_string()));
         } else {
             panic!("Expected list");
+        }
+    }
+
+    #[test]
+    fn test_parse_vector() {
+        let vals = parse("[1 2 3]").unwrap();
+        let val = &vals[0];
+        if let Value::Vector(v) = val {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Integer(1));
+            assert_eq!(v[1], Value::Integer(2));
+            assert_eq!(v[2], Value::Integer(3));
+        } else {
+            panic!("Expected vector");
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_vector() {
+        let vals = parse("[1 (2 3) [4 5]]").unwrap();
+        let val = &vals[0];
+        if let Value::Vector(v) = val {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v[0], Value::Integer(1));
+            if let Value::List(l) = &v[1] {
+                assert_eq!(l.len(), 2);
+            } else {
+                panic!("Expected list nested in vector");
+            }
+            if let Value::Vector(vec) = &v[2] {
+                assert_eq!(vec.len(), 2);
+            } else {
+                panic!("Expected vector nested in vector");
+            }
+        } else {
+            panic!("Expected vector");
         }
     }
 }

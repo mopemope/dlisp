@@ -9,6 +9,7 @@ pub enum ValueType {
     Nil,
     String,
     List,
+    Vector,
     Symbol,
     Closure,
     NativePtr,
@@ -22,6 +23,7 @@ pub union ValuePayload {
     pub bool_val: bool,
     pub str_val: *mut i8, // C-string
     pub list_val: *mut ListData,
+    pub vector_val: *mut VectorData,
     pub ptr_val: *mut c_void,
 }
 
@@ -30,6 +32,14 @@ pub union ValuePayload {
 pub struct ListData {
     pub car: *mut DlispValue,
     pub cdr: *mut DlispValue,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct VectorData {
+    pub len: usize,
+    pub cap: usize,
+    pub data: *mut *mut DlispValue,
 }
 
 #[repr(C)]
@@ -79,6 +89,13 @@ impl DlispValue {
         Self {
             type_: ValueType::Nil,
             payload: ValuePayload { int_val: 0 }, // Payload doesn't matter for Nil
+        }
+    }
+
+    pub fn new_vector(vec: *mut VectorData) -> Self {
+        Self {
+            type_: ValueType::Vector,
+            payload: ValuePayload { vector_val: vec },
         }
     }
 }

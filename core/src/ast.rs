@@ -26,6 +26,7 @@ pub enum Value {
         body: Vec<Value>,
     },
     List(Vec<Value>),
+    Vector(Vec<Value>),
     Nil,
 }
 
@@ -50,6 +51,16 @@ impl fmt::Display for Value {
                     write!(f, "{}", v)?;
                 }
                 write!(f, ")")
+            }
+            Value::Vector(l) => {
+                write!(f, "[")?;
+                for (i, v) in l.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{}", v)?;
+                }
+                write!(f, "]")
             }
             Value::Nil => write!(f, "nil"),
             Value::NativeFunc(_) => write!(f, "<native-func>"),

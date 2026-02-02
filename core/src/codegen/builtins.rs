@@ -25,6 +25,11 @@ pub struct BuiltinDefinitions {
     pub dlisp_lt: FuncId,
     pub dlisp_eq: FuncId,
     pub dlisp_read_file: FuncId,
+    pub dlisp_make_vector: FuncId,
+    pub dlisp_vector_push: FuncId,
+    pub dlisp_vector_get: FuncId,
+    pub dlisp_vector_count: FuncId,
+    pub dlisp_vector_copy: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -114,6 +119,47 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     make_nil_sig.returns.push(AbiParam::new(int));
     let make_nil_id = module
         .declare_function("dlisp_make_nil", Linkage::Import, &make_nil_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_make_vector(capacity: usize) -> DlispValue*
+    let mut make_vector_sig = module.make_signature();
+    make_vector_sig.params.push(AbiParam::new(int)); // capacity
+    make_vector_sig.returns.push(AbiParam::new(int));
+    let make_vector_id = module
+        .declare_function("dlisp_make_vector", Linkage::Import, &make_vector_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_vector_push(vec: DlispValue*, val: DlispValue*)
+    let mut vector_push_sig = module.make_signature();
+    vector_push_sig.params.push(AbiParam::new(int));
+    vector_push_sig.params.push(AbiParam::new(int));
+    let vector_push_id = module
+        .declare_function("dlisp_vector_push", Linkage::Import, &vector_push_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_vector_get(vec: DlispValue*, index: usize) -> DlispValue*
+    let mut vector_get_sig = module.make_signature();
+    vector_get_sig.params.push(AbiParam::new(int));
+    vector_get_sig.params.push(AbiParam::new(int));
+    vector_get_sig.returns.push(AbiParam::new(int));
+    let vector_get_id = module
+        .declare_function("dlisp_vector_get", Linkage::Import, &vector_get_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_vector_count(vec: DlispValue*) -> usize
+    let mut vector_count_sig = module.make_signature();
+    vector_count_sig.params.push(AbiParam::new(int));
+    vector_count_sig.returns.push(AbiParam::new(int));
+    let vector_count_id = module
+        .declare_function("dlisp_vector_count", Linkage::Import, &vector_count_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_vector_copy(vec: DlispValue*) -> DlispValue*
+    let mut vector_copy_sig = module.make_signature();
+    vector_copy_sig.params.push(AbiParam::new(int));
+    vector_copy_sig.returns.push(AbiParam::new(int));
+    let vector_copy_id = module
+        .declare_function("dlisp_vector_copy", Linkage::Import, &vector_copy_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_print(DlispValue*)
@@ -232,5 +278,10 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_lt: lt_id,
         dlisp_eq: eq_id,
         dlisp_read_file: read_file_id,
+        dlisp_make_vector: make_vector_id,
+        dlisp_vector_push: vector_push_id,
+        dlisp_vector_get: vector_get_id,
+        dlisp_vector_count: vector_count_id,
+        dlisp_vector_copy: vector_copy_id,
     })
 }

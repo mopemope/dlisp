@@ -11,6 +11,7 @@ pub mod mul;
 pub mod print;
 pub mod sleep;
 pub mod sub;
+pub mod vector;
 
 pub fn install(env: &mut Environment) {
     env.set("+".to_string(), Value::NativeFunc(add::add));
@@ -23,4 +24,8 @@ pub fn install(env: &mut Environment) {
     env.set("sleep".to_string(), Value::NativeFunc(sleep::sleep_fn));
     env.set("read-file".to_string(), Value::NativeFunc(io::read_file));
     env.set("list".to_string(), Value::NativeFunc(list::list));
+    env.set("vector".to_string(), Value::NativeFunc(vector::vector));
+    env.set("nth".to_string(), Value::NativeFunc(vector::nth));
+    env.set("count".to_string(), Value::NativeFunc(vector::count));
+    env.set("conj".to_string(), Value::NativeFunc(vector::conj));
 }
