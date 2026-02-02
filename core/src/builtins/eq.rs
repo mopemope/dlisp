@@ -7,37 +7,56 @@ pub fn eq(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Val
             return Err("= requires exactly 2 arguments".to_string());
         }
 
-        match (&args[0], &args[1]) {
-            (Value::Integer(a), Value::Integer(b)) => {
-                Ok(Value::Integer(if a == b { 1 } else { 0 }))
+        fn is_equal(a: &Value, b: &Value) -> bool {
+            match (a, b) {
+                (Value::Integer(a), Value::Integer(b)) => a == b,
+                (Value::Float(a), Value::Float(b)) => (a - b).abs() < f64::EPSILON,
+                (Value::Integer(a), Value::Float(b)) => (*a as f64 - *b).abs() < f64::EPSILON,
+                (Value::Float(a), Value::Integer(b)) => (*a - *b as f64).abs() < f64::EPSILON,
+                (Value::List(a), Value::List(b)) => {
+                    if a.len() != b.len() {
+                        return false;
+                    }
+                    a.iter().zip(b.iter()).all(|(x, y)| is_equal(x, y))
+                }
+                (Value::Vector(a), Value::Vector(b)) => {
+                    if a.len() != b.len() {
+                        return false;
+                    }
+                    a.iter().zip(b.iter()).all(|(x, y)| is_equal(x, y))
+                }
+                (Value::Map(a), Value::Map(b)) => {
+                    if a.len() != b.len() {
+                        return false;
+                    }
+                    // For Maps, we can't zip. We must check if every key in A exists in B and values are equal.
+                    // Note: This relies on key equality being strict (Hash/Eq) for lookup.
+                    // If we want loose key equality, it's O(N^2).
+                    // We will stick to strict KEY equality, but loose VALUE equality.
+                    for (k, v_a) in a {
+                        if let Some(v_b) = b.get(k) {
+                            if !is_equal(v_a, v_b) {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    }
+                    true
+                }
+                (Value::Symbol(a), Value::Symbol(b)) => a == b,
+                (Value::String(a), Value::String(b)) => a == b,
+                (Value::Nil, Value::Nil) => true,
+                (Value::Bool(a), Value::Bool(b)) => a == b,
+                _ => false,
             }
-            (Value::Float(a), Value::Float(b)) => {
-                Ok(Value::Integer(if (a - b).abs() < f64::EPSILON {
-                    1
-                } else {
-                    0
-                }))
-            }
-            (Value::Integer(a), Value::Float(b)) => {
-                Ok(Value::Integer(if (*a as f64 - *b).abs() < f64::EPSILON {
-                    1
-                } else {
-                    0
-                }))
-            }
-            (Value::Float(a), Value::Integer(b)) => {
-                Ok(Value::Integer(if (*a - *b as f64).abs() < f64::EPSILON {
-                    1
-                } else {
-                    0
-                }))
-            }
-            // Add other equality checks if needed, e.g. strings, symbols
-            (Value::Symbol(a), Value::Symbol(b)) => Ok(Value::Integer(if a == b { 1 } else { 0 })),
-            (Value::String(a), Value::String(b)) => Ok(Value::Integer(if a == b { 1 } else { 0 })),
-            (Value::Nil, Value::Nil) => Ok(Value::Integer(1)),
-            _ => Ok(Value::Integer(0)), // Different types or values are not equal
         }
+
+        Ok(Value::Integer(if is_equal(&args[0], &args[1]) {
+            1
+        } else {
+            0
+        }))
     })
 }
 
@@ -65,6 +84,43 @@ mod tests {
         );
         assert_eq!(
             eq(&[Value::Float(1.0), Value::Float(2.0)]).await,
+            Ok(Value::Integer(0))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eq_mixed() {
+        assert_eq!(
+            eq(&[Value::Integer(1), Value::Float(1.0)]).await,
+            Ok(Value::Integer(1))
+        );
+        assert_eq!(
+            eq(&[Value::Float(1.0), Value::Integer(1)]).await,
+            Ok(Value::Integer(1))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eq_other_types() {
+        assert_eq!(
+            eq(&[
+                Value::Symbol("a".to_string()),
+                Value::Symbol("a".to_string())
+            ])
+            .await,
+            Ok(Value::Integer(1))
+        );
+        assert_eq!(
+            eq(&[
+                Value::String("a".to_string()),
+                Value::String("a".to_string())
+            ])
+            .await,
+            Ok(Value::Integer(1))
+        );
+        assert_eq!(eq(&[Value::Nil, Value::Nil]).await, Ok(Value::Integer(1)));
+        assert_eq!(
+            eq(&[Value::Nil, Value::Integer(0)]).await,
             Ok(Value::Integer(0))
         );
     }

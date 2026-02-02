@@ -7,6 +7,7 @@ pub mod gt;
 pub mod io;
 pub mod list;
 pub mod lt;
+pub mod map;
 pub mod mul;
 pub mod print;
 pub mod sleep;
@@ -28,4 +29,12 @@ pub fn install(env: &mut Environment) {
     env.set("nth".to_string(), Value::NativeFunc(vector::nth));
     env.set("count".to_string(), Value::NativeFunc(vector::count));
     env.set("conj".to_string(), Value::NativeFunc(vector::conj));
+
+    env.set("hash-map".to_string(), Value::NativeFunc(map::hash_map));
+    env.set("get".to_string(), Value::NativeFunc(map::get));
+    env.set("assoc".to_string(), Value::NativeFunc(map::assoc));
+    env.set("dissoc".to_string(), Value::NativeFunc(map::dissoc));
+    env.set("keys".to_string(), Value::NativeFunc(map::keys));
+    env.set("vals".to_string(), Value::NativeFunc(map::vals));
+    env.set("contains?".to_string(), Value::NativeFunc(map::contains_q));
 }

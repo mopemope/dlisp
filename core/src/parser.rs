@@ -1,7 +1,7 @@
 use crate::ast::Value;
 use chumsky::prelude::*;
 
-pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Simple<'src, char>>> {
+pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Rich<'src, char>>> {
     let float = text::int(10)
         .then(just('.'))
         .then(text::int(10))
@@ -16,7 +16,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
 
     // Lisp symbols: letters, digits, and extended characters
     let symbol_char =
-        any().filter(|c: &char| c.is_alphanumeric() || "+-*/!@$%^&_=<>?".contains(*c));
+        any().filter(|c: &char| c.is_alphanumeric() || "+-*/!@$%^&_=<>?:".contains(*c));
 
     let symbol = symbol_char
         .repeated()
@@ -52,15 +52,35 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
             .delimited_by(just('['), just(']'))
             .map(Value::Vector);
 
+        let map = expr
+            .clone()
+            .padded()
+            .repeated()
+            .collect::<Vec<Value>>()
+            .delimited_by(just('{'), just('}'))
+            .try_map(|vec, span| {
+                if vec.len() % 2 != 0 {
+                    Err(Rich::custom(
+                        span,
+                        "Map literal must have even number of elements",
+                    ))
+                } else {
+                    let mut m = std::collections::HashMap::new();
+                    for chunk in vec.chunks(2) {
+                        m.insert(chunk[0].clone(), chunk[1].clone());
+                    }
+                    Ok(Value::Map(m))
+                }
+            });
+
         let quoted = just('\'')
             .ignore_then(expr)
             .map(|v| Value::List(vec![Value::Symbol("quote".to_string()), v]));
 
         // Order matters: float before int, boolean/nil before symbol if strictly overlapping,
-        // but here true/false/nil are specific symbols technically.
-        // We put specific keywords first.
+        // but here true/false/nil are specific keywords.
         choice((
-            float, int, boolean, nil, string, list, vector, quoted,
+            float, int, boolean, nil, string, list, vector, map, quoted,
             symbol, // symbol is last catch-all for identifiers
         ))
         .padded_by(comment.repeated()) // parsing comments trailing/surrounding values
@@ -72,7 +92,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Sim
     .then_ignore(end())
 }
 
-pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Simple<'_, char>>> {
+pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Rich<'_, char>>> {
     parser().parse(src).into_result()
 }
 
@@ -153,5 +173,48 @@ mod tests {
         } else {
             panic!("Expected vector");
         }
+    }
+
+    #[test]
+    fn test_parse_map() {
+        let vals = parse("{:a 1 :b 2}").unwrap();
+        let val = &vals[0];
+        if let Value::Map(m) = val {
+            assert_eq!(m.len(), 2);
+            assert_eq!(
+                m.get(&Value::Symbol(":a".to_string())),
+                Some(&Value::Integer(1))
+            );
+            assert_eq!(
+                m.get(&Value::Symbol(":b".to_string())),
+                Some(&Value::Integer(2))
+            );
+        } else {
+            panic!("Expected map");
+        }
+    }
+
+    #[test]
+    fn test_parse_map_nested() {
+        let vals = parse("{:a {1 2}}").unwrap();
+        let val = &vals[0];
+        if let Value::Map(m) = val {
+            assert_eq!(m.len(), 1);
+            let inner = m.get(&Value::Symbol(":a".to_string())).unwrap();
+            if let Value::Map(m2) = inner {
+                assert_eq!(m2.len(), 1);
+                assert_eq!(m2.get(&Value::Integer(1)), Some(&Value::Integer(2)));
+            } else {
+                panic!("Expected inner map");
+            }
+        } else {
+            panic!("Expected map");
+        }
+    }
+
+    #[test]
+    fn test_parse_map_odd_elements() {
+        let res = parse("{:a 1 :b}");
+        assert!(res.is_err());
     }
 }

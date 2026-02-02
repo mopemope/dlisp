@@ -39,10 +39,15 @@ impl Interpreter {
         let expanded = self.expand(val, env).await?;
 
         match expanded {
-            Value::Symbol(s) => env
-                .borrow()
-                .get(&s)
-                .ok_or_else(|| format!("Undefined symbol: {}", s)),
+            Value::Symbol(s) => {
+                if s.starts_with(':') {
+                    Ok(Value::Symbol(s))
+                } else {
+                    env.borrow()
+                        .get(&s)
+                        .ok_or_else(|| format!("Undefined symbol: {}", s))
+                }
+            }
             Value::List(list) => {
                 if list.is_empty() {
                     return Ok(Value::Nil);
@@ -81,6 +86,15 @@ impl Interpreter {
                     new_vec.push(self.eval(item, env).await?);
                 }
                 Ok(Value::Vector(new_vec))
+            }
+            Value::Map(map) => {
+                let mut new_map = std::collections::HashMap::new();
+                for (k, v) in map {
+                    let k_eval = self.eval(k, env).await?;
+                    let v_eval = self.eval(v, env).await?;
+                    new_map.insert(k_eval, v_eval);
+                }
+                Ok(Value::Map(new_map))
             }
             _ => Ok(expanded), // Self-evaluating
         }
@@ -230,6 +244,15 @@ impl Interpreter {
                     new_vec.push(self.expand(item.clone(), env).await?);
                 }
                 Ok(Value::Vector(new_vec))
+            }
+            Value::Map(map) => {
+                let mut new_map = std::collections::HashMap::new();
+                for (k, v) in map {
+                    let k_expanded = self.expand(k.clone(), env).await?;
+                    let v_expanded = self.expand(v.clone(), env).await?;
+                    new_map.insert(k_expanded, v_expanded);
+                }
+                Ok(Value::Map(new_map))
             }
             _ => Ok(val),
         }
