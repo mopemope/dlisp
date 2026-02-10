@@ -134,6 +134,18 @@ impl SpecialForm for QuoteForm {
     }
 }
 
+pub struct SetQForm;
+impl SpecialForm for SetQForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::setq::setq(interpreter, args, env))
+    }
+}
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
@@ -143,5 +155,6 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("lambda", LambdaForm);
     reg.register("defvar", DefVarForm);
     reg.register("quote", QuoteForm);
+    reg.register("setq", SetQForm);
     reg
 }

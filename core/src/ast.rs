@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::mutable_key_type)]
 #[allow(unpredictable_function_pointer_comparisons)]
 pub enum Value {
     Integer(i64),

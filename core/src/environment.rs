@@ -30,4 +30,15 @@ impl Environment {
     pub fn set(&mut self, name: String, value: Value) {
         self.values.insert(name, value);
     }
+
+    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
+        if self.values.contains_key(name) {
+            self.values.insert(name.to_string(), value);
+            Ok(())
+        } else if let Some(parent) = &self.parent {
+            parent.borrow_mut().assign(name, value)
+        } else {
+            Err(format!("Undefined variable '{}'", name))
+        }
+    }
 }

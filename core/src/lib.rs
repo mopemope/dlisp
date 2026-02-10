@@ -1,3 +1,4 @@
+#![allow(clippy::mutable_key_type)]
 // Core modules for dlisp
 
 pub mod ast;

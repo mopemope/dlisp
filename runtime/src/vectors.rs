@@ -22,7 +22,7 @@ pub extern "C" fn dlisp_make_vector(capacity: usize) -> *mut DlispValue {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_vector_push(vec: *mut DlispValue, val: *mut DlispValue) {
+pub unsafe extern "C" fn dlisp_vector_push(vec: *mut DlispValue, val: *mut DlispValue) {
     unsafe {
         if vec.is_null() || (*vec).type_ != ValueType::Vector {
             eprintln!("Type Error: vector push requires vector");
@@ -58,7 +58,7 @@ pub extern "C" fn dlisp_vector_push(vec: *mut DlispValue, val: *mut DlispValue) 
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_vector_get(
+pub unsafe extern "C" fn dlisp_vector_get(
     vec: *mut DlispValue,
     index_val: *mut DlispValue,
 ) -> *mut DlispValue {
@@ -93,7 +93,7 @@ pub extern "C" fn dlisp_vector_get(
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_vector_count(vec: *mut DlispValue) -> *mut DlispValue {
+pub unsafe extern "C" fn dlisp_vector_count(vec: *mut DlispValue) -> *mut DlispValue {
     unsafe {
         if vec.is_null() {
             return dlisp_make_int(0);
@@ -111,7 +111,7 @@ pub extern "C" fn dlisp_vector_count(vec: *mut DlispValue) -> *mut DlispValue {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_vector_copy(vec: *mut DlispValue) -> *mut DlispValue {
+pub unsafe extern "C" fn dlisp_vector_copy(vec: *mut DlispValue) -> *mut DlispValue {
     unsafe {
         if vec.is_null() || (*vec).type_ != ValueType::Vector {
             eprintln!("Type Error: vector copy requires vector");

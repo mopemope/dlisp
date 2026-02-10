@@ -5,4 +5,5 @@ pub mod lambda;
 pub mod let_expr;
 pub mod quote;
 pub mod registry;
+pub mod setq;
 pub mod spawn;

@@ -49,6 +49,19 @@
 (defvar *count* 0)
 ```
 
+### setq
+既存の変数の値を更新します。
+
+**構文:** `(setq <name> <value>)`
+
+- `<name>`: 変数名（シンボル）。
+- `<value>`: 新しい値。
+
+**例:**
+```lisp
+(setq *count* (+ *count* 1))
+```
+
 ### if
 条件分岐を行います。
 
