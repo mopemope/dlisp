@@ -30,6 +30,23 @@ pub struct BuiltinDefinitions {
     pub dlisp_vector_get: FuncId,
     pub dlisp_vector_count: FuncId,
     pub dlisp_vector_copy: FuncId,
+    // Phase 2 additions
+    pub dlisp_div: FuncId,
+    pub dlisp_mod: FuncId,
+    pub dlisp_gte: FuncId,
+    pub dlisp_lte: FuncId,
+    pub dlisp_neq: FuncId,
+    pub dlisp_str: FuncId,
+    pub dlisp_string_length: FuncId,
+    pub dlisp_substring: FuncId,
+    pub dlisp_string_append: FuncId,
+    pub dlisp_nil_p: FuncId,
+    pub dlisp_list_p: FuncId,
+    pub dlisp_number_p: FuncId,
+    pub dlisp_string_p: FuncId,
+    pub dlisp_symbol_p: FuncId,
+    pub dlisp_vector_p: FuncId,
+    pub dlisp_type_of: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -255,6 +272,81 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_read_file", Linkage::Import, &read_file_sig)
         .map_err(|e| e.to_string())?;
 
+    // --- Phase 2 Additions ---
+
+    // dlisp_div(DlispValue*, DlispValue*) -> DlispValue*
+    let div_id = module
+        .declare_function("dlisp_div", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_mod(DlispValue*, DlispValue*) -> DlispValue*
+    let mod_id = module
+        .declare_function("dlisp_mod", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_gte(DlispValue*, DlispValue*) -> DlispValue*
+    let gte_id = module
+        .declare_function("dlisp_gte", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_lte(DlispValue*, DlispValue*) -> DlispValue*
+    let lte_id = module
+        .declare_function("dlisp_lte", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_neq(DlispValue*, DlispValue*) -> DlispValue*
+    let neq_id = module
+        .declare_function("dlisp_neq", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_str(DlispValue*) -> DlispValue*
+    let str_id = module
+        .declare_function("dlisp_str", Linkage::Import, &car_sig) // Reuse unary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_string_length(DlispValue*) -> DlispValue*
+    let string_length_id = module
+        .declare_function("dlisp_string_length", Linkage::Import, &car_sig) // Reuse unary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_substring(DlispValue*, DlispValue*, DlispValue*) -> DlispValue*
+    let mut substring_sig = module.make_signature();
+    substring_sig.params.push(AbiParam::new(int));
+    substring_sig.params.push(AbiParam::new(int));
+    substring_sig.params.push(AbiParam::new(int));
+    substring_sig.returns.push(AbiParam::new(int));
+    let substring_id = module
+        .declare_function("dlisp_substring", Linkage::Import, &substring_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_string_append(DlispValue*, DlispValue*) -> DlispValue*
+    let string_append_id = module
+        .declare_function("dlisp_string_append", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // Predicates (unary)
+    let nil_p_id = module
+        .declare_function("dlisp_nil_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let list_p_id = module
+        .declare_function("dlisp_list_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let number_p_id = module
+        .declare_function("dlisp_number_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let string_p_id = module
+        .declare_function("dlisp_string_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let symbol_p_id = module
+        .declare_function("dlisp_symbol_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let vector_p_id = module
+        .declare_function("dlisp_vector_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let type_of_id = module
+        .declare_function("dlisp_type_of", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
     Ok(BuiltinDefinitions {
         printf: printf_id,
         dlisp_spawn: spawn_id,
@@ -283,5 +375,21 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_vector_get: vector_get_id,
         dlisp_vector_count: vector_count_id,
         dlisp_vector_copy: vector_copy_id,
+        dlisp_div: div_id,
+        dlisp_mod: mod_id,
+        dlisp_gte: gte_id,
+        dlisp_lte: lte_id,
+        dlisp_neq: neq_id,
+        dlisp_str: str_id,
+        dlisp_string_length: string_length_id,
+        dlisp_substring: substring_id,
+        dlisp_string_append: string_append_id,
+        dlisp_nil_p: nil_p_id,
+        dlisp_list_p: list_p_id,
+        dlisp_number_p: number_p_id,
+        dlisp_string_p: string_p_id,
+        dlisp_symbol_p: symbol_p_id,
+        dlisp_vector_p: vector_p_id,
+        dlisp_type_of: type_of_id,
     })
 }

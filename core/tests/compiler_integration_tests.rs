@@ -143,9 +143,9 @@ extern "C" fn dummy_sub(a: *mut u64, b: *mut u64) -> *mut u64 {
 }
 extern "C" fn dummy_lt(a: *mut u64, b: *mut u64) -> *mut u64 {
     if (a as u64) < (b as u64) {
-        1 as *mut u64
+        std::ptr::dangling_mut::<u64>()
     } else {
-        0 as *mut u64
+        std::ptr::null_mut::<u64>()
     }
 }
 extern "C" fn dummy_is_truthy(a: *mut u64) -> i32 {
@@ -157,5 +157,5 @@ extern "C" fn dummy_malloc(size: usize) -> *mut u8 {
 }
 extern "C" fn dummy_print(_: *mut u64) {}
 extern "C" fn dummy_make_nil() -> *mut u64 {
-    0 as *mut u64
+    std::ptr::null_mut::<u64>()
 }

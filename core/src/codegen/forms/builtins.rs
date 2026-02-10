@@ -27,6 +27,32 @@ pub fn compile_builtin<M: Module>(
         "count" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_count, false),
         "nth" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_vector_get),
         "conj" => compile_conj(ctx, list),
+        // Phase 2
+        "/" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_div),
+        "%" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_mod),
+        "mod" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_mod),
+        ">=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_gte),
+        "<=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_lte),
+        "/=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_neq),
+        "str" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_str, true),
+        "string-length" => {
+            compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_length, true)
+        }
+        "substring" => compile_substring(ctx, list), // Special case for 3 args
+        "string-append" => {
+            compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_string_append)
+        } // Can be variadic? No, runtime is binary. Use binary for now.
+        // Actually string-append in runtime is binary. If I use variadic arithmetic logic it loops.
+        // But variadic arithmetic logic assumes the function takes 2 args (acc, next).
+        // dlisp_string_append takes 2 args. So compile_variadic_arithmetic SHOULD work for string-append too!
+        // predicates
+        "nil?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_nil_p, true),
+        "list?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_list_p, true),
+        "number?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_number_p, true),
+        "string?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_p, true),
+        "symbol?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_symbol_p, true),
+        "vector?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_p, true),
+        "type-of" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_type_of, true),
         _ => unreachable!("Unknown builtin: {}", op),
     }
 }
@@ -187,4 +213,25 @@ fn compile_conj<M: Module>(
     }
 
     Ok(col_val)
+}
+
+fn compile_substring<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if list.len() != 4 {
+        return Err("substring requires exactly 3 arguments".to_string());
+    }
+    let s_val = ctx.compile_expr(&list[1])?;
+    let start_val = ctx.compile_expr(&list[2])?;
+    let end_val = ctx.compile_expr(&list[3])?;
+
+    let local_func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_substring, ctx.builder.func);
+    let call = ctx
+        .builder
+        .ins()
+        .call(local_func, &[s_val, start_val, end_val]);
+    Ok(ctx.builder.inst_results(call)[0])
 }

@@ -34,6 +34,27 @@ impl Default for JIT {
             "dlisp_spawn",
             "dlisp_sleep",
             "dlisp_gc_malloc",
+            // Phase 2
+            "dlisp_div",
+            "dlisp_mod",
+            "dlisp_gte",
+            "dlisp_lte",
+            "dlisp_neq",
+            "dlisp_str",
+            "dlisp_string_length",
+            "dlisp_substring",
+            "dlisp_string_append",
+            "dlisp_nil_p",
+            "dlisp_list_p",
+            "dlisp_number_p",
+            "dlisp_string_p",
+            "dlisp_symbol_p",
+            "dlisp_vector_p",
+            "dlisp_type_of",
+            "dlisp_vector_copy",
+            "dlisp_vector_push",
+            "dlisp_vector_get",
+            "dlisp_vector_count",
         ];
 
         unsafe extern "C" {

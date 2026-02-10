@@ -7,10 +7,7 @@ pub fn is_nil(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result
         if args.len() != 1 {
             return Err("nil? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::Nil => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(args[0], Value::Nil)))
     })
 }
 
@@ -21,10 +18,7 @@ pub fn is_list(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Resul
         if args.len() != 1 {
             return Err("list? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::List(_) | Value::Nil => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(args[0], Value::List(_) | Value::Nil)))
     })
 }
 
@@ -37,10 +31,10 @@ pub fn is_number(
         if args.len() != 1 {
             return Err("number? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::Integer(_) | Value::Float(_) => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(
+            args[0],
+            Value::Integer(_) | Value::Float(_)
+        )))
     })
 }
 
@@ -53,10 +47,7 @@ pub fn is_string(
         if args.len() != 1 {
             return Err("string? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::String(_) => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(args[0], Value::String(_))))
     })
 }
 
@@ -69,10 +60,7 @@ pub fn is_symbol(
         if args.len() != 1 {
             return Err("symbol? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::Symbol(_) => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(args[0], Value::Symbol(_))))
     })
 }
 
@@ -85,10 +73,7 @@ pub fn is_vector(
         if args.len() != 1 {
             return Err("vector? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::Vector(_) => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(args[0], Value::Vector(_))))
     })
 }
 
@@ -99,10 +84,7 @@ pub fn is_map(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result
         if args.len() != 1 {
             return Err("map? requires exactly 1 argument".to_string());
         }
-        Ok(match args[0] {
-            Value::Map(_) => Value::Integer(1),
-            _ => Value::Nil,
-        })
+        Ok(Value::Bool(matches!(args[0], Value::Map(_))))
     })
 }
 
@@ -138,24 +120,24 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_nil() {
-        assert_eq!(is_nil(&[Value::Nil]).await, Ok(Value::Integer(1)));
-        assert_eq!(is_nil(&[Value::Integer(1)]).await, Ok(Value::Nil));
+        assert_eq!(is_nil(&[Value::Nil]).await, Ok(Value::Bool(true)));
+        assert_eq!(is_nil(&[Value::Integer(1)]).await, Ok(Value::Bool(false)));
     }
 
     #[tokio::test]
     async fn test_is_list() {
-        assert_eq!(is_list(&[Value::List(vec![])]).await, Ok(Value::Integer(1)));
-        assert_eq!(is_list(&[Value::Nil]).await, Ok(Value::Integer(1)));
-        assert_eq!(is_list(&[Value::Integer(1)]).await, Ok(Value::Nil));
+        assert_eq!(is_list(&[Value::List(vec![])]).await, Ok(Value::Bool(true)));
+        assert_eq!(is_list(&[Value::Nil]).await, Ok(Value::Bool(true)));
+        assert_eq!(is_list(&[Value::Integer(1)]).await, Ok(Value::Bool(false)));
     }
 
     #[tokio::test]
     async fn test_is_number() {
-        assert_eq!(is_number(&[Value::Integer(1)]).await, Ok(Value::Integer(1)));
-        assert_eq!(is_number(&[Value::Float(1.0)]).await, Ok(Value::Integer(1)));
+        assert_eq!(is_number(&[Value::Integer(1)]).await, Ok(Value::Bool(true)));
+        assert_eq!(is_number(&[Value::Float(1.0)]).await, Ok(Value::Bool(true)));
         assert_eq!(
             is_number(&[Value::String("hi".to_string())]).await,
-            Ok(Value::Nil)
+            Ok(Value::Bool(false))
         );
     }
 

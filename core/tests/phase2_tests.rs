@@ -98,15 +98,15 @@ async fn test_gte() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(>= 3 3)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(>= 4 3)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(>= 2 3)", &mut i, &mut e).await,
-        Value::Integer(0)
+        Value::Bool(false)
     );
 }
 
@@ -115,15 +115,15 @@ async fn test_lte() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(<= 3 3)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(<= 2 3)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(<= 4 3)", &mut i, &mut e).await,
-        Value::Integer(0)
+        Value::Bool(false)
     );
 }
 
@@ -132,11 +132,11 @@ async fn test_neq() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(/= 1 2)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(/= 1 1)", &mut i, &mut e).await,
-        Value::Integer(0)
+        Value::Bool(false)
     );
 }
 
@@ -185,9 +185,12 @@ async fn test_nil_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(nil? nil)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(nil? 1)", &mut i, &mut e).await, Value::Nil);
+    assert_eq!(
+        eval_str("(nil? 1)", &mut i, &mut e).await,
+        Value::Bool(false)
+    );
 }
 
 #[tokio::test]
@@ -195,13 +198,16 @@ async fn test_list_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(list? '(1 2))", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(list? nil)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(list? 42)", &mut i, &mut e).await, Value::Nil);
+    assert_eq!(
+        eval_str("(list? 42)", &mut i, &mut e).await,
+        Value::Bool(false)
+    );
 }
 
 #[tokio::test]
@@ -209,15 +215,15 @@ async fn test_number_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(number? 42)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str("(number? 3.14)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
     assert_eq!(
         eval_str(r#"(number? "hi")"#, &mut i, &mut e).await,
-        Value::Nil
+        Value::Bool(false)
     );
 }
 
@@ -226,9 +232,12 @@ async fn test_string_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str(r#"(string? "hello")"#, &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(string? 42)", &mut i, &mut e).await, Value::Nil);
+    assert_eq!(
+        eval_str("(string? 42)", &mut i, &mut e).await,
+        Value::Bool(false)
+    );
 }
 
 #[tokio::test]
@@ -236,9 +245,12 @@ async fn test_symbol_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(symbol? 'foo)", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(symbol? 42)", &mut i, &mut e).await, Value::Nil);
+    assert_eq!(
+        eval_str("(symbol? 42)", &mut i, &mut e).await,
+        Value::Bool(false)
+    );
 }
 
 #[tokio::test]
@@ -246,9 +258,12 @@ async fn test_vector_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(vector? [1 2 3])", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(vector? 42)", &mut i, &mut e).await, Value::Nil);
+    assert_eq!(
+        eval_str("(vector? 42)", &mut i, &mut e).await,
+        Value::Bool(false)
+    );
 }
 
 #[tokio::test]
@@ -256,9 +271,12 @@ async fn test_map_pred() {
     let (mut i, mut e) = setup();
     assert_eq!(
         eval_str("(map? {1 2})", &mut i, &mut e).await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(map? 42)", &mut i, &mut e).await, Value::Nil);
+    assert_eq!(
+        eval_str("(map? 42)", &mut i, &mut e).await,
+        Value::Bool(false)
+    );
 }
 
 #[tokio::test]

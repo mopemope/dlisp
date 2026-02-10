@@ -446,6 +446,142 @@ pub unsafe extern "C" fn dlisp_eq(a: *mut DlispValue, b: *mut DlispValue) -> *mu
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_gte(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        let result = match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => (*a).payload.int_val >= (*b).payload.int_val,
+            (ValueType::Float, ValueType::Float) => {
+                (*a).payload.float_val >= (*b).payload.float_val
+            }
+            (ValueType::Int, ValueType::Float) => {
+                ((*a).payload.int_val as f64) >= (*b).payload.float_val
+            }
+            (ValueType::Float, ValueType::Int) => {
+                (*a).payload.float_val >= ((*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: >= requires numbers");
+                std::process::abort();
+            }
+        };
+
+        if result {
+            dlisp_make_bool(true)
+        } else {
+            dlisp_make_bool(false)
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_lte(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        let result = match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => (*a).payload.int_val <= (*b).payload.int_val,
+            (ValueType::Float, ValueType::Float) => {
+                (*a).payload.float_val <= (*b).payload.float_val
+            }
+            (ValueType::Int, ValueType::Float) => {
+                ((*a).payload.int_val as f64) <= (*b).payload.float_val
+            }
+            (ValueType::Float, ValueType::Int) => {
+                (*a).payload.float_val <= ((*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: <= requires numbers");
+                std::process::abort();
+            }
+        };
+
+        if result {
+            dlisp_make_bool(true)
+        } else {
+            dlisp_make_bool(false)
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_neq(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        let eq = dlisp_eq(a, b);
+        let is_eq = dlisp_is_truthy(eq) != 0;
+        dlisp_make_bool(!is_eq)
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_div(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => {
+                if (*b).payload.int_val == 0 {
+                    eprintln!("Runtime Error: Division by zero");
+                    std::process::abort();
+                }
+                dlisp_make_int((*a).payload.int_val / (*b).payload.int_val)
+            }
+            (ValueType::Float, ValueType::Float) => {
+                dlisp_make_float((*a).payload.float_val / (*b).payload.float_val)
+            }
+            (ValueType::Int, ValueType::Float) => {
+                dlisp_make_float((*a).payload.int_val as f64 / (*b).payload.float_val)
+            }
+            (ValueType::Float, ValueType::Int) => {
+                dlisp_make_float((*a).payload.float_val / (*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: / requires numbers");
+                std::process::abort();
+            }
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_mod(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        match ((*a).type_, (*b).type_) {
+            (ValueType::Int, ValueType::Int) => {
+                if (*b).payload.int_val == 0 {
+                    eprintln!("Runtime Error: Modulo by zero");
+                    std::process::abort();
+                }
+                dlisp_make_int((*a).payload.int_val % (*b).payload.int_val)
+            }
+            (ValueType::Float, ValueType::Float) => {
+                dlisp_make_float((*a).payload.float_val % (*b).payload.float_val)
+            }
+            (ValueType::Int, ValueType::Float) => {
+                dlisp_make_float((*a).payload.int_val as f64 % (*b).payload.float_val)
+            }
+            (ValueType::Float, ValueType::Int) => {
+                dlisp_make_float((*a).payload.float_val % (*b).payload.int_val as f64)
+            }
+            _ => {
+                eprintln!("Type Error: % requires numbers");
+                std::process::abort();
+            }
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `val` points to a valid `DlispValue` struct.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_is_truthy(val: *mut DlispValue) -> i32 {
@@ -594,6 +730,190 @@ pub unsafe extern "C" fn dlisp_read_file(val: *mut DlispValue) -> *mut DlispValu
                 dlisp_make_nil()
             }
         }
+    }
+}
+
+// --- String Operations ---
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_str(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if val.is_null() {
+            let c_str = std::ffi::CString::new("").unwrap();
+            return dlisp_make_string(c_str.into_raw());
+        }
+
+        let s = match (*val).type_ {
+            ValueType::Int => (*val).payload.int_val.to_string(),
+            ValueType::Float => (*val).payload.float_val.to_string(),
+            ValueType::Bool => (*val).payload.bool_val.to_string(),
+            ValueType::Nil => "nil".to_string(),
+            ValueType::String => {
+                let c_str = CStr::from_ptr((*val).payload.str_val);
+                c_str.to_string_lossy().to_string()
+            }
+            ValueType::Symbol => {
+                let c_str = CStr::from_ptr((*val).payload.str_val);
+                c_str.to_string_lossy().to_string()
+            }
+            ValueType::List => {
+                // Simplified representation for now
+                "list".to_string()
+            }
+            ValueType::Vector => "vector".to_string(),
+            _ => "unknown".to_string(),
+        };
+        let c_str = std::ffi::CString::new(s).unwrap();
+        dlisp_make_string(c_str.into_raw())
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_string_length(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if (*val).type_ != ValueType::String {
+            eprintln!("Type Error: string-length requires string");
+            std::process::abort();
+        }
+        let c_str = CStr::from_ptr((*val).payload.str_val);
+        let s = c_str.to_string_lossy();
+        let len = s.chars().count() as i64;
+        dlisp_make_int(len)
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_substring(
+    s_val: *mut DlispValue,
+    start_val: *mut DlispValue,
+    end_val: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if (*s_val).type_ != ValueType::String
+            || (*start_val).type_ != ValueType::Int
+            || (*end_val).type_ != ValueType::Int
+        {
+            eprintln!("Type Error: substring requires string, int, int");
+            std::process::abort();
+        }
+        let c_str = CStr::from_ptr((*s_val).payload.str_val);
+        let s = c_str.to_string_lossy();
+        let start = (*start_val).payload.int_val as usize;
+        let end = (*end_val).payload.int_val as usize;
+
+        let chars: Vec<char> = s.chars().collect();
+        if start > chars.len() || end > chars.len() || start > end {
+            let empty = std::ffi::CString::new("").unwrap();
+            return dlisp_make_string(empty.into_raw());
+        }
+
+        let sub: String = chars[start..end].iter().collect();
+        let c_sub = std::ffi::CString::new(sub).unwrap();
+        dlisp_make_string(c_sub.into_raw())
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_string_append(
+    a: *mut DlispValue,
+    b: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if (*a).type_ != ValueType::String || (*b).type_ != ValueType::String {
+            eprintln!("Type Error: string-append requires strings");
+            std::process::abort();
+        }
+        let s1 = CStr::from_ptr((*a).payload.str_val).to_string_lossy();
+        let s2 = CStr::from_ptr((*b).payload.str_val).to_string_lossy();
+        let combined = format!("{}{}", s1, s2);
+        let c_combined = std::ffi::CString::new(combined).unwrap();
+        dlisp_make_string(c_combined.into_raw())
+    }
+}
+
+// --- Type Predicates ---
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_nil_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::Nil) }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_list_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        dlisp_make_bool(
+            !val.is_null() && ((*val).type_ == ValueType::List || (*val).type_ == ValueType::Nil),
+        )
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_number_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        dlisp_make_bool(
+            !val.is_null() && ((*val).type_ == ValueType::Int || (*val).type_ == ValueType::Float),
+        )
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_string_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::String) }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_symbol_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::Symbol) }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_vector_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::Vector) }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_type_of(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        let name = if val.is_null() {
+            "nil"
+        } else {
+            match (*val).type_ {
+                ValueType::Int => "integer",
+                ValueType::Float => "float",
+                ValueType::Bool => "boolean",
+                ValueType::Nil => "nil",
+                ValueType::String => "string",
+                ValueType::Symbol => "symbol",
+                ValueType::List => "cons",
+                ValueType::Vector => "vector",
+                ValueType::Closure => "closure",
+                ValueType::NativePtr => "native_ptr",
+            }
+        };
+        let c_str = std::ffi::CString::new(name).unwrap();
+        dlisp_make_string(c_str.into_raw())
     }
 }
 

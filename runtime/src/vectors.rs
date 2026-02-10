@@ -21,6 +21,11 @@ pub extern "C" fn dlisp_make_vector(capacity: usize) -> *mut DlispValue {
     }
 }
 
+/// Pushes a value onto the end of a vector.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `vec` and `val` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_vector_push(vec: *mut DlispValue, val: *mut DlispValue) {
     unsafe {
@@ -57,6 +62,11 @@ pub unsafe extern "C" fn dlisp_vector_push(vec: *mut DlispValue, val: *mut Dlisp
     }
 }
 
+/// Gets an element from a vector at the specified index.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `vec` and `index_val` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_vector_get(
     vec: *mut DlispValue,
@@ -92,6 +102,11 @@ pub unsafe extern "C" fn dlisp_vector_get(
     }
 }
 
+/// Returns the number of elements in a vector.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `vec` points to a valid `DlispValue` struct.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_vector_count(vec: *mut DlispValue) -> *mut DlispValue {
     unsafe {
@@ -110,6 +125,11 @@ pub unsafe extern "C" fn dlisp_vector_count(vec: *mut DlispValue) -> *mut DlispV
     }
 }
 
+/// Returns a shallow copy of the vector.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `vec` points to a valid `DlispValue` struct.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_vector_copy(vec: *mut DlispValue) -> *mut DlispValue {
     unsafe {

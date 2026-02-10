@@ -16,6 +16,7 @@ pub async fn if_form(
     let cond = interpreter.eval(args[0].clone(), env).await?;
     let is_true = match cond {
         Value::Nil => false,        // nil is false
+        Value::Bool(b) => b,        // boolean false is false
         Value::Integer(0) => false, // 0 is false? common lisp nil is false, but let's stick to nil.
         // Actually earlier code treated 0 as false in JIT? No JIT treated 0 as false for logic.
         // Let's settle: Nil is false. Everything else is true.

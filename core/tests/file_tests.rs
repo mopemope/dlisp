@@ -22,10 +22,8 @@ async fn run_file(name: &str) -> Result<Value, String> {
 
     // Check for main
     let main_val = env.borrow().get("main");
-    if let Some(main_val) = main_val {
-        if let Value::UserFunc { .. } = main_val {
-            last_res = interpreter.apply(main_val, vec![], &mut env).await?;
-        }
+    if let Some(main_val @ Value::UserFunc { .. }) = main_val {
+        last_res = interpreter.apply(main_val, vec![], &mut env).await?;
     }
 
     Ok(last_res)
