@@ -2,17 +2,44 @@ use crate::ast::Value;
 use chumsky::prelude::*;
 
 pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Rich<'src, char>>> {
-    let float = text::int(10)
+    let float = just('-')
+        .or_not()
+        .then(text::int(10))
         .then(just('.'))
         .then(text::int(10))
-        .map(|((int_part, _dot), frac_part)| format!("{}.{}", int_part, frac_part))
-        .map(|s: String| Value::Float(s.parse().unwrap()));
+        .map(|(((sign, int_part), _dot), frac_part)| {
+            let mut s = String::new();
+            if sign.is_some() {
+                s.push('-');
+            }
+            s.push_str(int_part);
+            s.push('.');
+            s.push_str(frac_part);
+            Value::Float(s.parse().unwrap())
+        });
 
-    let int = text::int(10).map(|s: &str| Value::Integer(s.parse().unwrap()));
+    let int = just('-').or_not().then(text::int(10)).map(|(sign, s)| {
+        let mut res = String::new();
+        if sign.is_some() {
+            res.push('-');
+        }
+        res.push_str(s);
+        Value::Integer(res.parse().unwrap())
+    });
+    // Keywords nil/true/false must not be followed by symbol characters,
+    // otherwise "nil?" should parse as a single symbol.
+    let not_symbol_next =
+        none_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/!@$%^&_=<>?:")
+            .rewind()
+            .ignored()
+            .or(end().to(()));
 
     let boolean = just("true")
+        .then_ignore(not_symbol_next)
         .to(Value::Bool(true))
-        .or(just("false").to(Value::Bool(false)));
+        .or(just("false")
+            .then_ignore(not_symbol_next)
+            .to(Value::Bool(false)));
 
     // Lisp symbols: letters, digits, and extended characters
     let symbol_char =
@@ -29,7 +56,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
         .then_ignore(just('"'))
         .map(Value::String);
 
-    let nil = just("nil").to(Value::Nil);
+    let nil = just("nil").then_ignore(not_symbol_next).to(Value::Nil);
 
     let comment = just(';')
         .ignore_then(any().filter(|c| *c != '\n').repeated())
