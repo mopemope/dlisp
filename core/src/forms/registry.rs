@@ -146,6 +146,54 @@ impl SpecialForm for SetQForm {
     }
 }
 
+pub struct PrognForm;
+impl SpecialForm for PrognForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::progn::progn(interpreter, args, env))
+    }
+}
+
+pub struct CondForm;
+impl SpecialForm for CondForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::cond::cond(interpreter, args, env))
+    }
+}
+
+pub struct AndForm;
+impl SpecialForm for AndForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::and_or::and_form(interpreter, args, env))
+    }
+}
+
+pub struct OrForm;
+impl SpecialForm for OrForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::and_or::or_form(interpreter, args, env))
+    }
+}
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
@@ -156,5 +204,10 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("defvar", DefVarForm);
     reg.register("quote", QuoteForm);
     reg.register("setq", SetQForm);
+    reg.register("progn", PrognForm);
+    reg.register("do", PrognForm);
+    reg.register("cond", CondForm);
+    reg.register("and", AndForm);
+    reg.register("or", OrForm);
     reg
 }

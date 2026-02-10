@@ -6,6 +6,7 @@ pub mod eq;
 pub mod gt;
 pub mod io;
 pub mod list;
+pub mod list_ops;
 pub mod lt;
 pub mod map;
 pub mod mul;
@@ -37,4 +38,12 @@ pub fn install(env: &mut Environment) {
     env.set("keys".to_string(), Value::NativeFunc(map::keys));
     env.set("vals".to_string(), Value::NativeFunc(map::vals));
     env.set("contains?".to_string(), Value::NativeFunc(map::contains_q));
+
+    // List operations
+    env.set("not".to_string(), Value::NativeFunc(list_ops::not));
+    env.set("car".to_string(), Value::NativeFunc(list_ops::car));
+    env.set("first".to_string(), Value::NativeFunc(list_ops::car));
+    env.set("cdr".to_string(), Value::NativeFunc(list_ops::cdr));
+    env.set("rest".to_string(), Value::NativeFunc(list_ops::cdr));
+    env.set("cons".to_string(), Value::NativeFunc(list_ops::cons));
 }
