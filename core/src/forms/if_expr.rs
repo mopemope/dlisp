@@ -14,19 +14,8 @@ pub async fn if_form(
     }
 
     let cond = interpreter.eval(args[0].clone(), env).await?;
-    let is_true = match cond {
-        Value::Nil => false,        // nil is false
-        Value::Bool(b) => b,        // boolean false is false
-        Value::Integer(0) => false, // 0 is false? common lisp nil is false, but let's stick to nil.
-        // Actually earlier code treated 0 as false in JIT? No JIT treated 0 as false for logic.
-        // Let's settle: Nil is false. Everything else is true.
-        // Or if we used (>) returning 0/1. The JIT (>) returns 0 or 1.
-        // So Integer(0) should probably be false.
-        Value::Integer(n) => n != 0,
-        _ => true,
-    };
 
-    if is_true {
+    if cond.is_truthy() {
         Ok(Some(interpreter.eval(args[1].clone(), env).await?))
     } else if args.len() > 2 {
         Ok(Some(interpreter.eval(args[2].clone(), env).await?))

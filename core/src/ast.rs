@@ -48,6 +48,12 @@ impl Value {
             Value::Macro { .. } => 11,
         }
     }
+
+    /// Canonical truthiness check for DLisp values.
+    /// Nil, Bool(false), and Integer(0) are falsy; everything else is truthy.
+    pub fn is_truthy(&self) -> bool {
+        !matches!(self, Value::Nil | Value::Bool(false) | Value::Integer(0))
+    }
 }
 
 impl PartialEq for Value {

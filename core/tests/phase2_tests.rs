@@ -170,6 +170,19 @@ async fn test_substring() {
 }
 
 #[tokio::test]
+async fn test_substring_negative_index() {
+    let (mut i, mut e) = setup();
+    // Negative start index should return an error
+    let exprs = parse(r#"(substring "hello" -1 3)"#).unwrap();
+    let result = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(result.is_err(), "Expected error for negative start index");
+    // Negative end index should return an error
+    let exprs = parse(r#"(substring "hello" 0 -1)"#).unwrap();
+    let result = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(result.is_err(), "Expected error for negative end index");
+}
+
+#[tokio::test]
 async fn test_string_append() {
     let (mut i, mut e) = setup();
     assert_eq!(

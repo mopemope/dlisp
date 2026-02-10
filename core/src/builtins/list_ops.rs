@@ -2,15 +2,12 @@ use crate::ast::Value;
 use futures::future::LocalBoxFuture;
 
 /// (not expr)
-/// Returns true (1) if expr is nil or 0, false (nil) otherwise.
+/// Returns true if expr is falsy (nil, false, or 0), false otherwise.
 pub fn not(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
     if args.len() != 1 {
         return Box::pin(async { Err("not requires exactly 1 argument".to_string()) });
     }
-    let result = match &args[0] {
-        Value::Nil | Value::Integer(0) => Value::Integer(1),
-        _ => Value::Nil,
-    };
+    let result = Value::Bool(!args[0].is_truthy());
     Box::pin(async move { Ok(result) })
 }
 
@@ -90,17 +87,17 @@ mod tests {
 
     #[test]
     fn test_not_nil() {
-        assert_eq!(run(not(&[Value::Nil])).unwrap(), Value::Integer(1));
+        assert_eq!(run(not(&[Value::Nil])).unwrap(), Value::Bool(true));
     }
 
     #[test]
     fn test_not_zero() {
-        assert_eq!(run(not(&[Value::Integer(0)])).unwrap(), Value::Integer(1));
+        assert_eq!(run(not(&[Value::Integer(0)])).unwrap(), Value::Bool(true));
     }
 
     #[test]
     fn test_not_truthy() {
-        assert_eq!(run(not(&[Value::Integer(42)])).unwrap(), Value::Nil);
+        assert_eq!(run(not(&[Value::Integer(42)])).unwrap(), Value::Bool(false));
     }
 
     #[test]

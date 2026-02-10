@@ -124,7 +124,7 @@ async fn test_and_short_circuit() {
 async fn test_and_empty() {
     let (mut interp, mut env) = setup();
     let res = eval_str("(and)", &mut interp, &mut env).await;
-    assert_eq!(res, Value::Integer(1));
+    assert_eq!(res, Value::Bool(true));
 }
 
 #[tokio::test]
@@ -170,21 +170,21 @@ async fn test_or_short_circuit() {
 async fn test_not_nil() {
     let (mut interp, mut env) = setup();
     let res = eval_str("(not nil)", &mut interp, &mut env).await;
-    assert_eq!(res, Value::Integer(1));
+    assert_eq!(res, Value::Bool(true));
 }
 
 #[tokio::test]
 async fn test_not_zero() {
     let (mut interp, mut env) = setup();
     let res = eval_str("(not 0)", &mut interp, &mut env).await;
-    assert_eq!(res, Value::Integer(1));
+    assert_eq!(res, Value::Bool(true));
 }
 
 #[tokio::test]
 async fn test_not_truthy() {
     let (mut interp, mut env) = setup();
     let res = eval_str("(not 42)", &mut interp, &mut env).await;
-    assert_eq!(res, Value::Nil);
+    assert_eq!(res, Value::Bool(false));
 }
 
 // --- car ---
@@ -302,4 +302,56 @@ async fn test_progn_with_when_macro() {
     )
     .await;
     assert_eq!(res, Value::Integer(101));
+}
+
+// --- Bool(false) edge cases ---
+
+#[tokio::test]
+async fn test_and_bool_false() {
+    let (mut interp, mut env) = setup();
+    // (and false 42) should short-circuit on false
+    let res = eval_str("(and false 42)", &mut interp, &mut env).await;
+    assert_eq!(res, Value::Bool(false));
+}
+
+#[tokio::test]
+async fn test_or_bool_false() {
+    let (mut interp, mut env) = setup();
+    // (or false 42) should skip false and return 42
+    let res = eval_str("(or false 42)", &mut interp, &mut env).await;
+    assert_eq!(res, Value::Integer(42));
+}
+
+#[tokio::test]
+async fn test_cond_bool_false_condition() {
+    let (mut interp, mut env) = setup();
+    // cond with false as condition should skip to next clause
+    let res = eval_str(
+        "(cond (false \"wrong\") (true \"right\"))",
+        &mut interp,
+        &mut env,
+    )
+    .await;
+    assert_eq!(res, Value::String("right".to_string()));
+}
+
+#[tokio::test]
+async fn test_not_bool_false() {
+    let (mut interp, mut env) = setup();
+    let res = eval_str("(not false)", &mut interp, &mut env).await;
+    assert_eq!(res, Value::Bool(true));
+}
+
+#[tokio::test]
+async fn test_not_bool_true() {
+    let (mut interp, mut env) = setup();
+    let res = eval_str("(not true)", &mut interp, &mut env).await;
+    assert_eq!(res, Value::Bool(false));
+}
+
+#[tokio::test]
+async fn test_if_bool_false() {
+    let (mut interp, mut env) = setup();
+    let res = eval_str("(if false \"then\" \"else\")", &mut interp, &mut env).await;
+    assert_eq!(res, Value::String("else".to_string()));
 }

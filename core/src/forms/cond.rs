@@ -4,10 +4,6 @@ use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-fn is_truthy(val: &Value) -> bool {
-    !matches!(val, Value::Nil | Value::Integer(0))
-}
-
 pub async fn cond(
     interpreter: &mut Interpreter,
     args: &[Value],
@@ -20,7 +16,7 @@ pub async fn cond(
                     return Err("cond clause must be a non-empty list".to_string());
                 }
                 let test_val = interpreter.eval(pair[0].clone(), env).await?;
-                if is_truthy(&test_val) {
+                if test_val.is_truthy() {
                     // Evaluate remaining expressions in the clause, return last
                     if pair.len() == 1 {
                         return Ok(Some(test_val));

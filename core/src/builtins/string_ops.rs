@@ -48,11 +48,13 @@ pub fn substring(
             _ => return Err("substring first argument must be a string".to_string()),
         };
         let start = match &args[1] {
-            Value::Integer(i) => *i as usize,
+            Value::Integer(i) if *i >= 0 => *i as usize,
+            Value::Integer(_) => return Err("substring start must be non-negative".to_string()),
             _ => return Err("substring start must be an integer".to_string()),
         };
         let end = match &args[2] {
-            Value::Integer(i) => *i as usize,
+            Value::Integer(i) if *i >= 0 => *i as usize,
+            Value::Integer(_) => return Err("substring end must be non-negative".to_string()),
             _ => return Err("substring end must be an integer".to_string()),
         };
 
