@@ -1,7 +1,9 @@
 pub mod and_or;
+pub mod apply;
 pub mod cond;
 pub mod defun;
 pub mod defvar;
+pub mod eval;
 pub mod higher_order;
 pub mod if_expr;
 pub mod lambda;

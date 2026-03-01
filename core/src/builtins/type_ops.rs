@@ -114,6 +114,25 @@ pub fn type_of(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Resul
     })
 }
 
+/// (empty? x)
+/// Returns true if the collection or string is empty, false otherwise.
+pub fn is_empty(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("empty? requires exactly 1 argument".to_string());
+        }
+        match &args[0] {
+            Value::List(l) => Ok(Value::Bool(l.is_empty())),
+            Value::Vector(v) => Ok(Value::Bool(v.is_empty())),
+            Value::Map(m) => Ok(Value::Bool(m.is_empty())),
+            Value::String(s) => Ok(Value::Bool(s.is_empty())),
+            Value::Nil => Ok(Value::Bool(true)),
+            _ => Err("empty? requires a collection or string".to_string()),
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +173,27 @@ mod tests {
         assert_eq!(
             type_of(&[Value::Nil]).await,
             Ok(Value::String("nil".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_is_empty() {
+        assert_eq!(is_empty(&[Value::Nil]).await, Ok(Value::Bool(true)));
+        assert_eq!(
+            is_empty(&[Value::List(vec![])]).await,
+            Ok(Value::Bool(true))
+        );
+        assert_eq!(
+            is_empty(&[Value::List(vec![Value::Integer(1)])]).await,
+            Ok(Value::Bool(false))
+        );
+        assert_eq!(
+            is_empty(&[Value::String("hi".to_string())]).await,
+            Ok(Value::Bool(false))
+        );
+        assert_eq!(
+            is_empty(&[Value::String("".to_string())]).await,
+            Ok(Value::Bool(true))
         );
     }
 }

@@ -35,6 +35,8 @@ pub fn install(env: &mut Environment) {
     env.set(">=".to_string(), Value::NativeFunc(cmp::gte));
     env.set("<=".to_string(), Value::NativeFunc(cmp::lte));
     env.set("/=".to_string(), Value::NativeFunc(cmp::neq));
+    env.set("max".to_string(), Value::NativeFunc(cmp::max));
+    env.set("min".to_string(), Value::NativeFunc(cmp::min));
 
     // I/O
     env.set("print".to_string(), Value::NativeFunc(print::print));
@@ -49,6 +51,8 @@ pub fn install(env: &mut Environment) {
     env.set("cdr".to_string(), Value::NativeFunc(list_ops::cdr));
     env.set("rest".to_string(), Value::NativeFunc(list_ops::cdr));
     env.set("cons".to_string(), Value::NativeFunc(list_ops::cons));
+    env.set("append".to_string(), Value::NativeFunc(list_ops::append));
+    env.set("reverse".to_string(), Value::NativeFunc(list_ops::reverse));
 
     // Vector
     env.set("vector".to_string(), Value::NativeFunc(vector::vector));
@@ -82,6 +86,7 @@ pub fn install(env: &mut Environment) {
 
     // Type predicates
     env.set("nil?".to_string(), Value::NativeFunc(type_ops::is_nil));
+    env.set("empty?".to_string(), Value::NativeFunc(type_ops::is_empty));
     env.set("list?".to_string(), Value::NativeFunc(type_ops::is_list));
     env.set(
         "number?".to_string(),

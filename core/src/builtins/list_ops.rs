@@ -77,6 +77,49 @@ pub fn cons(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
     Box::pin(async move { Ok(result) })
 }
 
+/// (append &rest lists)
+/// Concatenates multiple lists or vectors into a single list.
+pub fn append(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        let mut result_list = Vec::new();
+        for arg in args {
+            match arg {
+                Value::List(l) => result_list.extend(l.into_iter()),
+                Value::Vector(v) => result_list.extend(v.into_iter()),
+                Value::Nil => {} // treat nil as empty list
+                _ => return Err("append requires lists or vectors".to_string()),
+            }
+        }
+        Ok(Value::List(result_list))
+    })
+}
+
+/// (reverse list)
+/// Returns a list with the elements in reverse order.
+pub fn reverse(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("reverse requires exactly 1 argument".to_string());
+        }
+        match &args[0] {
+            Value::List(l) => {
+                let mut rev = l.clone();
+                rev.reverse();
+                Ok(Value::List(rev))
+            }
+            Value::Vector(v) => {
+                let mut rev = v.clone();
+                rev.reverse();
+                Ok(Value::Vector(rev))
+            }
+            Value::Nil => Ok(Value::Nil),
+            _ => Err("reverse requires a list or vector".to_string()),
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +205,39 @@ mod tests {
         assert_eq!(
             run(cons(&[Value::Integer(1), Value::Nil])).unwrap(),
             Value::List(vec![Value::Integer(1)])
+        );
+    }
+
+    #[test]
+    fn test_append() {
+        let list1 = Value::List(vec![Value::Integer(1), Value::Integer(2)]);
+        let list2 = Value::List(vec![Value::Integer(3), Value::Integer(4)]);
+        assert_eq!(
+            run(append(&[list1, list2])).unwrap(),
+            Value::List(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+                Value::Integer(4)
+            ])
+        );
+        assert_eq!(run(append(&[])).unwrap(), Value::List(vec![]));
+    }
+
+    #[test]
+    fn test_reverse() {
+        let list = Value::List(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
+        assert_eq!(
+            run(reverse(&[list])).unwrap(),
+            Value::List(vec![
+                Value::Integer(3),
+                Value::Integer(2),
+                Value::Integer(1)
+            ])
         );
     }
 }

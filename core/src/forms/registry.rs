@@ -238,6 +238,30 @@ impl SpecialForm for ReduceForm {
     }
 }
 
+pub struct EvalForm;
+impl SpecialForm for EvalForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::eval::eval_form(interpreter, args, env))
+    }
+}
+
+pub struct ApplyForm;
+impl SpecialForm for ApplyForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::apply::apply_form(interpreter, args, env))
+    }
+}
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
@@ -256,5 +280,7 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("map", MapForm);
     reg.register("filter", FilterForm);
     reg.register("reduce", ReduceForm);
+    reg.register("eval", EvalForm);
+    reg.register("apply", ApplyForm);
     reg
 }

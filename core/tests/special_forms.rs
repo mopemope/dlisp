@@ -202,3 +202,48 @@ async fn test_spawn_with_arguments() {
         })
         .await;
 }
+
+#[tokio::test]
+async fn test_eval_form() {
+    let env = default_env();
+    let mut interpreter = default_interpreter();
+
+    // (eval '(+ 1 2)) -> 3
+    let eval_expr = Value::List(vec![
+        Value::Symbol("eval".to_string()),
+        Value::List(vec![
+            Value::Symbol("quote".to_string()),
+            Value::List(vec![
+                Value::Symbol("+".to_string()),
+                Value::Integer(1),
+                Value::Integer(2),
+            ]),
+        ]),
+    ]);
+
+    let res = interpreter.eval(eval_expr, &mut env.clone()).await;
+    assert_eq!(res.unwrap(), Value::Integer(3));
+}
+
+#[tokio::test]
+async fn test_apply_form() {
+    let env = default_env();
+    let mut interpreter = default_interpreter();
+
+    // (apply + '(1 2 3)) -> 6
+    let apply_expr = Value::List(vec![
+        Value::Symbol("apply".to_string()),
+        Value::Symbol("+".to_string()),
+        Value::List(vec![
+            Value::Symbol("quote".to_string()),
+            Value::List(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+            ]),
+        ]),
+    ]);
+
+    let res = interpreter.eval(apply_expr, &mut env.clone()).await;
+    assert_eq!(res.unwrap(), Value::Integer(6));
+}
