@@ -64,6 +64,19 @@ pub fn is_symbol(
     })
 }
 
+/// (keyword? x)
+pub fn is_keyword(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("keyword? requires exactly 1 argument".to_string());
+        }
+        Ok(Value::Bool(matches!(args[0], Value::Keyword(_))))
+    })
+}
+
 /// (vector? x)
 pub fn is_vector(
     args: &[Value],
@@ -101,6 +114,7 @@ pub fn type_of(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Resul
             Value::Float(_) => "float",
             Value::Bool(_) => "bool",
             Value::Symbol(_) => "symbol",
+            Value::Keyword(_) => "keyword",
             Value::String(_) => "string",
             Value::NativeFunc(_) => "function",
             Value::UserFunc { .. } => "function",

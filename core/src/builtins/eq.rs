@@ -45,6 +45,7 @@ pub fn eq(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Val
                     true
                 }
                 (Value::Symbol(a), Value::Symbol(b)) => a == b,
+                (Value::Keyword(a), Value::Keyword(b)) => a == b,
                 (Value::String(a), Value::String(b)) => a == b,
                 (Value::Nil, Value::Nil) => true,
                 (Value::Bool(a), Value::Bool(b)) => a == b,
@@ -121,6 +122,35 @@ mod tests {
         assert_eq!(eq(&[Value::Nil, Value::Nil]).await, Ok(Value::Integer(1)));
         assert_eq!(
             eq(&[Value::Nil, Value::Integer(0)]).await,
+            Ok(Value::Integer(0))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eq_keywords() {
+        assert_eq!(
+            eq(&[
+                Value::Keyword("a".to_string()),
+                Value::Keyword("a".to_string())
+            ])
+            .await,
+            Ok(Value::Integer(1))
+        );
+        assert_eq!(
+            eq(&[
+                Value::Keyword("a".to_string()),
+                Value::Keyword("b".to_string())
+            ])
+            .await,
+            Ok(Value::Integer(0))
+        );
+        // Keyword != Symbol
+        assert_eq!(
+            eq(&[
+                Value::Keyword("a".to_string()),
+                Value::Symbol("a".to_string())
+            ])
+            .await,
             Ok(Value::Integer(0))
         );
     }

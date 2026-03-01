@@ -26,7 +26,7 @@ async fn test_map_literal() {
         Value::Map(m) => {
             assert_eq!(m.len(), 2);
             assert_eq!(
-                m.get(&Value::Symbol(":a".to_string())),
+                m.get(&Value::Keyword("a".to_string())),
                 Some(&Value::Integer(1))
             );
         }
@@ -41,7 +41,7 @@ async fn test_hash_map() {
         Value::Map(m) => {
             assert_eq!(m.len(), 2);
             assert_eq!(
-                m.get(&Value::Symbol(":a".to_string())),
+                m.get(&Value::Keyword("a".to_string())),
                 Some(&Value::Integer(1))
             );
         }
@@ -64,11 +64,11 @@ async fn test_assoc() {
         Value::Map(m) => {
             assert_eq!(m.len(), 2);
             assert_eq!(
-                m.get(&Value::Symbol(":a".to_string())),
+                m.get(&Value::Keyword("a".to_string())),
                 Some(&Value::Integer(1))
             );
             assert_eq!(
-                m.get(&Value::Symbol(":b".to_string())),
+                m.get(&Value::Keyword("b".to_string())),
                 Some(&Value::Integer(2))
             );
         }
@@ -80,7 +80,7 @@ async fn test_assoc() {
         Value::Map(m) => {
             assert_eq!(m.len(), 1);
             assert_eq!(
-                m.get(&Value::Symbol(":a".to_string())),
+                m.get(&Value::Keyword("a".to_string())),
                 Some(&Value::Integer(1))
             );
         }
@@ -95,10 +95,10 @@ async fn test_dissoc() {
         Value::Map(m) => {
             assert_eq!(m.len(), 1);
             assert_eq!(
-                m.get(&Value::Symbol(":b".to_string())),
+                m.get(&Value::Keyword("b".to_string())),
                 Some(&Value::Integer(2))
             );
-            assert_eq!(m.get(&Value::Symbol(":a".to_string())), None);
+            assert_eq!(m.get(&Value::Keyword("a".to_string())), None);
         }
         _ => panic!("Expected Map"),
     }
@@ -110,7 +110,7 @@ async fn test_keys_vals() {
     let keys_val = eval_str("(keys {:a 1})").await;
     if let Value::List(l) = keys_val {
         assert_eq!(l.len(), 1);
-        assert_eq!(l[0], Value::Symbol(":a".to_string()));
+        assert_eq!(l[0], Value::Keyword("a".to_string()));
     } else {
         panic!("Expected List");
     }
@@ -156,7 +156,7 @@ async fn test_get_vector() {
     assert_eq!(eval_str("(get [10 20] 5)").await, Value::Nil);
     assert_eq!(
         eval_str("(get [10 20] 5 :default)").await,
-        Value::Symbol(":default".to_string())
+        Value::Keyword("default".to_string())
     );
 }
 
@@ -167,7 +167,7 @@ async fn test_nested_map() {
         Value::Map(m) => {
             assert_eq!(m.len(), 1);
             assert_eq!(
-                m.get(&Value::Symbol(":b".to_string())),
+                m.get(&Value::Keyword("b".to_string())),
                 Some(&Value::Integer(1))
             );
         }

@@ -122,6 +122,10 @@ pub fn install(env: &mut Environment) {
         Value::NativeFunc(type_ops::is_symbol),
     );
     env.set(
+        "keyword?".to_string(),
+        Value::NativeFunc(type_ops::is_keyword),
+    );
+    env.set(
         "vector?".to_string(),
         Value::NativeFunc(type_ops::is_vector),
     );

@@ -39,15 +39,11 @@ impl Interpreter {
         let expanded = self.expand(val, env).await?;
 
         match expanded {
-            Value::Symbol(s) => {
-                if s.starts_with(':') {
-                    Ok(Value::Symbol(s))
-                } else {
-                    env.borrow()
-                        .get(&s)
-                        .ok_or_else(|| format!("Undefined symbol: {}", s))
-                }
-            }
+            Value::Symbol(s) => env
+                .borrow()
+                .get(&s)
+                .ok_or_else(|| format!("Undefined symbol: {}", s)),
+            Value::Keyword(_) => Ok(expanded),
             Value::List(list) => {
                 if list.is_empty() {
                     return Ok(Value::Nil);

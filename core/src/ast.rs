@@ -13,6 +13,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     Symbol(String),
+    Keyword(String),
     String(String),
     NativeFunc(fn(&[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>>),
     UserFunc {
@@ -39,13 +40,14 @@ impl Value {
             Value::Integer(_) => 2,
             Value::Float(_) => 3,
             Value::Symbol(_) => 4,
-            Value::String(_) => 5,
-            Value::List(_) => 6,
-            Value::Vector(_) => 7,
-            Value::Map(_) => 8,
-            Value::NativeFunc(_) => 9,
-            Value::UserFunc { .. } => 10,
-            Value::Macro { .. } => 11,
+            Value::Keyword(_) => 5,
+            Value::String(_) => 6,
+            Value::List(_) => 7,
+            Value::Vector(_) => 8,
+            Value::Map(_) => 9,
+            Value::NativeFunc(_) => 10,
+            Value::UserFunc { .. } => 11,
+            Value::Macro { .. } => 12,
         }
     }
 
@@ -64,6 +66,7 @@ impl PartialEq for Value {
             (Value::Integer(a), Value::Integer(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
+            (Value::Keyword(a), Value::Keyword(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::List(a), Value::List(b)) => a == b,
             (Value::Vector(a), Value::Vector(b)) => a == b,
@@ -119,6 +122,7 @@ impl Hash for Value {
             Value::Integer(i) => i.hash(state),
             Value::Float(f) => f.to_bits().hash(state),
             Value::Symbol(s) => s.hash(state),
+            Value::Keyword(s) => s.hash(state),
             Value::String(s) => s.hash(state),
             Value::List(l) => l.hash(state),
             Value::Vector(v) => v.hash(state),
@@ -174,6 +178,7 @@ impl Ord for Value {
             // Handle float NaN ordering
             (Value::Float(a), Value::Float(b)) => a.total_cmp(b),
             (Value::Symbol(a), Value::Symbol(b)) => a.cmp(b),
+            (Value::Keyword(a), Value::Keyword(b)) => a.cmp(b),
             (Value::String(a), Value::String(b)) => a.cmp(b),
             (Value::List(a), Value::List(b)) => a.cmp(b),
             (Value::Vector(a), Value::Vector(b)) => a.cmp(b),
@@ -230,6 +235,7 @@ impl fmt::Display for Value {
             Value::Float(n) => write!(f, "{}", n),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Symbol(s) => write!(f, "{}", s),
+            Value::Keyword(s) => write!(f, ":{}", s),
             Value::String(s) => write!(f, "{}", s),
             Value::List(l) => {
                 write!(f, "(")?;

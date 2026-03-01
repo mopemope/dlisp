@@ -51,6 +51,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
         .collect::<String>()
         .map(Value::Symbol);
 
+    let keyword = just(':')
+        .ignore_then(symbol_char.repeated().at_least(1).collect::<String>())
+        .map(Value::Keyword);
+
     let string = just('"')
         .ignore_then(any().filter(|c| *c != '"').repeated().collect::<String>())
         .then_ignore(just('"'))
@@ -108,7 +112,8 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
         // but here true/false/nil are specific keywords.
         choice((
             float, int, boolean, nil, string, list, vector, map, quoted,
-            symbol, // symbol is last catch-all for identifiers
+            keyword, // keyword before symbol since both start with alphanumeric but keyword has :
+            symbol,  // symbol is last catch-all for identifiers
         ))
         .padded_by(comment.repeated()) // parsing comments trailing/surrounding values
     })
@@ -209,11 +214,11 @@ mod tests {
         if let Value::Map(m) = val {
             assert_eq!(m.len(), 2);
             assert_eq!(
-                m.get(&Value::Symbol(":a".to_string())),
+                m.get(&Value::Keyword("a".to_string())),
                 Some(&Value::Integer(1))
             );
             assert_eq!(
-                m.get(&Value::Symbol(":b".to_string())),
+                m.get(&Value::Keyword("b".to_string())),
                 Some(&Value::Integer(2))
             );
         } else {
@@ -227,7 +232,7 @@ mod tests {
         let val = &vals[0];
         if let Value::Map(m) = val {
             assert_eq!(m.len(), 1);
-            let inner = m.get(&Value::Symbol(":a".to_string())).unwrap();
+            let inner = m.get(&Value::Keyword("a".to_string())).unwrap();
             if let Value::Map(m2) = inner {
                 assert_eq!(m2.len(), 1);
                 assert_eq!(m2.get(&Value::Integer(1)), Some(&Value::Integer(2)));
