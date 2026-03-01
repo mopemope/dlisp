@@ -194,6 +194,50 @@ impl SpecialForm for OrForm {
     }
 }
 
+pub struct MapForm;
+impl SpecialForm for MapForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::map_form(interpreter, args, env))
+    }
+}
+
+pub struct FilterForm;
+impl SpecialForm for FilterForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::filter_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct ReduceForm;
+impl SpecialForm for ReduceForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::reduce_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
@@ -209,5 +253,8 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("cond", CondForm);
     reg.register("and", AndForm);
     reg.register("or", OrForm);
+    reg.register("map", MapForm);
+    reg.register("filter", FilterForm);
+    reg.register("reduce", ReduceForm);
     reg
 }
