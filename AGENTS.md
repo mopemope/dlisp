@@ -23,6 +23,9 @@ The project is organized as a Cargo workspace with two members:
 - **Run Script**: `cargo run --bin cli -- <filename>`
 - **Test**: `cargo test`
 
+### ⚠️ Testing Requirements After Code Modifications
+**IMPORTANT**: After applying code modifications in any task, you must explicitly verify that all features work correctly in both **JIT Compilation** and **Native (Interpreter) Execution** modes. Ensure that `cargo test` passes completely, specifically checking that both the normal AST evaluation and the Cranelift JIT compiled execution paths are unaffected.
+
 ## Key Concepts
 - **Values**: All Lisp values are represented by the `Value` enum. `UserFunc` stores both the AST body and an optional JIT-compiled code pointer.
 - **Async Execution**: The interpreter is async-first, leveraging `tokio` and `async_recursion`. The `spawn` special form allows concurrent execution.
