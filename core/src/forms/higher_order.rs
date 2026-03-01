@@ -25,11 +25,7 @@ pub fn map_form<'a>(
                     let val = interpreter.apply(func.clone(), vec![item], env).await?;
                     result.push(val);
                 }
-                if result.is_empty() {
-                    Ok(Some(Value::Nil))
-                } else {
-                    Ok(Some(Value::List(result)))
-                }
+                Ok(Some(Value::List(result)))
             }
             Value::Vector(list) => {
                 let mut result = Vec::with_capacity(list.len());
@@ -72,11 +68,7 @@ pub fn filter_form<'a>(
                         result.push(item);
                     }
                 }
-                if result.is_empty() {
-                    Ok(Some(Value::Nil))
-                } else {
-                    Ok(Some(Value::List(result)))
-                }
+                Ok(Some(Value::List(result)))
             }
             Value::Vector(list) => {
                 let mut result = Vec::with_capacity(list.len());

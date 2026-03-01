@@ -262,6 +262,18 @@ impl SpecialForm for ApplyForm {
     }
 }
 
+pub struct WhileForm;
+impl SpecialForm for WhileForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::while_loop::while_form(interpreter, args, env))
+    }
+}
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
@@ -282,5 +294,6 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("reduce", ReduceForm);
     reg.register("eval", EvalForm);
     reg.register("apply", ApplyForm);
+    reg.register("while", WhileForm);
     reg
 }

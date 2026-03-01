@@ -114,7 +114,9 @@ pub fn keys(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
             Box::pin(future::ready(Ok(Value::List(keys))))
         }
         Value::Nil => Box::pin(future::ready(Ok(Value::List(vec![])))),
-        _ => Box::pin(future::ready(Ok(Value::List(vec![])))),
+        _ => Box::pin(future::ready(Err(
+            "keys requires a map argument".to_string()
+        ))),
     }
 }
 
@@ -128,7 +130,9 @@ pub fn vals(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
             Box::pin(future::ready(Ok(Value::List(vals))))
         }
         Value::Nil => Box::pin(future::ready(Ok(Value::List(vec![])))),
-        _ => Box::pin(future::ready(Ok(Value::List(vec![])))),
+        _ => Box::pin(future::ready(Err(
+            "vals requires a map argument".to_string()
+        ))),
     }
 }
 

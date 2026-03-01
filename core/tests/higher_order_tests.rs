@@ -44,7 +44,7 @@ async fn test_map_basic() {
 async fn test_map_empty() {
     let (mut i, mut e) = setup();
     let res = eval_str("(map (lambda (x) (* x 2)) '())", &mut i, &mut e).await;
-    assert_eq!(res, Value::Nil);
+    assert_eq!(res, Value::List(vec![]));
 
     let res_nil = eval_str("(map (lambda (x) (* x 2)) nil)", &mut i, &mut e).await;
     assert_eq!(res_nil, Value::Nil);
@@ -79,14 +79,14 @@ async fn test_filter_basic() {
 async fn test_filter_all_out() {
     let (mut i, mut e) = setup();
     let res = eval_str("(filter (lambda (x) (> x 10)) '(1 2 3))", &mut i, &mut e).await;
-    assert_eq!(res, Value::Nil);
+    assert_eq!(res, Value::List(vec![]));
 }
 
 #[tokio::test]
 async fn test_filter_empty() {
     let (mut i, mut e) = setup();
     let res = eval_str("(filter (lambda (x) (> x 0)) '())", &mut i, &mut e).await;
-    assert_eq!(res, Value::Nil);
+    assert_eq!(res, Value::List(vec![]));
 }
 
 #[tokio::test]

@@ -120,6 +120,45 @@ pub fn reverse(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>>
     })
 }
 
+/// (sort list)
+/// Sorts a list or vector of comparable elements in ascending order.
+pub fn sort(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("sort requires exactly 1 argument".to_string());
+        }
+
+        let do_sort = |mut items: Vec<Value>| -> Result<Vec<Value>, String> {
+            items.sort_by(|a, b| {
+                match (a, b) {
+                    (Value::Integer(x), Value::Integer(y)) => x.cmp(y),
+                    (Value::Float(x), Value::Float(y)) => {
+                        x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
+                    }
+                    (Value::Integer(x), Value::Float(y)) => (*x as f64)
+                        .partial_cmp(y)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                    (Value::Float(x), Value::Integer(y)) => x
+                        .partial_cmp(&(*y as f64))
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                    (Value::String(x), Value::String(y)) => x.cmp(y),
+                    // If types are different or not comparable correctly, fallback to comparing formatted strings
+                    _ => format!("{}", a).cmp(&format!("{}", b)),
+                }
+            });
+            Ok(items)
+        };
+
+        match &args[0] {
+            Value::List(l) => Ok(Value::List(do_sort(l.clone())?)),
+            Value::Vector(v) => Ok(Value::Vector(do_sort(v.clone())?)),
+            Value::Nil => Ok(Value::Nil),
+            _ => Err("sort requires a list or vector".to_string()),
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,6 +276,37 @@ mod tests {
                 Value::Integer(3),
                 Value::Integer(2),
                 Value::Integer(1)
+            ])
+        );
+    }
+
+    #[test]
+    fn test_sort() {
+        let list = Value::List(vec![
+            Value::Integer(3),
+            Value::Integer(1),
+            Value::Integer(2),
+        ]);
+        assert_eq!(
+            run(sort(&[list])).unwrap(),
+            Value::List(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3)
+            ])
+        );
+
+        let str_list = Value::List(vec![
+            Value::String("c".to_string()),
+            Value::String("a".to_string()),
+            Value::String("b".to_string()),
+        ]);
+        assert_eq!(
+            run(sort(&[str_list])).unwrap(),
+            Value::List(vec![
+                Value::String("a".to_string()),
+                Value::String("b".to_string()),
+                Value::String("c".to_string())
             ])
         );
     }

@@ -247,3 +247,51 @@ async fn test_apply_form() {
     let res = interpreter.eval(apply_expr, &mut env.clone()).await;
     assert_eq!(res.unwrap(), Value::Integer(6));
 }
+
+#[tokio::test]
+async fn test_while_form() {
+    let env = default_env();
+    let mut interpreter = default_interpreter();
+
+    // Define a variable x = 0
+    let defvar_expr = Value::List(vec![
+        Value::Symbol("defvar".to_string()),
+        Value::Symbol("x".to_string()),
+        Value::Integer(0),
+    ]);
+    interpreter
+        .eval(defvar_expr, &mut env.clone())
+        .await
+        .unwrap();
+
+    // (while (< x 3) (setq x (+ x 1))) -> nil or last result
+    let while_expr = Value::List(vec![
+        Value::Symbol("while".to_string()),
+        Value::List(vec![
+            Value::Symbol("<".to_string()),
+            Value::Symbol("x".to_string()),
+            Value::Integer(3),
+        ]),
+        Value::List(vec![
+            Value::Symbol("setq".to_string()),
+            Value::Symbol("x".to_string()),
+            Value::List(vec![
+                Value::Symbol("+".to_string()),
+                Value::Symbol("x".to_string()),
+                Value::Integer(1),
+            ]),
+        ]),
+    ]);
+
+    interpreter
+        .eval(while_expr, &mut env.clone())
+        .await
+        .unwrap();
+
+    // Check x is 3
+    let get_x = Value::Symbol("x".to_string());
+    assert_eq!(
+        interpreter.eval(get_x, &mut env.clone()).await.unwrap(),
+        Value::Integer(3)
+    );
+}

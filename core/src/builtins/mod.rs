@@ -11,6 +11,7 @@ pub mod list;
 pub mod list_ops;
 pub mod lt;
 pub mod map;
+pub mod math;
 pub mod mul;
 pub mod print;
 pub mod sleep;
@@ -37,11 +38,14 @@ pub fn install(env: &mut Environment) {
     env.set("/=".to_string(), Value::NativeFunc(cmp::neq));
     env.set("max".to_string(), Value::NativeFunc(cmp::max));
     env.set("min".to_string(), Value::NativeFunc(cmp::min));
+    env.set("abs".to_string(), Value::NativeFunc(math::abs));
+    env.set("pow".to_string(), Value::NativeFunc(math::pow));
 
     // I/O
     env.set("print".to_string(), Value::NativeFunc(print::print));
     env.set("sleep".to_string(), Value::NativeFunc(sleep::sleep_fn));
     env.set("read-file".to_string(), Value::NativeFunc(io::read_file));
+    env.set("write-file".to_string(), Value::NativeFunc(io::write_file));
 
     // List
     env.set("list".to_string(), Value::NativeFunc(list::list));
@@ -53,6 +57,7 @@ pub fn install(env: &mut Environment) {
     env.set("cons".to_string(), Value::NativeFunc(list_ops::cons));
     env.set("append".to_string(), Value::NativeFunc(list_ops::append));
     env.set("reverse".to_string(), Value::NativeFunc(list_ops::reverse));
+    env.set("sort".to_string(), Value::NativeFunc(list_ops::sort));
 
     // Vector
     env.set("vector".to_string(), Value::NativeFunc(vector::vector));
@@ -82,6 +87,22 @@ pub fn install(env: &mut Environment) {
     env.set(
         "string-append".to_string(),
         Value::NativeFunc(string_ops::string_append),
+    );
+    env.set(
+        "string-split".to_string(),
+        Value::NativeFunc(string_ops::string_split),
+    );
+    env.set(
+        "string-replace".to_string(),
+        Value::NativeFunc(string_ops::string_replace),
+    );
+    env.set(
+        "string-upper".to_string(),
+        Value::NativeFunc(string_ops::string_upper),
+    );
+    env.set(
+        "string-lower".to_string(),
+        Value::NativeFunc(string_ops::string_lower),
     );
 
     // Type predicates

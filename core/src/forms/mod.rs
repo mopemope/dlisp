@@ -13,3 +13,4 @@ pub mod quote;
 pub mod registry;
 pub mod setq;
 pub mod spawn;
+pub mod while_loop;
