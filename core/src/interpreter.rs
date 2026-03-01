@@ -81,14 +81,14 @@ impl Interpreter {
                 self.apply(func_val, args, env).await
             }
             Value::Vector(vec) => {
-                let mut new_vec = Vec::new();
+                let mut new_vec = Vec::with_capacity(vec.len());
                 for item in vec {
                     new_vec.push(self.eval(item, env).await?);
                 }
                 Ok(Value::Vector(new_vec))
             }
             Value::Map(map) => {
-                let mut new_map = std::collections::HashMap::new();
+                let mut new_map = std::collections::HashMap::with_capacity(map.len());
                 for (k, v) in map {
                     let k_eval = self.eval(k, env).await?;
                     let v_eval = self.eval(v, env).await?;
@@ -232,21 +232,21 @@ impl Interpreter {
                 }
 
                 // Recursively expand list elements (default case)
-                let mut new_list = Vec::new();
+                let mut new_list = Vec::with_capacity(list.len());
                 for item in list {
                     new_list.push(self.expand(item.clone(), env).await?);
                 }
                 Ok(Value::List(new_list))
             }
             Value::Vector(vec) => {
-                let mut new_vec = Vec::new();
+                let mut new_vec = Vec::with_capacity(vec.len());
                 for item in vec {
                     new_vec.push(self.expand(item.clone(), env).await?);
                 }
                 Ok(Value::Vector(new_vec))
             }
             Value::Map(map) => {
-                let mut new_map = std::collections::HashMap::new();
+                let mut new_map = std::collections::HashMap::with_capacity(map.len());
                 for (k, v) in map {
                     let k_expanded = self.expand(k.clone(), env).await?;
                     let v_expanded = self.expand(v.clone(), env).await?;

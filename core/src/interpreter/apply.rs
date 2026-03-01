@@ -46,10 +46,10 @@ pub async fn apply(
             for (name, val) in param_names.iter().zip(args.into_iter()) {
                 func_env.set(name.clone(), val);
             }
-            let func_env_rc = Rc::new(RefCell::new(func_env));
+            let mut func_env_rc = Rc::new(RefCell::new(func_env));
             let mut result = Value::Nil;
             for expr in body {
-                result = interpreter.eval(expr, &mut func_env_rc.clone()).await?;
+                result = interpreter.eval(expr, &mut func_env_rc).await?;
             }
             Ok(result)
         }

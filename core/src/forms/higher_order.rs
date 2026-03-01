@@ -31,9 +31,17 @@ pub fn map_form<'a>(
                     Ok(Some(Value::List(result)))
                 }
             }
+            Value::Vector(list) => {
+                let mut result = Vec::with_capacity(list.len());
+                for item in list {
+                    let val = interpreter.apply(func.clone(), vec![item], env).await?;
+                    result.push(val);
+                }
+                Ok(Some(Value::Vector(result)))
+            }
             Value::Nil => Ok(Some(Value::Nil)),
             val => Err(format!(
-                "map expects a list as the second argument, got: {}",
+                "map expects a list or vector as the second argument, got: {}",
                 val
             )),
         }
@@ -70,9 +78,21 @@ pub fn filter_form<'a>(
                     Ok(Some(Value::List(result)))
                 }
             }
+            Value::Vector(list) => {
+                let mut result = Vec::with_capacity(list.len());
+                for item in list {
+                    let val = interpreter
+                        .apply(func.clone(), vec![item.clone()], env)
+                        .await?;
+                    if val.is_truthy() {
+                        result.push(item);
+                    }
+                }
+                Ok(Some(Value::Vector(result)))
+            }
             Value::Nil => Ok(Some(Value::Nil)),
             val => Err(format!(
-                "filter expects a list as the second argument, got: {}",
+                "filter expects a list or vector as the second argument, got: {}",
                 val
             )),
         }
@@ -94,7 +114,7 @@ pub fn reduce_form<'a>(
         let list_val = interpreter.eval(args[2].clone(), env).await?;
 
         match list_val {
-            Value::List(list) => {
+            Value::List(list) | Value::Vector(list) => {
                 for item in list {
                     acc = interpreter
                         .apply(func.clone(), vec![acc, item], env)
@@ -104,7 +124,7 @@ pub fn reduce_form<'a>(
             }
             Value::Nil => Ok(Some(acc)),
             val => Err(format!(
-                "reduce expects a list as the third argument, got: {}",
+                "reduce expects a list or vector as the third argument, got: {}",
                 val
             )),
         }

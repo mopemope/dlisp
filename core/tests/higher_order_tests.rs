@@ -239,3 +239,38 @@ async fn test_reduce_not_a_func() {
     assert!(res.is_err());
     assert!(res.unwrap_err().contains("not a function"));
 }
+
+#[tokio::test]
+async fn test_map_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map (lambda (x) (* x 2)) [1 2 3])", &mut i, &mut e).await;
+    assert_eq!(
+        res,
+        Value::Vector(vec![
+            Value::Integer(2),
+            Value::Integer(4),
+            Value::Integer(6)
+        ])
+    );
+}
+
+#[tokio::test]
+async fn test_filter_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(filter (lambda (x) (> x 2)) [1 2 3 4 5])", &mut i, &mut e).await;
+    assert_eq!(
+        res,
+        Value::Vector(vec![
+            Value::Integer(3),
+            Value::Integer(4),
+            Value::Integer(5)
+        ])
+    );
+}
+
+#[tokio::test]
+async fn test_reduce_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(reduce + 0 [1 2 3 4 5])", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(15));
+}

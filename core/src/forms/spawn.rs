@@ -14,31 +14,21 @@ pub async fn spawn(
     }
 
     let func_val = interpreter.eval(args[0].clone(), env).await?;
+    let mut eval_args = Vec::with_capacity(args.len().saturating_sub(1));
+    for arg in &args[1..] {
+        eval_args.push(interpreter.eval(arg.clone(), env).await?);
+    }
+
     let env_clone = env.clone();
 
     tokio::task::spawn_local(async move {
-        match func_val {
-            Value::UserFunc {
-                args: _param_names,
-                body,
-                jit_code: _,
-                env: _,
-            } => {
-                let func_env = Environment::new(Some(env_clone));
-                let func_env_rc = Rc::new(RefCell::new(func_env));
-                let mut interpreter = Interpreter::new();
-                for expr in body {
-                    if let Err(e) = interpreter.eval(expr, &mut func_env_rc.clone()).await {
-                        eprintln!("Spawned task error: {}", e);
-                    }
-                }
-            }
-            Value::NativeFunc(f) => {
-                if let Err(e) = f(&[]).await {
-                    eprintln!("Spawned task error: {}", e);
-                }
-            }
-            _ => eprintln!("Spawn expected a function"),
+        let mut interpreter = Interpreter::new();
+        // apply expects the arguments and env to be passed seamlessly.
+        if let Err(e) = interpreter
+            .apply(func_val, eval_args, &mut env_clone.clone())
+            .await
+        {
+            eprintln!("Spawned task error: {}", e);
         }
     });
 

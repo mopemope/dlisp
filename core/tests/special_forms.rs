@@ -144,3 +144,61 @@ async fn test_spawn_execution() {
         })
         .await;
 }
+
+#[tokio::test]
+async fn test_spawn_with_arguments() {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            let env = default_env();
+
+            // Set up a global variable to track side-effects
+            env.borrow_mut()
+                .set("counter".to_string(), Value::Integer(0));
+
+            let mut interpreter = default_interpreter();
+
+            // (defun increment_counter (amount) (setq counter (+ counter amount)))
+            let defun_expr = Value::List(vec![
+                Value::Symbol("defun".to_string()),
+                Value::Symbol("increment_counter".to_string()),
+                Value::List(vec![Value::Symbol("amount".to_string())]),
+                Value::List(vec![
+                    Value::Symbol("setq".to_string()),
+                    Value::Symbol("counter".to_string()),
+                    Value::List(vec![
+                        Value::Symbol("+".to_string()),
+                        Value::Symbol("counter".to_string()),
+                        Value::Symbol("amount".to_string()),
+                    ]),
+                ]),
+            ]);
+            interpreter
+                .eval(defun_expr, &mut env.clone())
+                .await
+                .unwrap();
+
+            // (spawn increment_counter 10)
+            let spawn_expr = Value::List(vec![
+                Value::Symbol("spawn".to_string()),
+                Value::Symbol("increment_counter".to_string()),
+                Value::Integer(10),
+            ]);
+
+            let res = interpreter.eval(spawn_expr, &mut env.clone()).await;
+            assert_eq!(res.unwrap(), Value::Nil); // spawn immediately returns nil
+
+            // Give it a moment to run
+            tokio::time::sleep(tokio::time::Duration::from_millis(15)).await;
+
+            // Validate that the spawned task executed with the argument and updated 'counter'
+            let get_counter_expr = Value::Symbol("counter".to_string());
+            let current_counter = interpreter
+                .eval(get_counter_expr, &mut env.clone())
+                .await
+                .unwrap();
+
+            assert_eq!(current_counter, Value::Integer(10));
+        })
+        .await;
+}

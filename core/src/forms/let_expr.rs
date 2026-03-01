@@ -49,12 +49,12 @@ pub async fn let_form(
     for (name, val) in evaluated_bindings {
         new_env_inner.set(name, val);
     }
-    let new_env = Rc::new(RefCell::new(new_env_inner));
+    let mut new_env = Rc::new(RefCell::new(new_env_inner));
 
     // 3. Evaluate body in new scope
     let mut result = Value::Nil;
     for expr in body {
-        result = interpreter.eval(expr, &mut new_env.clone()).await?;
+        result = interpreter.eval(expr, &mut new_env).await?;
     }
 
     Ok(Some(result))
