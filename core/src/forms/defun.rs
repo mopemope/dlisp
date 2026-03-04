@@ -21,11 +21,29 @@ pub fn defun(
         _ => return Err("defun args must be a list".to_string()),
     };
     let mut arg_names = Vec::new();
-    for arg in params {
-        match arg {
+    let mut rest_param = None;
+    let mut i = 0;
+    while i < params.len() {
+        match &params[i] {
+            Value::Symbol(n) if n == "&rest" => {
+                if i + 1 >= params.len() {
+                    return Err("&rest requires a parameter name".to_string());
+                }
+                match &params[i + 1] {
+                    Value::Symbol(rest_name) => {
+                        rest_param = Some(rest_name.clone());
+                    }
+                    _ => return Err("&rest parameter must be a symbol".to_string()),
+                }
+                if i + 2 < params.len() {
+                    return Err("&rest parameter must be last in the parameter list".to_string());
+                }
+                break;
+            }
             Value::Symbol(n) => arg_names.push(n.clone()),
             _ => return Err("defun arg must be a symbol".to_string()),
         }
+        i += 1;
     }
     let body = args[2..].to_vec();
 
@@ -39,6 +57,7 @@ pub fn defun(
 
     let func = Value::UserFunc {
         args: arg_names,
+        rest_param,
         body,
         jit_code,
         env: Some(env.clone()),

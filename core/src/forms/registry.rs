@@ -302,6 +302,58 @@ impl SpecialForm for WhileForm {
     }
 }
 
+pub struct WhenForm;
+impl SpecialForm for WhenForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::when_unless::when_form(interpreter, args, env))
+    }
+}
+
+pub struct UnlessForm;
+impl SpecialForm for UnlessForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::when_unless::unless_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct DotimesForm;
+impl SpecialForm for DotimesForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::dotimes::dotimes_form(interpreter, args, env))
+    }
+}
+
+pub struct DolistForm;
+impl SpecialForm for DolistForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::dolist::dolist_form(interpreter, args, env))
+    }
+}
+
 pub struct MacroExpandForm;
 impl SpecialForm for MacroExpandForm {
     fn call<'a>(
@@ -354,6 +406,10 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("eval", EvalForm);
     reg.register("apply", ApplyForm);
     reg.register("while", WhileForm);
+    reg.register("when", WhenForm);
+    reg.register("unless", UnlessForm);
+    reg.register("dotimes", DotimesForm);
+    reg.register("dolist", DolistForm);
     reg.register("macroexpand", MacroExpandForm);
     reg.register("load", LoadForm);
     reg.register("try", TryCatchForm);

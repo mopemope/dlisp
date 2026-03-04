@@ -42,20 +42,21 @@ async fn try_catch_impl(
 
     if let Value::List(last_list) = &body[last_idx]
         && !last_list.is_empty()
-            && let Value::Symbol(s) = &last_list[0]
-                && s == "catch" {
-                    if last_list.len() < 2 {
-                        return Err("catch requires a variable name".to_string());
-                    }
-                    if let Value::Symbol(var) = &last_list[1] {
-                        catch_var = var.clone();
-                        catch_body = last_list[2..].to_vec();
-                        has_catch = true;
-                        body.pop(); // Remove catch from body
-                    } else {
-                        return Err("catch variable must be a symbol".to_string());
-                    }
-                }
+        && let Value::Symbol(s) = &last_list[0]
+        && s == "catch"
+    {
+        if last_list.len() < 2 {
+            return Err("catch requires a variable name".to_string());
+        }
+        if let Value::Symbol(var) = &last_list[1] {
+            catch_var = var.clone();
+            catch_body = last_list[2..].to_vec();
+            has_catch = true;
+            body.pop(); // Remove catch from body
+        } else {
+            return Err("catch variable must be a symbol".to_string());
+        }
+    }
 
     // Evaluate body sequentially
     let mut last_val = Value::Nil;

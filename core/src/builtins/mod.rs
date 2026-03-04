@@ -134,6 +134,46 @@ pub fn install(env: &mut Environment) {
         "string-lower".to_string(),
         Value::NativeFunc(string_ops::string_lower),
     );
+    env.set(
+        "string-trim".to_string(),
+        Value::NativeFunc(string_ops::string_trim),
+    );
+    env.set(
+        "string-trim-left".to_string(),
+        Value::NativeFunc(string_ops::string_trim_left),
+    );
+    env.set(
+        "string-trim-right".to_string(),
+        Value::NativeFunc(string_ops::string_trim_right),
+    );
+    env.set(
+        "string-starts-with?".to_string(),
+        Value::NativeFunc(string_ops::string_starts_with),
+    );
+    env.set(
+        "string-ends-with?".to_string(),
+        Value::NativeFunc(string_ops::string_ends_with),
+    );
+    env.set(
+        "string-contains?".to_string(),
+        Value::NativeFunc(string_ops::string_contains),
+    );
+    env.set(
+        "string-index-of".to_string(),
+        Value::NativeFunc(string_ops::string_index_of),
+    );
+    env.set(
+        "string->number".to_string(),
+        Value::NativeFunc(string_ops::string_to_number),
+    );
+    env.set(
+        "number->string".to_string(),
+        Value::NativeFunc(string_ops::number_to_string),
+    );
+    env.set(
+        "char-at".to_string(),
+        Value::NativeFunc(string_ops::char_at),
+    );
 
     // Type predicates
     env.set("nil?".to_string(), Value::NativeFunc(type_ops::is_nil));

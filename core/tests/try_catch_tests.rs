@@ -1,7 +1,5 @@
 use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{default_env, default_interpreter};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 async fn run_code(code: &str) -> Result<Value, String> {
     let mut interpreter = default_interpreter();

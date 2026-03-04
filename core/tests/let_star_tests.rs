@@ -98,3 +98,22 @@ async fn test_let_star_multi_body() {
     .await;
     assert_eq!(res, Value::Integer(4)); // last body form
 }
+
+#[tokio::test]
+async fn test_let_star_closure_capture() {
+    let (mut interp, mut env) = setup();
+    // f captures the first x=1. The second x=2 creates a new scope.
+    // So (f) should still return 1, not 2.
+    let res = eval_str(
+        r#"
+        (let* ((x 1)
+               (f (lambda () x))
+               (x 2))
+          (f))
+        "#,
+        &mut interp,
+        &mut env,
+    )
+    .await;
+    assert_eq!(res, Value::Integer(1));
+}

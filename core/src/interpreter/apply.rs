@@ -14,16 +14,30 @@ pub async fn apply(
         Value::NativeFunc(f) => f(&args).await,
         Value::UserFunc {
             args: param_names,
+            rest_param,
             body,
             jit_code,
             env: captured_env,
         } => {
-            if args.len() != param_names.len() {
-                return Err(format!(
-                    "Function expects {} arguments, got {}",
-                    param_names.len(),
-                    args.len()
-                ));
+            // Validate argument count
+            if let Some(ref _rest) = rest_param {
+                // With &rest: at least param_names.len() args required
+                if args.len() < param_names.len() {
+                    return Err(format!(
+                        "Function expects at least {} arguments, got {}",
+                        param_names.len(),
+                        args.len()
+                    ));
+                }
+            } else {
+                // Without &rest: exact count required
+                if args.len() != param_names.len() {
+                    return Err(format!(
+                        "Function expects {} arguments, got {}",
+                        param_names.len(),
+                        args.len()
+                    ));
+                }
             }
 
             #[allow(clippy::collapsible_if)]
@@ -43,9 +57,22 @@ pub async fn apply(
             };
 
             let mut func_env = Environment::new(Some(parent_env));
-            for (name, val) in param_names.iter().zip(args.into_iter()) {
-                func_env.set(name.clone(), val);
+
+            // Bind named parameters
+            for (name, val) in param_names.iter().zip(args.iter()) {
+                func_env.set(name.clone(), val.clone());
             }
+
+            // Bind &rest parameter (remaining args as a list)
+            if let Some(rest_name) = rest_param {
+                let rest_args = if args.len() > param_names.len() {
+                    Value::List(args[param_names.len()..].to_vec())
+                } else {
+                    Value::Nil
+                };
+                func_env.set(rest_name, rest_args);
+            }
+
             let mut func_env_rc = Rc::new(RefCell::new(func_env));
             let mut result = Value::Nil;
             for expr in body {

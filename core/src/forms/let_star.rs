@@ -26,10 +26,10 @@ pub async fn let_star_form(
 
     let body = args[1..].to_vec();
 
-    // Create new scope
-    let mut new_env = Rc::new(RefCell::new(Environment::new(Some(env.clone()))));
+    // Start with the incoming environment
+    let mut current_env = env.clone();
 
-    // Evaluate each binding sequentially in the growing new environment
+    // Evaluate each binding sequentially, creating a new nested environment for each
     for binding in bindings {
         match binding {
             Value::List(bind_pair) => {
@@ -42,18 +42,23 @@ pub async fn let_star_form(
                     Value::Symbol(s) => s.clone(),
                     _ => return Err("let* binding key must be a symbol".to_string()),
                 };
-                // Evaluate in the NEW environment so previous bindings are visible
-                let val = interpreter.eval(bind_pair[1].clone(), &mut new_env).await?;
-                new_env.borrow_mut().set(symbol, val);
+                
+                // Evaluate in the current environment
+                let val = interpreter.eval(bind_pair[1].clone(), &mut current_env).await?;
+                
+                // Create a new scope for the next bindings and body, extending the current one
+                let mut new_scope = Environment::new(Some(current_env.clone()));
+                new_scope.set(symbol, val);
+                current_env = Rc::new(RefCell::new(new_scope));
             }
             _ => return Err("let* binding must be a list".to_string()),
         }
     }
 
-    // Evaluate body in new scope
+    // Evaluate body in the final nested scope
     let mut result = Value::Nil;
     for expr in body {
-        result = interpreter.eval(expr, &mut new_env).await?;
+        result = interpreter.eval(expr, &mut current_env).await?;
     }
 
     Ok(Some(result))

@@ -178,6 +178,216 @@ pub fn string_lower(
     })
 }
 
+/// (string-trim s)
+/// Removes leading and trailing whitespace.
+pub fn string_trim(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("string-trim requires exactly 1 argument".to_string());
+        }
+        match &args[0] {
+            Value::String(s) => Ok(Value::String(s.trim().to_string())),
+            _ => Err("string-trim requires a string argument".to_string()),
+        }
+    })
+}
+
+/// (string-trim-left s)
+/// Removes leading whitespace.
+pub fn string_trim_left(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("string-trim-left requires exactly 1 argument".to_string());
+        }
+        match &args[0] {
+            Value::String(s) => Ok(Value::String(s.trim_start().to_string())),
+            _ => Err("string-trim-left requires a string argument".to_string()),
+        }
+    })
+}
+
+/// (string-trim-right s)
+/// Removes trailing whitespace.
+pub fn string_trim_right(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("string-trim-right requires exactly 1 argument".to_string());
+        }
+        match &args[0] {
+            Value::String(s) => Ok(Value::String(s.trim_end().to_string())),
+            _ => Err("string-trim-right requires a string argument".to_string()),
+        }
+    })
+}
+
+/// (string-starts-with? s prefix)
+/// Returns true if string starts with the given prefix.
+pub fn string_starts_with(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("string-starts-with? requires exactly 2 arguments".to_string());
+        }
+        let s = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("string-starts-with? first arg must be a string".to_string()),
+        };
+        let prefix = match &args[1] {
+            Value::String(s) => s,
+            _ => return Err("string-starts-with? second arg must be a string".to_string()),
+        };
+        Ok(Value::Bool(s.starts_with(prefix.as_str())))
+    })
+}
+
+/// (string-ends-with? s suffix)
+/// Returns true if string ends with the given suffix.
+pub fn string_ends_with(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("string-ends-with? requires exactly 2 arguments".to_string());
+        }
+        let s = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("string-ends-with? first arg must be a string".to_string()),
+        };
+        let suffix = match &args[1] {
+            Value::String(s) => s,
+            _ => return Err("string-ends-with? second arg must be a string".to_string()),
+        };
+        Ok(Value::Bool(s.ends_with(suffix.as_str())))
+    })
+}
+
+/// (string-contains? s substr)
+/// Returns true if string contains the given substring.
+pub fn string_contains(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("string-contains? requires exactly 2 arguments".to_string());
+        }
+        let s = match &args[0] {
+            Value::String(s) => s,
+            _ => return Err("string-contains? first arg must be a string".to_string()),
+        };
+        let substr = match &args[1] {
+            Value::String(s) => s,
+            _ => return Err("string-contains? second arg must be a string".to_string()),
+        };
+        Ok(Value::Bool(s.contains(substr.as_str())))
+    })
+}
+
+/// (string-index-of s substr)
+/// Returns the index of the first occurrence of substr in s, or nil if not found.
+pub fn string_index_of(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("string-index-of requires exactly 2 arguments".to_string());
+        }
+        let s = match &args[0] {
+            Value::String(s) => s.clone(),
+            _ => return Err("string-index-of first arg must be a string".to_string()),
+        };
+        let substr = match &args[1] {
+            Value::String(s) => s.clone(),
+            _ => return Err("string-index-of second arg must be a string".to_string()),
+        };
+        match s.find(&substr) {
+            Some(idx) => Ok(Value::Integer(idx as i64)),
+            None => Ok(Value::Nil),
+        }
+    })
+}
+
+/// (string->number s)
+/// Parses a string into a number (integer or float). Returns nil on failure.
+pub fn string_to_number(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("string->number requires exactly 1 argument".to_string());
+        }
+        let s = match &args[0] {
+            Value::String(s) => s.clone(),
+            _ => return Err("string->number requires a string argument".to_string()),
+        };
+        if let Ok(i) = s.parse::<i64>() {
+            Ok(Value::Integer(i))
+        } else if let Ok(f) = s.parse::<f64>() {
+            Ok(Value::Float(f))
+        } else {
+            Ok(Value::Nil)
+        }
+    })
+}
+
+/// (number->string n)
+/// Converts a number to its string representation.
+pub fn number_to_string(
+    args: &[Value],
+) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("number->string requires exactly 1 argument".to_string());
+        }
+        match &args[0] {
+            Value::Integer(n) => Ok(Value::String(n.to_string())),
+            Value::Float(n) => Ok(Value::String(n.to_string())),
+            _ => Err("number->string requires a number argument".to_string()),
+        }
+    })
+}
+
+/// (char-at s index)
+/// Returns the character at the given index as a string, or nil if out of bounds.
+pub fn char_at(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("char-at requires exactly 2 arguments (string index)".to_string());
+        }
+        let s = match &args[0] {
+            Value::String(s) => s.clone(),
+            _ => return Err("char-at first arg must be a string".to_string()),
+        };
+        let idx = match &args[1] {
+            Value::Integer(i) if *i >= 0 => *i as usize,
+            Value::Integer(_) => return Err("char-at index must be non-negative".to_string()),
+            _ => return Err("char-at second arg must be an integer".to_string()),
+        };
+        let chars: Vec<char> = s.chars().collect();
+        if idx < chars.len() {
+            Ok(Value::String(chars[idx].to_string()))
+        } else {
+            Ok(Value::Nil)
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -19,6 +19,7 @@ pub enum Value {
     NativeFunc(fn(&[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>>),
     UserFunc {
         args: Vec<String>,
+        rest_param: Option<String>,
         body: Vec<Value>,
         jit_code: Option<usize>,
         env: Option<Rc<RefCell<crate::environment::Environment>>>,
@@ -79,22 +80,25 @@ impl PartialEq for Value {
             (
                 Value::UserFunc {
                     args: a_args,
+                    rest_param: a_rest,
                     body: a_body,
                     jit_code: a_jit,
                     env: a_env,
                 },
                 Value::UserFunc {
                     args: b_args,
+                    rest_param: b_rest,
                     body: b_body,
                     jit_code: b_jit,
                     env: b_env,
                 },
             ) => {
                 a_args == b_args
+                    && a_rest == b_rest
                     && a_body == b_body
                     && a_jit == b_jit
                     && match (a_env, b_env) {
-                        (Some(a), Some(b)) => Rc::ptr_eq(a, b), // Pointer equality for env
+                        (Some(a), Some(b)) => Rc::ptr_eq(a, b),
                         (None, None) => true,
                         _ => false,
                     }
@@ -143,11 +147,13 @@ impl Hash for Value {
             Value::NativeFunc(f) => (*f as usize).hash(state),
             Value::UserFunc {
                 args,
+                rest_param,
                 body,
                 jit_code,
                 env,
             } => {
                 args.hash(state);
+                rest_param.hash(state);
                 body.hash(state);
                 jit_code.hash(state);
                 if let Some(env) = env {
