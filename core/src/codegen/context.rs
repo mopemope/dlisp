@@ -226,7 +226,13 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     self.compile_quoted_value(&list[1])
                 }
                 "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr"
-                | "read-file" | "vector" | "nth" | "count" | "conj" => {
+                | "read-file" | "vector" | "nth" | "count" | "conj"
+                | "/" | "%" | "mod" | ">=" | "<=" | "/=" | "str" | "string-length" | "substring"
+                | "string-append" | "nil?" | "list?" | "number?" | "string?" | "symbol?"
+                | "vector?" | "type-of"
+                // Phase 3 Additions
+                | "file-exists?" | "is-dir?" | "is-file?" | "list-dir" | "delete-file"
+                | "getenv" | "setenv" | "cwd" | "set-cwd" | "args" | "exit" | "sh" => {
                     crate::codegen::forms::builtins::compile_builtin(self, op, list)
                 }
                 _ => {

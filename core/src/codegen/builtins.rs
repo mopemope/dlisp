@@ -47,6 +47,19 @@ pub struct BuiltinDefinitions {
     pub dlisp_symbol_p: FuncId,
     pub dlisp_vector_p: FuncId,
     pub dlisp_type_of: FuncId,
+    // Phase 3 additions (IO/SYS/OS)
+    pub dlisp_file_exists: FuncId,
+    pub dlisp_is_dir: FuncId,
+    pub dlisp_is_file: FuncId,
+    pub dlisp_list_dir: FuncId,
+    pub dlisp_delete_file: FuncId,
+    pub dlisp_getenv: FuncId,
+    pub dlisp_setenv: FuncId,
+    pub dlisp_cwd: FuncId,
+    pub dlisp_set_cwd: FuncId,
+    pub dlisp_args: FuncId,
+    pub dlisp_exit: FuncId,
+    pub dlisp_sh: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -347,6 +360,72 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_type_of", Linkage::Import, &car_sig)
         .map_err(|e| e.to_string())?;
 
+    // --- Phase 3 Additions ---
+
+    // dlisp_file_exists(DlispValue*) -> DlispValue*
+    let file_exists_id = module
+        .declare_function("dlisp_file_exists", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_is_dir(DlispValue*) -> DlispValue*
+    let is_dir_id = module
+        .declare_function("dlisp_is_dir", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_is_file(DlispValue*) -> DlispValue*
+    let is_file_id = module
+        .declare_function("dlisp_is_file", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_list_dir(DlispValue*) -> DlispValue*
+    let list_dir_id = module
+        .declare_function("dlisp_list_dir", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_delete_file(DlispValue*) -> DlispValue*
+    let delete_file_id = module
+        .declare_function("dlisp_delete_file", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_getenv(DlispValue*) -> DlispValue*
+    let getenv_id = module
+        .declare_function("dlisp_getenv", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_setenv(DlispValue*, DlispValue*) -> DlispValue*
+    let setenv_id = module
+        .declare_function("dlisp_setenv", Linkage::Import, &mul_sig) // Reuse binary sig
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_cwd() -> DlispValue*
+    let mut cwd_sig = module.make_signature();
+    cwd_sig.returns.push(AbiParam::new(int));
+    let cwd_id = module
+        .declare_function("dlisp_cwd", Linkage::Import, &cwd_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_set_cwd(DlispValue*) -> DlispValue*
+    let set_cwd_id = module
+        .declare_function("dlisp_set_cwd", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_args() -> DlispValue*
+    let mut args_sig = module.make_signature();
+    args_sig.returns.push(AbiParam::new(int));
+    let args_id = module
+        .declare_function("dlisp_args", Linkage::Import, &args_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_exit(DlispValue*) -> DlispValue*
+    let exit_id = module
+        .declare_function("dlisp_exit", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_sh(DlispValue*) -> DlispValue*
+    let sh_id = module
+        .declare_function("dlisp_sh", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
     Ok(BuiltinDefinitions {
         printf: printf_id,
         dlisp_spawn: spawn_id,
@@ -391,5 +470,17 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_symbol_p: symbol_p_id,
         dlisp_vector_p: vector_p_id,
         dlisp_type_of: type_of_id,
+        dlisp_file_exists: file_exists_id,
+        dlisp_is_dir: is_dir_id,
+        dlisp_is_file: is_file_id,
+        dlisp_list_dir: list_dir_id,
+        dlisp_delete_file: delete_file_id,
+        dlisp_getenv: getenv_id,
+        dlisp_setenv: setenv_id,
+        dlisp_cwd: cwd_id,
+        dlisp_set_cwd: set_cwd_id,
+        dlisp_args: args_id,
+        dlisp_exit: exit_id,
+        dlisp_sh: sh_id,
     })
 }

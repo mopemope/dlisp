@@ -917,4 +917,8 @@ pub unsafe extern "C" fn dlisp_type_of(val: *mut DlispValue) -> *mut DlispValue 
     }
 }
 
+pub mod io;
+pub mod os;
+pub mod sys;
+
 mod verify_tests;

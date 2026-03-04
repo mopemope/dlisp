@@ -54,7 +54,19 @@ impl Default for JIT {
             "dlisp_vector_copy",
             "dlisp_vector_push",
             "dlisp_vector_get",
-            "dlisp_vector_count",
+            // Phase 3 (IO/SYS/OS)
+            "dlisp_file_exists",
+            "dlisp_is_dir",
+            "dlisp_is_file",
+            "dlisp_delete_file",
+            "dlisp_list_dir",
+            "dlisp_getenv",
+            "dlisp_setenv",
+            "dlisp_cwd",
+            "dlisp_set_cwd",
+            "dlisp_args",
+            "dlisp_exit",
+            "dlisp_sh",
         ];
 
         unsafe extern "C" {

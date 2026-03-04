@@ -53,8 +53,71 @@ pub fn compile_builtin<M: Module>(
         "symbol?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_symbol_p, true),
         "vector?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_p, true),
         "type-of" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_type_of, true),
+        // Phase 3 additions
+        "file-exists?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_file_exists, false),
+        "is-dir?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_is_dir, false),
+        "is-file?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_is_file, false),
+        "list-dir" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_list_dir, false),
+        "delete-file" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_delete_file, false),
+        "getenv" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_getenv, false),
+        "setenv" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_setenv),
+        "cwd" => compile_nullary(ctx, op, list, ctx.builtins.funcs.dlisp_cwd),
+        "set-cwd" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_set_cwd, false),
+        "args" => compile_nullary(ctx, op, list, ctx.builtins.funcs.dlisp_args),
+        "exit" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_exit, false),
+        "sh" => compile_variadic_list_call(ctx, op, list, ctx.builtins.funcs.dlisp_sh),
         _ => unreachable!("Unknown builtin: {}", op),
     }
+}
+
+fn compile_variadic_list_call<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    _op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    if list.len() < 2 {
+        return Err(format!("{} requires at least 1 argument", _op));
+    }
+    // evaluate all arguments and form a Lisp list
+    // (cons arg1 (cons arg2 ... nil))
+    let local_nil_func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_make_nil, ctx.builder.func);
+    let nil_call = ctx.builder.ins().call(local_nil_func, &[]);
+    let mut current_list = ctx.builder.inst_results(nil_call)[0];
+
+    let local_cons_func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_make_cons, ctx.builder.func);
+
+    // we must build the list backwards
+    for arg in list[1..].iter().rev() {
+        let arg_val = ctx.compile_expr(arg)?;
+        let cons_call = ctx
+            .builder
+            .ins()
+            .call(local_cons_func, &[arg_val, current_list]);
+        current_list = ctx.builder.inst_results(cons_call)[0];
+    }
+
+    let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
+    let call = ctx.builder.ins().call(local_func, &[current_list]);
+    Ok(ctx.builder.inst_results(call)[0])
+}
+
+fn compile_nullary<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    if list.len() != 1 {
+        return Err(format!("{} requires exactly 0 arguments", op));
+    }
+    let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
+    let call = ctx.builder.ins().call(local_func, &[]);
+    Ok(ctx.builder.inst_results(call)[0])
 }
 
 fn compile_unary<M: Module>(
