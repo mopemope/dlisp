@@ -85,6 +85,34 @@ impl SpecialForm for LetForm {
     }
 }
 
+pub struct LetStarForm;
+impl SpecialForm for LetStarForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::let_star::let_star_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct ThrowForm;
+impl SpecialForm for ThrowForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::throw::throw_form(interpreter, args, env))
+    }
+}
+
 pub struct SpawnForm;
 impl SpecialForm for SpawnForm {
     fn call<'a>(
@@ -302,11 +330,14 @@ impl SpecialForm for LoadForm {
     }
 }
 
+use crate::forms::try_catch::TryCatchForm;
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
     reg.register("if", IfForm);
     reg.register("let", LetForm);
+    reg.register("let*", LetStarForm);
     reg.register("spawn", SpawnForm);
     reg.register("lambda", LambdaForm);
     reg.register("defvar", DefVarForm);
@@ -325,5 +356,7 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("while", WhileForm);
     reg.register("macroexpand", MacroExpandForm);
     reg.register("load", LoadForm);
+    reg.register("try", TryCatchForm);
+    reg.register("throw", ThrowForm);
     reg
 }

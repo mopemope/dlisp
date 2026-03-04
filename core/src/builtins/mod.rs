@@ -5,6 +5,7 @@ pub mod add;
 pub mod cmp;
 pub mod div;
 pub mod eq;
+pub mod error_ops;
 pub mod gt;
 pub mod io;
 pub mod list;
@@ -136,6 +137,7 @@ pub fn install(env: &mut Environment) {
 
     // Type predicates
     env.set("nil?".to_string(), Value::NativeFunc(type_ops::is_nil));
+    env.set("error?".to_string(), Value::NativeFunc(type_ops::is_error));
     env.set("empty?".to_string(), Value::NativeFunc(type_ops::is_empty));
     env.set("list?".to_string(), Value::NativeFunc(type_ops::is_list));
     env.set(
@@ -160,4 +162,10 @@ pub fn install(env: &mut Environment) {
     );
     env.set("map?".to_string(), Value::NativeFunc(type_ops::is_map));
     env.set("type-of".to_string(), Value::NativeFunc(type_ops::type_of));
+
+    // Errors
+    env.set(
+        "error-value".to_string(),
+        Value::NativeFunc(error_ops::error_value),
+    );
 }

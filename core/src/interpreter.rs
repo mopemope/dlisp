@@ -13,6 +13,7 @@ use crate::forms::registry::{FormRegistry, standard_registry};
 pub struct Interpreter {
     pub jit: JIT,
     pub forms: FormRegistry,
+    pub last_error: Option<Value>,
 }
 
 impl Default for Interpreter {
@@ -26,6 +27,7 @@ impl Interpreter {
         Self {
             jit: JIT::new(),
             forms: standard_registry(),
+            last_error: None,
         }
     }
 
@@ -112,7 +114,7 @@ impl Interpreter {
                     // Check for special forms that need custom expansion handling
                     match s.as_str() {
                         "quote" => return Ok(val),
-                        "let" => {
+                        "let" | "let*" => {
                             // (let bindings body...)
                             // bindings: ((var val) ...)
                             // We must NOT expand the bindings list itself as a macro call, but we MUST expand the 'val's inside it.

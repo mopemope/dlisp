@@ -15,6 +15,7 @@ pub enum Value {
     Symbol(String),
     Keyword(String),
     String(String),
+    Error(Box<Value>),
     NativeFunc(fn(&[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>>),
     UserFunc {
         args: Vec<String>,
@@ -42,12 +43,13 @@ impl Value {
             Value::Symbol(_) => 4,
             Value::Keyword(_) => 5,
             Value::String(_) => 6,
-            Value::List(_) => 7,
-            Value::Vector(_) => 8,
-            Value::Map(_) => 9,
-            Value::NativeFunc(_) => 10,
-            Value::UserFunc { .. } => 11,
-            Value::Macro { .. } => 12,
+            Value::Error(_) => 7,
+            Value::List(_) => 8,
+            Value::Vector(_) => 9,
+            Value::Map(_) => 10,
+            Value::NativeFunc(_) => 11,
+            Value::UserFunc { .. } => 12,
+            Value::Macro { .. } => 13,
         }
     }
 
@@ -68,6 +70,7 @@ impl PartialEq for Value {
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
             (Value::Keyword(a), Value::Keyword(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
+            (Value::Error(a), Value::Error(b)) => a == b,
             (Value::List(a), Value::List(b)) => a == b,
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::Map(a), Value::Map(b)) => a == b,
@@ -124,6 +127,7 @@ impl Hash for Value {
             Value::Symbol(s) => s.hash(state),
             Value::Keyword(s) => s.hash(state),
             Value::String(s) => s.hash(state),
+            Value::Error(e) => e.hash(state),
             Value::List(l) => l.hash(state),
             Value::Vector(v) => v.hash(state),
             Value::Map(m) => {
@@ -180,6 +184,7 @@ impl Ord for Value {
             (Value::Symbol(a), Value::Symbol(b)) => a.cmp(b),
             (Value::Keyword(a), Value::Keyword(b)) => a.cmp(b),
             (Value::String(a), Value::String(b)) => a.cmp(b),
+            (Value::Error(a), Value::Error(b)) => a.cmp(b),
             (Value::List(a), Value::List(b)) => a.cmp(b),
             (Value::Vector(a), Value::Vector(b)) => a.cmp(b),
             (Value::Map(a), Value::Map(b)) => {
@@ -237,6 +242,7 @@ impl fmt::Display for Value {
             Value::Symbol(s) => write!(f, "{}", s),
             Value::Keyword(s) => write!(f, ":{}", s),
             Value::String(s) => write!(f, "{}", s),
+            Value::Error(e) => write!(f, "<error {}>", e),
             Value::List(l) => {
                 write!(f, "(")?;
                 for (i, v) in l.iter().enumerate() {

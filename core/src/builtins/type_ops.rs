@@ -116,6 +116,7 @@ pub fn type_of(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Resul
             Value::Symbol(_) => "symbol",
             Value::Keyword(_) => "keyword",
             Value::String(_) => "string",
+            Value::Error(_) => "error",
             Value::NativeFunc(_) => "function",
             Value::UserFunc { .. } => "function",
             Value::Macro { .. } => "macro",
@@ -125,6 +126,17 @@ pub fn type_of(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Resul
             Value::Nil => "nil",
         };
         Ok(Value::String(type_name.to_string()))
+    })
+}
+
+/// (error? x)
+pub fn is_error(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
+    let args = args.to_vec();
+    Box::pin(async move {
+        if args.len() != 1 {
+            return Err("error? requires exactly 1 argument".to_string());
+        }
+        Ok(Value::Bool(matches!(args[0], Value::Error(_))))
     })
 }
 
@@ -209,5 +221,14 @@ mod tests {
             is_empty(&[Value::String("".to_string())]).await,
             Ok(Value::Bool(true))
         );
+    }
+
+    #[tokio::test]
+    async fn test_is_error() {
+        assert_eq!(
+            is_error(&[Value::Error(Box::new(Value::String("err".to_string())))]).await,
+            Ok(Value::Bool(true))
+        );
+        assert_eq!(is_error(&[Value::Nil]).await, Ok(Value::Bool(false)));
     }
 }
