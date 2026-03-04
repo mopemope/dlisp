@@ -42,10 +42,12 @@ pub async fn let_star_form(
                     Value::Symbol(s) => s.clone(),
                     _ => return Err("let* binding key must be a symbol".to_string()),
                 };
-                
+
                 // Evaluate in the current environment
-                let val = interpreter.eval(bind_pair[1].clone(), &mut current_env).await?;
-                
+                let val = interpreter
+                    .eval(bind_pair[1].clone(), &mut current_env)
+                    .await?;
+
                 // Create a new scope for the next bindings and body, extending the current one
                 let mut new_scope = Environment::new(Some(current_env.clone()));
                 new_scope.set(symbol, val);

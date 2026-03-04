@@ -47,6 +47,16 @@ pub fn install(env: &mut Environment) {
 
     // I/O
     env.set("print".to_string(), Value::NativeFunc(print::print));
+    env.set("println".to_string(), Value::NativeFunc(print::println_fn));
+    env.set(
+        "print-str".to_string(),
+        Value::NativeFunc(print::print_str_fn),
+    );
+    env.set(
+        "eprintln".to_string(),
+        Value::NativeFunc(print::eprintln_fn),
+    );
+    env.set("format".to_string(), Value::NativeFunc(print::format_str));
     env.set("sleep".to_string(), Value::NativeFunc(sleep::sleep_fn));
     env.set("read-file".to_string(), Value::NativeFunc(io::read_file));
     env.set("write-file".to_string(), Value::NativeFunc(io::write_file));
