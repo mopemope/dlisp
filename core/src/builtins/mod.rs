@@ -13,10 +13,12 @@ pub mod lt;
 pub mod map;
 pub mod math;
 pub mod mul;
+pub mod os;
 pub mod print;
 pub mod sleep;
 pub mod string_ops;
 pub mod sub;
+pub mod sys;
 pub mod type_ops;
 pub mod vector;
 
@@ -46,6 +48,29 @@ pub fn install(env: &mut Environment) {
     env.set("sleep".to_string(), Value::NativeFunc(sleep::sleep_fn));
     env.set("read-file".to_string(), Value::NativeFunc(io::read_file));
     env.set("write-file".to_string(), Value::NativeFunc(io::write_file));
+    env.set(
+        "file-exists?".to_string(),
+        Value::NativeFunc(io::file_exists),
+    );
+    env.set("is-dir?".to_string(), Value::NativeFunc(io::is_dir));
+    env.set("is-file?".to_string(), Value::NativeFunc(io::is_file));
+    env.set(
+        "delete-file".to_string(),
+        Value::NativeFunc(io::delete_file),
+    );
+    env.set("list-dir".to_string(), Value::NativeFunc(io::list_dir));
+
+    // Sys
+    env.set("getenv".to_string(), Value::NativeFunc(sys::getenv));
+    env.set("setenv".to_string(), Value::NativeFunc(sys::setenv));
+    env.set("cwd".to_string(), Value::NativeFunc(sys::cwd));
+    env.set("set-cwd".to_string(), Value::NativeFunc(sys::set_cwd));
+    env.set("exit".to_string(), Value::NativeFunc(sys::exit));
+    env.set("args".to_string(), Value::NativeFunc(sys::get_args));
+
+    // OS
+    env.set("sh".to_string(), Value::NativeFunc(os::sh));
+    env.set("exec".to_string(), Value::NativeFunc(os::sh));
 
     // List
     env.set("list".to_string(), Value::NativeFunc(list::list));
