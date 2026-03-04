@@ -274,6 +274,34 @@ impl SpecialForm for WhileForm {
     }
 }
 
+pub struct MacroExpandForm;
+impl SpecialForm for MacroExpandForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::macroexpand::macroexpand_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct LoadForm;
+impl SpecialForm for LoadForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::load::load_form(interpreter, args, env))
+    }
+}
+
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
@@ -295,5 +323,7 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("eval", EvalForm);
     reg.register("apply", ApplyForm);
     reg.register("while", WhileForm);
+    reg.register("macroexpand", MacroExpandForm);
+    reg.register("load", LoadForm);
     reg
 }

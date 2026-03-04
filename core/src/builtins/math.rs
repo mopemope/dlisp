@@ -52,7 +52,7 @@ mod tests {
     #[tokio::test]
     async fn test_abs() {
         assert_eq!(abs(&[Value::Integer(-5)]).await, Ok(Value::Integer(5)));
-        assert_eq!(abs(&[Value::Float(-3.14)]).await, Ok(Value::Float(3.14)));
+        assert_eq!(abs(&[Value::Float(-1.23)]).await, Ok(Value::Float(1.23)));
     }
 
     #[tokio::test]

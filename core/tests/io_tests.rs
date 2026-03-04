@@ -1,5 +1,4 @@
 use dlisp_core::ast::Value;
-use dlisp_core::environment::Environment;
 use dlisp_core::interpreter::default_env;
 use std::env;
 

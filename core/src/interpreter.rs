@@ -190,6 +190,13 @@ impl Interpreter {
                             }
                             return Ok(Value::List(new_list));
                         }
+                        "backquote" => {
+                            if list.len() < 2 {
+                                return Ok(val);
+                            }
+                            let expanded = self.expand_backquote(list[1].clone(), env, 1).await?;
+                            return self.expand(expanded, env).await;
+                        }
                         _ => {} // Fall through to macro check or default expansion
                     }
 
@@ -264,6 +271,117 @@ impl Interpreter {
             form.call(self, args, env).await
         } else {
             Ok(None)
+        }
+    }
+
+    #[async_recursion(?Send)]
+    pub async fn expand_backquote(
+        &mut self,
+        val: Value,
+        env: &mut Rc<RefCell<Environment>>,
+        depth: usize,
+    ) -> Result<Value, String> {
+        match val {
+            Value::List(list) => {
+                if list.is_empty() {
+                    return Ok(Value::List(vec![
+                        Value::Symbol("quote".to_string()),
+                        Value::Nil,
+                    ]));
+                }
+
+                let mut is_bq = false;
+                let mut is_uq = false;
+
+                if let Value::Symbol(ref s) = list[0] {
+                    if s == "unquote" {
+                        if depth == 1 {
+                            if list.len() < 2 {
+                                return Err("unquote expects 1 argument".to_string());
+                            }
+                            return self.expand(list[1].clone(), env).await;
+                        }
+                        is_uq = true;
+                    } else if s == "unquote-splicing" {
+                        if depth == 1 {
+                            return Err(
+                                "unquote-splicing invalid at top-level of backquote".to_string()
+                            );
+                        }
+                        is_uq = true;
+                    } else if s == "backquote" {
+                        is_bq = true;
+                    }
+                }
+
+                let mut append_args = Vec::new();
+                let mut current_list = Vec::new();
+
+                for (i, item) in list.iter().enumerate() {
+                    let mut child_depth = depth;
+                    if i > 0 {
+                        if is_bq {
+                            child_depth += 1;
+                        } else if is_uq {
+                            child_depth -= 1;
+                        }
+                    }
+
+                    if depth == 1
+                        && let Value::List(inner) = item
+                        && !inner.is_empty()
+                        && matches!(&inner[0], Value::Symbol(s) if s == "unquote-splicing")
+                    {
+                        if !current_list.is_empty() {
+                            let mut list_call = vec![Value::Symbol("list".to_string())];
+                            list_call.append(&mut current_list);
+                            append_args.push(Value::List(list_call));
+                        }
+                        if inner.len() < 2 {
+                            return Err("unquote-splicing expects 1 argument".to_string());
+                        }
+                        append_args.push(self.expand(inner[1].clone(), env).await?);
+                        continue;
+                    }
+
+                    let expanded_item = self
+                        .expand_backquote(item.clone(), env, child_depth)
+                        .await?;
+                    current_list.push(expanded_item);
+                }
+
+                if !current_list.is_empty() {
+                    let mut list_call = vec![Value::Symbol("list".to_string())];
+                    list_call.extend(current_list);
+                    append_args.push(Value::List(list_call));
+                }
+
+                if append_args.is_empty() {
+                    Ok(Value::List(vec![
+                        Value::Symbol("quote".to_string()),
+                        Value::Nil,
+                    ]))
+                } else if append_args.len() == 1 {
+                    Ok(append_args[0].clone())
+                } else {
+                    let mut res = vec![Value::Symbol("append".to_string())];
+                    res.extend(append_args);
+                    Ok(Value::List(res))
+                }
+            }
+            Value::Vector(vec) => {
+                let list_val = Value::List(vec);
+                let list_expansion = self.expand_backquote(list_val, env, depth).await?;
+                Ok(Value::List(vec![
+                    Value::Symbol("apply".to_string()),
+                    Value::Symbol("vector".to_string()),
+                    list_expansion,
+                ]))
+            }
+            Value::Symbol(_) | Value::Map(_) => {
+                Ok(Value::List(vec![Value::Symbol("quote".to_string()), val]))
+            }
+            _ => Ok(val),
         }
     }
 

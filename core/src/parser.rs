@@ -105,13 +105,36 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
             });
 
         let quoted = just('\'')
-            .ignore_then(expr)
+            .ignore_then(expr.clone())
             .map(|v| Value::List(vec![Value::Symbol("quote".to_string()), v]));
+
+        let backquoted = just('`')
+            .ignore_then(expr.clone())
+            .map(|v| Value::List(vec![Value::Symbol("backquote".to_string()), v]));
+
+        let unquote_spliced = just(",@")
+            .ignore_then(expr.clone())
+            .map(|v| Value::List(vec![Value::Symbol("unquote-splicing".to_string()), v]));
+
+        let unquoted = just(',')
+            .ignore_then(expr.clone())
+            .map(|v| Value::List(vec![Value::Symbol("unquote".to_string()), v]));
 
         // Order matters: float before int, boolean/nil before symbol if strictly overlapping,
         // but here true/false/nil are specific keywords.
         choice((
-            float, int, boolean, nil, string, list, vector, map, quoted,
+            float,
+            int,
+            boolean,
+            nil,
+            string,
+            list,
+            vector,
+            map,
+            quoted,
+            backquoted,
+            unquote_spliced,
+            unquoted,
             keyword, // keyword before symbol since both start with alphanumeric but keyword has :
             symbol,  // symbol is last catch-all for identifiers
         ))
@@ -248,5 +271,63 @@ mod tests {
     fn test_parse_map_odd_elements() {
         let res = parse("{:a 1 :b}");
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_parse_backquote_unquote() {
+        let vals = parse("`a").unwrap();
+        assert_eq!(
+            vals[0],
+            Value::List(vec![
+                Value::Symbol("backquote".to_string()),
+                Value::Symbol("a".to_string())
+            ])
+        );
+
+        let vals = parse(",a").unwrap();
+        assert_eq!(
+            vals[0],
+            Value::List(vec![
+                Value::Symbol("unquote".to_string()),
+                Value::Symbol("a".to_string())
+            ])
+        );
+
+        let vals = parse(",@a").unwrap();
+        assert_eq!(
+            vals[0],
+            Value::List(vec![
+                Value::Symbol("unquote-splicing".to_string()),
+                Value::Symbol("a".to_string())
+            ])
+        );
+
+        let vals = parse("`(1 ,2 ,@3)").unwrap();
+        if let Value::List(v) = &vals[0] {
+            assert_eq!(v.len(), 2);
+            assert_eq!(v[0], Value::Symbol("backquote".to_string()));
+            if let Value::List(inner) = &v[1] {
+                assert_eq!(inner.len(), 3);
+                assert_eq!(inner[0], Value::Integer(1));
+                assert_eq!(
+                    inner[1],
+                    Value::List(vec![
+                        Value::Symbol("unquote".to_string()),
+                        Value::Integer(2)
+                    ])
+                );
+                assert_eq!(
+                    inner[2],
+                    Value::List(vec![
+                        Value::Symbol("unquote-splicing".to_string()),
+                        Value::Integer(3)
+                    ])
+                );
+            } else {
+                panic!("Expected list for backquoted form");
+            }
+        } else {
+            panic!("Expected list for backquote");
+        }
     }
 }

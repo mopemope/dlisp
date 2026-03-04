@@ -8,6 +8,8 @@ pub mod higher_order;
 pub mod if_expr;
 pub mod lambda;
 pub mod let_expr;
+pub mod load;
+pub mod macroexpand;
 pub mod progn;
 pub mod quote;
 pub mod registry;

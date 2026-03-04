@@ -10,6 +10,7 @@ pub mod io;
 pub mod list;
 pub mod list_ops;
 pub mod lt;
+pub mod macro_ops;
 pub mod map;
 pub mod math;
 pub mod mul;
@@ -98,6 +99,9 @@ pub fn install(env: &mut Environment) {
     env.set("keys".to_string(), Value::NativeFunc(map::keys));
     env.set("vals".to_string(), Value::NativeFunc(map::vals));
     env.set("contains?".to_string(), Value::NativeFunc(map::contains_q));
+
+    // Macro utils
+    env.set("gensym".to_string(), Value::NativeFunc(macro_ops::gensym));
 
     // String operations
     env.set("str".to_string(), Value::NativeFunc(string_ops::str_fn));
