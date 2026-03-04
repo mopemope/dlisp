@@ -23,8 +23,8 @@ pub async fn apply_form(
 
     // For apply, all but the last argument are evaluated and pushed verbatim.
     // The last argument is evaluated and MUST be a list, whose elements are then appended.
-    for i in 1..(args.len() - 1) {
-        eval_args.push(interpreter.eval(args[i].clone(), env).await?);
+    for arg in args.iter().take(args.len() - 1).skip(1) {
+        eval_args.push(interpreter.eval(arg.clone(), env).await?);
     }
 
     let last_arg = interpreter.eval(args[args.len() - 1].clone(), env).await?;
