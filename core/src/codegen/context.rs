@@ -226,24 +226,16 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         let local_func = self.module.declare_func_in_func(func_id, self.builder.func);
         let func_addr = self.builder.ins().func_addr(self.ptr_type, local_func);
 
-        // Allocate Closure
-        let closure_size = 16;
-        let size_val = self.builder.ins().iconst(self.ptr_type, closure_size);
-        let local_malloc = self
-            .module
-            .declare_func_in_func(self.builtins.funcs.gc_malloc, self.builder.func);
-        let call = self.builder.ins().call(local_malloc, &[size_val]);
-        let closure_ptr = self.builder.inst_results(call)[0];
-
-        // Store func ptr at offset 0
-        self.builder
-            .ins()
-            .store(MemFlags::new(), func_addr, closure_ptr, 0);
-        // Store NULL env at offset 8
+        // Allocate Closure via runtime
         let null_val = self.builder.ins().iconst(self.ptr_type, 0);
-        self.builder
+        let local_make_closure = self
+            .module
+            .declare_func_in_func(self.builtins.funcs.dlisp_make_closure, self.builder.func);
+        let call = self
+            .builder
             .ins()
-            .store(MemFlags::new(), null_val, closure_ptr, 8);
+            .call(local_make_closure, &[null_val, func_addr]);
+        let closure_ptr = self.builder.inst_results(call)[0];
 
         Ok(closure_ptr)
     }
@@ -283,7 +275,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 | "read-file" | "vector" | "nth" | "count" | "conj"
                 | "/" | "%" | "mod" | ">=" | "<=" | "/=" | "str" | "string-length" | "substring"
                 | "string-append" | "hash-map" | "assoc" | "get" | "map?" | "nil?" | "list?" | "number?" | "string?" | "symbol?"
-                | "keyword?" | "vector?" | "type-of"
+                | "keyword?" | "vector?" | "type-of" | "map" | "filter" | "reduce"
                 // Phase 3 Additions
                 | "file-exists?" | "is-dir?" | "is-file?" | "list-dir" | "delete-file"
                 | "getenv" | "setenv" | "cwd" | "set-cwd" | "args" | "exit" | "sh" => {
@@ -308,17 +300,27 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         func_var_name: &str,
         list: &[Value],
     ) -> Result<IrValue, String> {
-        let closure_ptr = self.resolve_variable(func_var_name)?;
+        let closure_dlisp_val = self.resolve_variable(func_var_name)?;
 
-        let mut args = Vec::new();
-        // Indirect Call: args are (env, args...)
-        // We get env from closure_ptr->env (offset 8)
+        // closure_dlisp_val is a DlispValue* (type_ at offset 0, payload at offset 8).
+        // payload.closure_val is a ClosureData* pointer stored at DlispValue offset 8.
+        let closure_data_ptr =
+            self.builder
+                .ins()
+                .load(self.ptr_type, MemFlags::new(), closure_dlisp_val, 8);
+
+        // ClosureData layout: { env: *mut DlispValue (offset 0), func_ptr: *const c_void (offset 8) }
         let env_ptr = self
             .builder
             .ins()
-            .load(self.ptr_type, MemFlags::new(), closure_ptr, 8);
-        args.push(env_ptr);
+            .load(self.ptr_type, MemFlags::new(), closure_data_ptr, 0);
+        let func_ptr = self
+            .builder
+            .ins()
+            .load(self.ptr_type, MemFlags::new(), closure_data_ptr, 8);
 
+        let mut args = Vec::new();
+        args.push(env_ptr);
         for arg in &list[1..] {
             args.push(self.compile_expr(arg)?);
         }
@@ -330,13 +332,6 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         sig.returns.push(AbiParam::new(self.ptr_type));
 
         let sig_ref = self.builder.import_signature(sig);
-
-        // Load func ptr from closure_ptr->func (offset 0)
-        let func_ptr = self
-            .builder
-            .ins()
-            .load(self.ptr_type, MemFlags::new(), closure_ptr, 0);
-
         let call = self.builder.ins().call_indirect(sig_ref, func_ptr, &args);
         let result = self.builder.inst_results(call)[0];
         Ok(result)

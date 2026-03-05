@@ -11,6 +11,7 @@ pub struct BuiltinDefinitions {
     pub dlisp_make_string: FuncId,
     pub dlisp_make_symbol: FuncId,
     pub dlisp_make_keyword: FuncId,
+    pub dlisp_make_closure: FuncId,
     pub dlisp_make_map: FuncId,
     pub dlisp_map_assoc: FuncId,
     pub dlisp_map_get: FuncId,
@@ -34,6 +35,9 @@ pub struct BuiltinDefinitions {
     pub dlisp_vector_get: FuncId,
     pub dlisp_vector_count: FuncId,
     pub dlisp_vector_copy: FuncId,
+    pub dlisp_map: FuncId,
+    pub dlisp_filter: FuncId,
+    pub dlisp_reduce: FuncId,
     // Phase 2 additions
     pub dlisp_div: FuncId,
     pub dlisp_mod: FuncId,
@@ -128,6 +132,15 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     // dlisp_make_keyword(char*) -> DlispValue*
     let make_keyword_id = module
         .declare_function("dlisp_make_keyword", Linkage::Import, &make_symbol_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_make_closure(DlispValue*, void*) -> DlispValue*
+    let mut make_closure_sig = module.make_signature();
+    make_closure_sig.params.push(AbiParam::new(int));
+    make_closure_sig.params.push(AbiParam::new(int));
+    make_closure_sig.returns.push(AbiParam::new(int));
+    let make_closure_id = module
+        .declare_function("dlisp_make_closure", Linkage::Import, &make_closure_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_make_cons(DlispValue*, DlispValue*) -> DlispValue*
@@ -250,6 +263,31 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     map_get_sig.returns.push(AbiParam::new(int));
     let map_get_id = module
         .declare_function("dlisp_map_get", Linkage::Import, &map_get_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_map(DlispValue*, DlispValue*) -> DlispValue*
+    let mut hof_binary_sig = module.make_signature();
+    hof_binary_sig.params.push(AbiParam::new(int));
+    hof_binary_sig.params.push(AbiParam::new(int));
+    hof_binary_sig.returns.push(AbiParam::new(int));
+
+    let map_id = module
+        .declare_function("dlisp_map", Linkage::Import, &hof_binary_sig)
+        .map_err(|e| e.to_string())?;
+
+    let filter_id = module
+        .declare_function("dlisp_filter", Linkage::Import, &hof_binary_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_reduce(DlispValue*, DlispValue*, DlispValue*) -> DlispValue*
+    let mut hof_ternary_sig = module.make_signature();
+    hof_ternary_sig.params.push(AbiParam::new(int));
+    hof_ternary_sig.params.push(AbiParam::new(int));
+    hof_ternary_sig.params.push(AbiParam::new(int));
+    hof_ternary_sig.returns.push(AbiParam::new(int));
+
+    let reduce_id = module
+        .declare_function("dlisp_reduce", Linkage::Import, &hof_ternary_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_add(DlispValue*, DlispValue*) -> DlispValue*
@@ -478,6 +516,7 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_make_string: make_string_id,
         dlisp_make_symbol: make_symbol_id,
         dlisp_make_keyword: make_keyword_id,
+        dlisp_make_closure: make_closure_id,
         dlisp_make_map: make_map_id,
         dlisp_map_assoc: map_assoc_id,
         dlisp_map_get: map_get_id,
@@ -531,5 +570,8 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_args: args_id,
         dlisp_exit: exit_id,
         dlisp_sh: sh_id,
+        dlisp_map: map_id,
+        dlisp_filter: filter_id,
+        dlisp_reduce: reduce_id,
     })
 }

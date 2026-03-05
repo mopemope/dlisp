@@ -86,6 +86,25 @@ pub unsafe extern "C" fn dlisp_make_symbol(s: *mut c_char) -> *mut DlispValue {
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_make_closure(
+    env: *mut DlispValue,
+    func_ptr: *const std::ffi::c_void,
+) -> *mut DlispValue {
+    unsafe {
+        let closure_data_ptr =
+            dlisp_gc_malloc(std::mem::size_of::<value::ClosureData>()) as *mut value::ClosureData;
+        *closure_data_ptr = value::ClosureData { env, func_ptr };
+
+        let ptr = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        (*ptr).type_ = ValueType::Closure;
+        (*ptr).payload.closure_val = closure_data_ptr;
+        ptr
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `car` and `cdr` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_make_cons(
@@ -130,6 +149,7 @@ pub extern "C" fn dlisp_make_nil() -> *mut DlispValue {
     }
 }
 
+pub mod higher_order;
 pub mod vectors;
 
 /// # Safety
@@ -220,7 +240,7 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
                 let mut curr = val;
                 let mut first = true;
                 loop {
-                    if curr.is_null() {
+                    if curr.is_null() || (*curr).type_ == ValueType::Nil {
                         break;
                     }
 

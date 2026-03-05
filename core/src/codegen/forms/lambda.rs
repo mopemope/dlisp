@@ -136,21 +136,15 @@ pub fn compile_lambda<M: Module>(
     let local_func = ctx.module.declare_func_in_func(id, ctx.builder.func);
     let func_addr = ctx.builder.ins().func_addr(ctx.ptr_type, local_func);
 
-    // 5. Create Closure Struct { func_ptr, env_ptr }
-    let closure_size = 16;
-    let size_val = ctx.builder.ins().iconst(ctx.ptr_type, closure_size);
-    let local_malloc = ctx
+    // 5. Create Closure Struct via runtime
+    let local_make_closure = ctx
         .module
-        .declare_func_in_func(ctx.builtins.funcs.gc_malloc, ctx.builder.func);
-    let call = ctx.builder.ins().call(local_malloc, &[size_val]);
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_make_closure, ctx.builder.func);
+    let call = ctx
+        .builder
+        .ins()
+        .call(local_make_closure, &[env_ptr_val, func_addr]);
     let closure_ptr = ctx.builder.inst_results(call)[0];
-
-    ctx.builder
-        .ins()
-        .store(MemFlags::new(), func_addr, closure_ptr, 0);
-    ctx.builder
-        .ins()
-        .store(MemFlags::new(), env_ptr_val, closure_ptr, 8);
 
     Ok(closure_ptr)
 }
@@ -180,7 +174,62 @@ fn find_free_vars(
     match expr {
         Value::Symbol(s) => {
             if !bound.contains(s) {
-                let builtins = ["+", "-", "*", "print", "sleep", "spawn", "let", "lambda"];
+                let builtins = [
+                    "+",
+                    "-",
+                    "*",
+                    "/",
+                    "%",
+                    "mod",
+                    ">",
+                    "<",
+                    "=",
+                    ">=",
+                    "<=",
+                    "/=",
+                    "print",
+                    "sleep",
+                    "spawn",
+                    "let",
+                    "lambda",
+                    "if",
+                    "quote",
+                    "vector",
+                    "count",
+                    "nth",
+                    "conj",
+                    "hash-map",
+                    "assoc",
+                    "get",
+                    "nil?",
+                    "list?",
+                    "number?",
+                    "string?",
+                    "symbol?",
+                    "keyword?",
+                    "map?",
+                    "vector?",
+                    "type-of",
+                    "str",
+                    "string-length",
+                    "substring",
+                    "string-append",
+                    "map",
+                    "filter",
+                    "reduce",
+                    "file-exists?",
+                    "is-dir?",
+                    "is-file?",
+                    "list-dir",
+                    "delete-file",
+                    "getenv",
+                    "setenv",
+                    "cwd",
+                    "set-cwd",
+                    "args",
+                    "exit",
+                    "sh",
+                ];
                 if !builtins.contains(&s.as_str()) {
                     free.push(s.clone());
                 }

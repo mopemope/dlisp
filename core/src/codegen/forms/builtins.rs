@@ -22,11 +22,15 @@ pub fn compile_builtin<M: Module>(
         ">" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_gt),
         "<" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_lt),
         "=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_eq),
-        // Vector builtins
-        "vector" => compile_vector(ctx, list),
+        // HOF Phase
+        "map" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_map),
+        "filter" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_filter),
+        "reduce" => compile_ternary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_reduce),
+        // Vector operations
+        "vector" => compile_vector_literal(ctx, list),
         "count" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_count, false),
         "nth" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_vector_get),
-        "conj" => compile_conj(ctx, list),
+        "conj" => compile_conj_builtin(ctx, list),
         "hash-map" => compile_hash_map(ctx, list),
         "assoc" => compile_assoc(ctx, list),
         "get" => compile_get(ctx, list),
@@ -219,7 +223,24 @@ fn compile_binary_builtin<M: Module>(
     Ok(ctx.builder.inst_results(call)[0])
 }
 
-fn compile_vector<M: Module>(
+fn compile_ternary_builtin<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    if list.len() != 4 {
+        return Err(format!("{} requires exactly 3 arguments", op));
+    }
+    let arg1 = ctx.compile_expr(&list[1])?;
+    let arg2 = ctx.compile_expr(&list[2])?;
+    let arg3 = ctx.compile_expr(&list[3])?;
+    let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
+    let call = ctx.builder.ins().call(local_func, &[arg1, arg2, arg3]);
+    Ok(ctx.builder.inst_results(call)[0])
+}
+
+fn compile_vector_literal<M: Module>(
     ctx: &mut FunctionTranslationContext<M>,
     list: &[Value],
 ) -> Result<IrValue, String> {
@@ -232,7 +253,7 @@ fn compile_vector<M: Module>(
     ctx.compile_expr(&vec_val)
 }
 
-fn compile_conj<M: Module>(
+fn compile_conj_builtin<M: Module>(
     ctx: &mut FunctionTranslationContext<M>,
     list: &[Value],
 ) -> Result<IrValue, String> {
@@ -243,34 +264,16 @@ fn compile_conj<M: Module>(
     let col_expr = &list[1];
     let items = &list[2..];
 
-    // 1. Evaluate collection
     let col_eval = ctx.compile_expr(col_expr)?;
 
-    // 2. Clone collection (dlisp_vector_copy)
-    // Note: We need to handle List concatenation too?
-    // Interpreter generic `conj` handles Lists and Vectors.
-    // Making compiled `conj` generic requires runtime type check unless we have a generic `dlisp_conj`.
-    // Implementing `dlisp_conj` in runtime is probably better than emitting type checks here.
-    // BUT, for now let's assume Vector or implement `dlisp_conj`?
-    // The task is Vector support. `dlisp_vector_copy` and `dlisp_vector_push` are Vector only.
-    // If I use `conj` on a list in compiled code, it will crash or fail?
-    // Yes.
-    // For this MVP, let's assume Vector for compiled `conj` or implement `dlisp_conj` in runtime.
-    // Implementing `dlisp_conj` in runtime is safer.
-    // Let's stick to Vector-only for now using `dlisp_vector_copy` and `dlisp_vector_push`,
-    // and maybe add a TODO for list support or runtime check.
-    // Or, call a new runtime function `dlisp_conj`?
-    // I haven't added `dlisp_conj` to `lib.rs` yet.
-    // I added `dlisp_vector_push`.
-    // Let's implement Vector-only `conj` here for now (using copy+push).
-
+    // TODO: Currently Vector-only. A generic dlisp_conj runtime function
+    // would be needed for List support.
     let copy_func = ctx
         .module
         .declare_func_in_func(ctx.builtins.funcs.dlisp_vector_copy, ctx.builder.func);
     let call = ctx.builder.ins().call(copy_func, &[col_eval]);
     let col_val = ctx.builder.inst_results(call)[0];
 
-    // 3. Push items
     let push_func = ctx
         .module
         .declare_func_in_func(ctx.builtins.funcs.dlisp_vector_push, ctx.builder.func);

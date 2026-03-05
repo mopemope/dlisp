@@ -29,8 +29,8 @@ fn test_add_lambda_jit() {
     builder.symbol("dlisp_is_truthy", dummy_is_truthy as *const u8);
     builder.symbol("dlisp_gc_malloc", dummy_malloc as *const u8);
     builder.symbol("dlisp_print", dummy_print as *const u8);
-    // Add others if needed
     builder.symbol("dlisp_make_nil", dummy_make_nil as *const u8);
+    builder.symbol("dlisp_make_closure", dummy_make_closure as *const u8);
 
     let mut module = JITModule::new(builder);
     let builtins_defs = declare_builtins(&mut module).unwrap();
@@ -158,4 +158,7 @@ extern "C" fn dummy_malloc(size: usize) -> *mut u8 {
 extern "C" fn dummy_print(_: *mut u64) {}
 extern "C" fn dummy_make_nil() -> *mut u64 {
     std::ptr::null_mut::<u64>()
+}
+extern "C" fn dummy_make_closure(_env: *mut u64, _func_ptr: *const u8) -> *mut u64 {
+    dummy_malloc(16) as *mut u64
 }
