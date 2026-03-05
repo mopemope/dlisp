@@ -266,6 +266,86 @@ impl SpecialForm for ReduceForm {
     }
 }
 
+pub struct SomeForm;
+impl SpecialForm for SomeForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::some_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct EveryForm;
+impl SpecialForm for EveryForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::every_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct FindForm;
+impl SpecialForm for FindForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::find_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct ForEachForm;
+impl SpecialForm for ForEachForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::for_each_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct MapIndexedForm;
+impl SpecialForm for MapIndexedForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::map_indexed_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
 pub struct EvalForm;
 impl SpecialForm for EvalForm {
     fn call<'a>(
@@ -403,6 +483,11 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("map", MapForm);
     reg.register("filter", FilterForm);
     reg.register("reduce", ReduceForm);
+    reg.register("some", SomeForm);
+    reg.register("every", EveryForm);
+    reg.register("find", FindForm);
+    reg.register("for-each", ForEachForm);
+    reg.register("map-indexed", MapIndexedForm);
     reg.register("eval", EvalForm);
     reg.register("apply", ApplyForm);
     reg.register("while", WhileForm);

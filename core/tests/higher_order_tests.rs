@@ -274,3 +274,258 @@ async fn test_reduce_vector() {
     let res = eval_str("(reduce + 0 [1 2 3 4 5])", &mut i, &mut e).await;
     assert_eq!(res, Value::Integer(15));
 }
+
+#[tokio::test]
+async fn test_some_basic() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(some (lambda (x) (> x 2)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(1));
+    
+    let res2 = eval_str("(some (lambda (x) (> x 5)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res2, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_some_returning_truthy() {
+    let (mut i, mut e) = setup();
+    // Return the actual truthy value
+    let res = eval_str("(some (lambda (x) (if (> x 2) x nil)) '(1 3 5))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(3));
+}
+
+#[tokio::test]
+async fn test_every_basic() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(every (lambda (x) (> x 0)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Bool(true));
+    
+    let res2 = eval_str("(every (lambda (x) (> x 2)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res2, Value::Bool(false));
+}
+
+#[tokio::test]
+async fn test_find_basic() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(find (lambda (x) (> x 2)) '(1 2 3 4))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(3));
+    
+    let res2 = eval_str("(find (lambda (x) (> x 5)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res2, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_for_each_basic() {
+    let (mut i, mut e) = setup();
+    // Use for-each to update a global variable side-effectfully
+    eval_str("(defvar *sum* 0)", &mut i, &mut e).await;
+    let res = eval_str("(for-each (lambda (x) (setq *sum* (+ *sum* x))) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+    
+    let sum = eval_str("*sum*", &mut i, &mut e).await;
+    assert_eq!(sum, Value::Integer(6));
+}
+
+#[tokio::test]
+async fn test_map_indexed_basic() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map-indexed (lambda (idx val) (list idx val)) '(\"a\" \"b\" \"c\"))", &mut i, &mut e).await;
+    assert_eq!(
+        res,
+        Value::List(vec![
+            Value::List(vec![Value::Integer(0), Value::String("a".to_string())]),
+            Value::List(vec![Value::Integer(1), Value::String("b".to_string())]),
+            Value::List(vec![Value::Integer(2), Value::String("c".to_string())]),
+        ])
+    );
+}
+
+#[tokio::test]
+async fn test_map_indexed_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map-indexed (lambda (idx val) (list idx val)) [\"a\" \"b\"])", &mut i, &mut e).await;
+    assert_eq!(
+        res,
+        Value::Vector(vec![
+            Value::List(vec![Value::Integer(0), Value::String("a".to_string())]),
+            Value::List(vec![Value::Integer(1), Value::String("b".to_string())]),
+        ])
+    );
+}
+
+// --- Edge case tests for new higher-order functions ---
+
+#[tokio::test]
+async fn test_some_empty_list() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(some (lambda (x) (> x 0)) '())", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_some_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(some (lambda (x) (> x 0)) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_some_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(some (lambda (x) (> x 2)) [1 2 3])", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(1));
+}
+
+#[tokio::test]
+async fn test_some_wrong_args() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(some (lambda (x) x))").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+    assert!(res.unwrap_err().contains("exactly 2 arguments"));
+}
+
+#[tokio::test]
+async fn test_some_not_a_list() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(some (lambda (x) x) 42)").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+    assert!(res.unwrap_err().contains("expects a list"));
+}
+
+#[tokio::test]
+async fn test_every_empty_list() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(every (lambda (x) (> x 0)) '())", &mut i, &mut e).await;
+    assert_eq!(res, Value::Bool(true));
+}
+
+#[tokio::test]
+async fn test_every_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(every (lambda (x) (> x 0)) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Bool(true));
+}
+
+#[tokio::test]
+async fn test_every_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(every (lambda (x) (> x 0)) [1 2 3])", &mut i, &mut e).await;
+    assert_eq!(res, Value::Bool(true));
+}
+
+#[tokio::test]
+async fn test_every_wrong_args() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(every number?)").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_find_empty_list() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(find (lambda (x) (> x 0)) '())", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_find_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(find (lambda (x) (> x 0)) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_find_vector() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(find (lambda (x) (> x 2)) [1 2 3 4])", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(3));
+}
+
+#[tokio::test]
+async fn test_find_wrong_args() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(find (lambda (x) x))").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_for_each_empty() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(for-each (lambda (x) x) '())", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_for_each_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(for-each (lambda (x) x) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_for_each_wrong_args() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(for-each (lambda (x) x))").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_map_indexed_empty() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map-indexed (lambda (i x) (list i x)) '())", &mut i, &mut e).await;
+    assert_eq!(res, Value::List(vec![]));
+}
+
+#[tokio::test]
+async fn test_map_indexed_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map-indexed (lambda (i x) (list i x)) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_map_indexed_wrong_args() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(map-indexed (lambda (i x) x))").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_some_all_falsy() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(some (lambda (x) (> x 10)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_every_all_truthy() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(every (lambda (x) (< x 10)) '(1 2 3))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Bool(true));
+}
+
+#[tokio::test]
+async fn test_find_with_named_func() {
+    let (mut i, mut e) = setup();
+    eval_str("(defun positive? (x) (> x 0))", &mut i, &mut e).await;
+    let res = eval_str("(find positive? '(-1 -2 3 4))", &mut i, &mut e).await;
+    assert_eq!(res, Value::Integer(3));
+}
+
+#[tokio::test]
+async fn test_for_each_vector() {
+    let (mut i, mut e) = setup();
+    eval_str("(defvar *items* '())", &mut i, &mut e).await;
+    eval_str("(for-each (lambda (x) (setq *items* (append *items* (list x)))) [10 20 30])", &mut i, &mut e).await;
+    let items = eval_str("*items*", &mut i, &mut e).await;
+    assert_eq!(
+        items,
+        Value::List(vec![Value::Integer(10), Value::Integer(20), Value::Integer(30)])
+    );
+}
+

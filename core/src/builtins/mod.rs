@@ -95,6 +95,19 @@ pub fn install(env: &mut Environment) {
     env.set("append".to_string(), Value::NativeFunc(list_ops::append));
     env.set("reverse".to_string(), Value::NativeFunc(list_ops::reverse));
     env.set("sort".to_string(), Value::NativeFunc(list_ops::sort));
+    env.set("last".to_string(), Value::NativeFunc(list_ops::last));
+    env.set(
+        "butlast".to_string(),
+        Value::NativeFunc(list_ops::butlast),
+    );
+    env.set(
+        "flatten".to_string(),
+        Value::NativeFunc(list_ops::flatten),
+    );
+    env.set("range".to_string(), Value::NativeFunc(list_ops::range_fn));
+    env.set("take".to_string(), Value::NativeFunc(list_ops::take));
+    env.set("drop".to_string(), Value::NativeFunc(list_ops::drop_fn));
+    env.set("zip".to_string(), Value::NativeFunc(list_ops::zip));
 
     // Vector
     env.set("vector".to_string(), Value::NativeFunc(vector::vector));
