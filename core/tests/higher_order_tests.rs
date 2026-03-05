@@ -280,7 +280,7 @@ async fn test_some_basic() {
     let (mut i, mut e) = setup();
     let res = eval_str("(some (lambda (x) (> x 2)) '(1 2 3))", &mut i, &mut e).await;
     assert_eq!(res, Value::Integer(1));
-    
+
     let res2 = eval_str("(some (lambda (x) (> x 5)) '(1 2 3))", &mut i, &mut e).await;
     assert_eq!(res2, Value::Nil);
 }
@@ -289,7 +289,12 @@ async fn test_some_basic() {
 async fn test_some_returning_truthy() {
     let (mut i, mut e) = setup();
     // Return the actual truthy value
-    let res = eval_str("(some (lambda (x) (if (> x 2) x nil)) '(1 3 5))", &mut i, &mut e).await;
+    let res = eval_str(
+        "(some (lambda (x) (if (> x 2) x nil)) '(1 3 5))",
+        &mut i,
+        &mut e,
+    )
+    .await;
     assert_eq!(res, Value::Integer(3));
 }
 
@@ -298,7 +303,7 @@ async fn test_every_basic() {
     let (mut i, mut e) = setup();
     let res = eval_str("(every (lambda (x) (> x 0)) '(1 2 3))", &mut i, &mut e).await;
     assert_eq!(res, Value::Bool(true));
-    
+
     let res2 = eval_str("(every (lambda (x) (> x 2)) '(1 2 3))", &mut i, &mut e).await;
     assert_eq!(res2, Value::Bool(false));
 }
@@ -308,7 +313,7 @@ async fn test_find_basic() {
     let (mut i, mut e) = setup();
     let res = eval_str("(find (lambda (x) (> x 2)) '(1 2 3 4))", &mut i, &mut e).await;
     assert_eq!(res, Value::Integer(3));
-    
+
     let res2 = eval_str("(find (lambda (x) (> x 5)) '(1 2 3))", &mut i, &mut e).await;
     assert_eq!(res2, Value::Nil);
 }
@@ -318,9 +323,14 @@ async fn test_for_each_basic() {
     let (mut i, mut e) = setup();
     // Use for-each to update a global variable side-effectfully
     eval_str("(defvar *sum* 0)", &mut i, &mut e).await;
-    let res = eval_str("(for-each (lambda (x) (setq *sum* (+ *sum* x))) '(1 2 3))", &mut i, &mut e).await;
+    let res = eval_str(
+        "(for-each (lambda (x) (setq *sum* (+ *sum* x))) '(1 2 3))",
+        &mut i,
+        &mut e,
+    )
+    .await;
     assert_eq!(res, Value::Nil);
-    
+
     let sum = eval_str("*sum*", &mut i, &mut e).await;
     assert_eq!(sum, Value::Integer(6));
 }
@@ -328,7 +338,12 @@ async fn test_for_each_basic() {
 #[tokio::test]
 async fn test_map_indexed_basic() {
     let (mut i, mut e) = setup();
-    let res = eval_str("(map-indexed (lambda (idx val) (list idx val)) '(\"a\" \"b\" \"c\"))", &mut i, &mut e).await;
+    let res = eval_str(
+        "(map-indexed (lambda (idx val) (list idx val)) '(\"a\" \"b\" \"c\"))",
+        &mut i,
+        &mut e,
+    )
+    .await;
     assert_eq!(
         res,
         Value::List(vec![
@@ -342,7 +357,12 @@ async fn test_map_indexed_basic() {
 #[tokio::test]
 async fn test_map_indexed_vector() {
     let (mut i, mut e) = setup();
-    let res = eval_str("(map-indexed (lambda (idx val) (list idx val)) [\"a\" \"b\"])", &mut i, &mut e).await;
+    let res = eval_str(
+        "(map-indexed (lambda (idx val) (list idx val)) [\"a\" \"b\"])",
+        &mut i,
+        &mut e,
+    )
+    .await;
     assert_eq!(
         res,
         Value::Vector(vec![
@@ -476,14 +496,24 @@ async fn test_for_each_wrong_args() {
 #[tokio::test]
 async fn test_map_indexed_empty() {
     let (mut i, mut e) = setup();
-    let res = eval_str("(map-indexed (lambda (i x) (list i x)) '())", &mut i, &mut e).await;
+    let res = eval_str(
+        "(map-indexed (lambda (i x) (list i x)) '())",
+        &mut i,
+        &mut e,
+    )
+    .await;
     assert_eq!(res, Value::List(vec![]));
 }
 
 #[tokio::test]
 async fn test_map_indexed_nil() {
     let (mut i, mut e) = setup();
-    let res = eval_str("(map-indexed (lambda (i x) (list i x)) nil)", &mut i, &mut e).await;
+    let res = eval_str(
+        "(map-indexed (lambda (i x) (list i x)) nil)",
+        &mut i,
+        &mut e,
+    )
+    .await;
     assert_eq!(res, Value::Nil);
 }
 
@@ -521,11 +551,234 @@ async fn test_find_with_named_func() {
 async fn test_for_each_vector() {
     let (mut i, mut e) = setup();
     eval_str("(defvar *items* '())", &mut i, &mut e).await;
-    eval_str("(for-each (lambda (x) (setq *items* (append *items* (list x)))) [10 20 30])", &mut i, &mut e).await;
+    eval_str(
+        "(for-each (lambda (x) (setq *items* (append *items* (list x)))) [10 20 30])",
+        &mut i,
+        &mut e,
+    )
+    .await;
     let items = eval_str("*items*", &mut i, &mut e).await;
     assert_eq!(
         items,
-        Value::List(vec![Value::Integer(10), Value::Integer(20), Value::Integer(30)])
+        Value::List(vec![
+            Value::Integer(10),
+            Value::Integer(20),
+            Value::Integer(30)
+        ])
     );
 }
 
+// --- Map higher-order function tests ---
+
+#[tokio::test]
+async fn test_update_basic() {
+    let (mut i, mut e) = setup();
+    let res = eval_str(
+        "(update {:a 1 :b 2} :a (lambda (x) (+ x 1)))",
+        &mut i,
+        &mut e,
+    )
+    .await;
+
+    if let Value::Map(m) = res {
+        assert_eq!(
+            m.get(&Value::Keyword("a".to_string())),
+            Some(&Value::Integer(2))
+        );
+        assert_eq!(
+            m.get(&Value::Keyword("b".to_string())),
+            Some(&Value::Integer(2))
+        );
+    } else {
+        panic!("Expected Map");
+    }
+}
+
+#[tokio::test]
+async fn test_update_missing_key() {
+    let (mut i, mut e) = setup();
+    // Default handles nil (missing key defaults to nil)
+    let res = eval_str(
+        "(update {:a 1} :b (lambda (x) (if (nil? x) 42 x)))",
+        &mut i,
+        &mut e,
+    )
+    .await;
+
+    if let Value::Map(m) = res {
+        assert_eq!(
+            m.get(&Value::Keyword("a".to_string())),
+            Some(&Value::Integer(1))
+        );
+        assert_eq!(
+            m.get(&Value::Keyword("b".to_string())),
+            Some(&Value::Integer(42))
+        );
+    } else {
+        panic!("Expected Map");
+    }
+}
+
+#[tokio::test]
+async fn test_update_with_extra_args() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(update {:a 1} :a + 10 20)", &mut i, &mut e).await;
+
+    if let Value::Map(m) = res {
+        // (+ 1 10 20) = 31
+        assert_eq!(
+            m.get(&Value::Keyword("a".to_string())),
+            Some(&Value::Integer(31))
+        );
+    } else {
+        panic!("Expected Map");
+    }
+}
+
+#[tokio::test]
+async fn test_update_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(update nil :a (lambda (x) 100))", &mut i, &mut e).await;
+
+    if let Value::Map(m) = res {
+        assert_eq!(
+            m.get(&Value::Keyword("a".to_string())),
+            Some(&Value::Integer(100))
+        );
+    } else {
+        panic!("Expected Map");
+    }
+}
+
+#[tokio::test]
+async fn test_map_keys_basic() {
+    let (mut i, mut e) = setup();
+    // Transform string keys to uppercase using `str` (or simple function)
+    eval_str("(defun prefix-key (k) (str \"prefix-\" k))", &mut i, &mut e).await;
+    let res = eval_str("(map-keys prefix-key {\"a\" 1 \"b\" 2})", &mut i, &mut e).await;
+
+    if let Value::Map(m) = res {
+        assert_eq!(
+            m.get(&Value::String("prefix-a".to_string())),
+            Some(&Value::Integer(1))
+        );
+        assert_eq!(
+            m.get(&Value::String("prefix-b".to_string())),
+            Some(&Value::Integer(2))
+        );
+    } else {
+        panic!("Expected Map");
+    }
+}
+
+#[tokio::test]
+async fn test_map_keys_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map-keys (lambda (x) x) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_map_vals_basic() {
+    let (mut i, mut e) = setup();
+    let res = eval_str(
+        "(map-vals (lambda (x) (* x 2)) {:a 1 :b 2})",
+        &mut i,
+        &mut e,
+    )
+    .await;
+
+    if let Value::Map(m) = res {
+        assert_eq!(
+            m.get(&Value::Keyword("a".to_string())),
+            Some(&Value::Integer(2))
+        );
+        assert_eq!(
+            m.get(&Value::Keyword("b".to_string())),
+            Some(&Value::Integer(4))
+        );
+    } else {
+        panic!("Expected Map");
+    }
+}
+
+#[tokio::test]
+async fn test_map_vals_nil() {
+    let (mut i, mut e) = setup();
+    let res = eval_str("(map-vals (lambda (x) x) nil)", &mut i, &mut e).await;
+    assert_eq!(res, Value::Nil);
+}
+
+// --- Edge case / error tests for map higher-order functions ---
+
+#[tokio::test]
+async fn test_update_wrong_args() {
+    let (mut i, mut e) = setup();
+    // Too few arguments: should error
+    let exprs = parse("(update {:a 1} :a)").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_update_wrong_map_type() {
+    let (mut i, mut e) = setup();
+    // First arg is not a map
+    let exprs = parse("(update 42 :a (lambda (x) x))").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_map_keys_wrong_args() {
+    let (mut i, mut e) = setup();
+    // Too few arguments
+    let exprs = parse("(map-keys (lambda (x) x))").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_map_keys_wrong_type() {
+    let (mut i, mut e) = setup();
+    // Second arg is not a map
+    let exprs = parse("(map-keys (lambda (x) x) 42)").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_map_vals_wrong_args() {
+    let (mut i, mut e) = setup();
+    // Too many arguments
+    let exprs = parse("(map-vals (lambda (x) x) {:a 1} {:b 2})").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_map_vals_wrong_type() {
+    let (mut i, mut e) = setup();
+    let exprs = parse("(map-vals (lambda (x) x) \"not-a-map\")").unwrap();
+    let res = i.eval(exprs[0].clone(), &mut e).await;
+    assert!(res.is_err());
+}
+
+#[tokio::test]
+async fn test_map_keys_collision() {
+    let (mut i, mut e) = setup();
+    // Map all keys to the same value — later entries overwrite earlier ones
+    let res = eval_str(
+        "(map-keys (lambda (k) \"same\") {\"a\" 1 \"b\" 2})",
+        &mut i,
+        &mut e,
+    )
+    .await;
+    if let Value::Map(m) = res {
+        // Both keys mapped to "same", so only one entry survives
+        assert_eq!(m.len(), 1);
+        assert!(m.contains_key(&Value::String("same".to_string())));
+    } else {
+        panic!("Expected Map");
+    }
+}

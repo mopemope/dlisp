@@ -196,7 +196,11 @@ pub fn butlast(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>>
             }
         }
         Value::Nil => Value::Nil,
-        _ => return Box::pin(async { Err("butlast requires a list or vector argument".to_string()) }),
+        _ => {
+            return Box::pin(async {
+                Err("butlast requires a list or vector argument".to_string())
+            });
+        }
     };
     Box::pin(async move { Ok(result) })
 }
@@ -233,7 +237,7 @@ pub fn range_fn(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>
         if args.is_empty() || args.len() > 3 {
             return Err("range requires 1 to 3 arguments".to_string());
         }
-        
+
         let mut int_args = Vec::new();
         for arg in args {
             match arg {
@@ -277,10 +281,14 @@ pub fn take(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
     if args.len() != 2 {
         return Box::pin(async { Err("take requires exactly 2 arguments".to_string()) });
     }
-    
+
     let n = match &args[0] {
         Value::Integer(i) if *i >= 0 => *i as usize,
-        Value::Integer(_) => return Box::pin(async { Err("take first argument must be a non-negative integer".to_string()) }),
+        Value::Integer(_) => {
+            return Box::pin(async {
+                Err("take first argument must be a non-negative integer".to_string())
+            });
+        }
         _ => return Box::pin(async { Err("take first argument must be an integer".to_string()) }),
     };
 
@@ -294,7 +302,11 @@ pub fn take(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
             Value::Vector(v[..take_len].to_vec())
         }
         Value::Nil => Value::Nil,
-        _ => return Box::pin(async { Err("take second argument must be a list or vector".to_string()) }),
+        _ => {
+            return Box::pin(async {
+                Err("take second argument must be a list or vector".to_string())
+            });
+        }
     };
     Box::pin(async move { Ok(result) })
 }
@@ -305,10 +317,14 @@ pub fn drop_fn(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>>
     if args.len() != 2 {
         return Box::pin(async { Err("drop requires exactly 2 arguments".to_string()) });
     }
-    
+
     let n = match &args[0] {
         Value::Integer(i) if *i >= 0 => *i as usize,
-        Value::Integer(_) => return Box::pin(async { Err("drop first argument must be a non-negative integer".to_string()) }),
+        Value::Integer(_) => {
+            return Box::pin(async {
+                Err("drop first argument must be a non-negative integer".to_string())
+            });
+        }
         _ => return Box::pin(async { Err("drop first argument must be an integer".to_string()) }),
     };
 
@@ -322,7 +338,11 @@ pub fn drop_fn(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>>
             Value::Vector(v[drop_len..].to_vec())
         }
         Value::Nil => Value::Nil,
-        _ => return Box::pin(async { Err("drop second argument must be a list or vector".to_string()) }),
+        _ => {
+            return Box::pin(async {
+                Err("drop second argument must be a list or vector".to_string())
+            });
+        }
     };
     Box::pin(async move { Ok(result) })
 }
@@ -527,7 +547,11 @@ mod tests {
 
     #[test]
     fn test_butlast_basic() {
-        let list = Value::List(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let list = Value::List(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         assert_eq!(
             run(butlast(&[list])).unwrap(),
             Value::List(vec![Value::Integer(1), Value::Integer(2)])
@@ -563,34 +587,64 @@ mod tests {
     fn test_range_basic() {
         assert_eq!(
             run(range_fn(&[Value::Integer(3)])).unwrap(),
-            Value::List(vec![Value::Integer(0), Value::Integer(1), Value::Integer(2)])
+            Value::List(vec![
+                Value::Integer(0),
+                Value::Integer(1),
+                Value::Integer(2)
+            ])
         );
         assert_eq!(
             run(range_fn(&[Value::Integer(1), Value::Integer(4)])).unwrap(),
-            Value::List(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)])
+            Value::List(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3)
+            ])
         );
         assert_eq!(
-            run(range_fn(&[Value::Integer(10), Value::Integer(0), Value::Integer(-3)])).unwrap(),
-            Value::List(vec![Value::Integer(10), Value::Integer(7), Value::Integer(4), Value::Integer(1)])
+            run(range_fn(&[
+                Value::Integer(10),
+                Value::Integer(0),
+                Value::Integer(-3)
+            ]))
+            .unwrap(),
+            Value::List(vec![
+                Value::Integer(10),
+                Value::Integer(7),
+                Value::Integer(4),
+                Value::Integer(1)
+            ])
         );
     }
 
     #[test]
     fn test_take_basic() {
-        let list = Value::List(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let list = Value::List(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         assert_eq!(
             run(take(&[Value::Integer(2), list.clone()])).unwrap(),
             Value::List(vec![Value::Integer(1), Value::Integer(2)])
         );
         assert_eq!(
             run(take(&[Value::Integer(5), list.clone()])).unwrap(),
-            Value::List(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)])
+            Value::List(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3)
+            ])
         );
     }
 
     #[test]
     fn test_drop_basic() {
-        let list = Value::List(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let list = Value::List(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         assert_eq!(
             run(drop_fn(&[Value::Integer(2), list.clone()])).unwrap(),
             Value::List(vec![Value::Integer(3)])
@@ -604,7 +658,10 @@ mod tests {
     #[test]
     fn test_zip_basic() {
         let l1 = Value::List(vec![Value::Integer(1), Value::Integer(2)]);
-        let l2 = Value::List(vec![Value::String("a".to_string()), Value::String("b".to_string())]);
+        let l2 = Value::List(vec![
+            Value::String("a".to_string()),
+            Value::String("b".to_string()),
+        ]);
         assert_eq!(
             run(zip(&[l1, l2])).unwrap(),
             Value::List(vec![
@@ -635,7 +692,11 @@ mod tests {
 
     #[test]
     fn test_butlast_vector() {
-        let v = Value::Vector(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let v = Value::Vector(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         assert_eq!(
             run(butlast(&[v])).unwrap(),
             Value::Vector(vec![Value::Integer(1), Value::Integer(2)])
@@ -657,10 +718,7 @@ mod tests {
 
     #[test]
     fn test_flatten_nil() {
-        assert_eq!(
-            run(flatten(&[Value::Nil])).unwrap(),
-            Value::List(vec![])
-        );
+        assert_eq!(run(flatten(&[Value::Nil])).unwrap(), Value::List(vec![]));
     }
 
     #[test]
@@ -703,7 +761,14 @@ mod tests {
 
     #[test]
     fn test_range_step_zero_error() {
-        assert!(run(range_fn(&[Value::Integer(0), Value::Integer(5), Value::Integer(0)])).is_err());
+        assert!(
+            run(range_fn(&[
+                Value::Integer(0),
+                Value::Integer(5),
+                Value::Integer(0)
+            ]))
+            .is_err()
+        );
     }
 
     #[test]
@@ -736,7 +801,11 @@ mod tests {
 
     #[test]
     fn test_take_vector() {
-        let v = Value::Vector(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let v = Value::Vector(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         assert_eq!(
             run(take(&[Value::Integer(2), v])).unwrap(),
             Value::Vector(vec![Value::Integer(1), Value::Integer(2)])
@@ -768,7 +837,11 @@ mod tests {
 
     #[test]
     fn test_drop_vector() {
-        let v = Value::Vector(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let v = Value::Vector(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         assert_eq!(
             run(drop_fn(&[Value::Integer(1), v])).unwrap(),
             Value::Vector(vec![Value::Integer(2), Value::Integer(3)])
@@ -777,22 +850,24 @@ mod tests {
 
     #[test]
     fn test_zip_unequal_lengths() {
-        let l1 = Value::List(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]);
+        let l1 = Value::List(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]);
         let l2 = Value::List(vec![Value::Integer(10)]);
         assert_eq!(
             run(zip(&[l1, l2])).unwrap(),
-            Value::List(vec![
-                Value::List(vec![Value::Integer(1), Value::Integer(10)])
-            ])
+            Value::List(vec![Value::List(vec![
+                Value::Integer(1),
+                Value::Integer(10)
+            ])])
         );
     }
 
     #[test]
     fn test_zip_empty() {
-        assert_eq!(
-            run(zip(&[])).unwrap(),
-            Value::List(vec![])
-        );
+        assert_eq!(run(zip(&[])).unwrap(), Value::List(vec![]));
     }
 
     #[test]
@@ -816,10 +891,7 @@ mod tests {
     fn test_zip_with_nil() {
         let l1 = Value::List(vec![Value::Integer(1), Value::Integer(2)]);
         // Nil is treated as empty list, so min_len = 0
-        assert_eq!(
-            run(zip(&[l1, Value::Nil])).unwrap(),
-            Value::List(vec![])
-        );
+        assert_eq!(run(zip(&[l1, Value::Nil])).unwrap(), Value::List(vec![]));
     }
 
     #[test]
@@ -830,10 +902,17 @@ mod tests {
         assert_eq!(
             run(zip(&[l1, l2, l3])).unwrap(),
             Value::List(vec![
-                Value::List(vec![Value::Integer(1), Value::Integer(3), Value::Integer(5)]),
-                Value::List(vec![Value::Integer(2), Value::Integer(4), Value::Integer(6)])
+                Value::List(vec![
+                    Value::Integer(1),
+                    Value::Integer(3),
+                    Value::Integer(5)
+                ]),
+                Value::List(vec![
+                    Value::Integer(2),
+                    Value::Integer(4),
+                    Value::Integer(6)
+                ])
             ])
         );
     }
 }
-

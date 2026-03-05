@@ -156,3 +156,189 @@ pub fn contains_q(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, Strin
         _ => Box::pin(future::ready(Ok(Value::Bool(false)))),
     }
 }
+
+pub fn merge(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
+    let mut m = HashMap::new();
+    for arg in args {
+        match arg {
+            Value::Map(map) => {
+                for (k, v) in map.iter() {
+                    m.insert(k.clone(), v.clone());
+                }
+            }
+            Value::Nil => {} // treat as empty map
+            _ => {
+                return Box::pin(future::ready(Err(
+                    "merge arguments must be maps or nil".to_string()
+                )));
+            }
+        }
+    }
+    Box::pin(future::ready(Ok(Value::Map(m))))
+}
+
+pub fn select_keys(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
+    if args.len() != 2 {
+        return Box::pin(future::ready(Err(
+            "select-keys requires exactly 2 arguments".to_string(),
+        )));
+    }
+
+    let map = match &args[0] {
+        Value::Map(m) => m,
+        Value::Nil => return Box::pin(future::ready(Ok(Value::Nil))),
+        _ => {
+            return Box::pin(future::ready(Err(
+                "select-keys first argument must be a map or nil".to_string(),
+            )));
+        }
+    };
+
+    let keys = match &args[1] {
+        Value::List(l) | Value::Vector(l) => l,
+        Value::Nil => return Box::pin(future::ready(Ok(Value::Map(HashMap::new())))),
+        _ => {
+            return Box::pin(future::ready(Err(
+                "select-keys second argument must be a list, vector or nil".to_string(),
+            )));
+        }
+    };
+
+    let mut new_m = HashMap::new();
+    for key in keys {
+        if let Some(val) = map.get(key) {
+            new_m.insert(key.clone(), val.clone());
+        }
+    }
+
+    Box::pin(future::ready(Ok(Value::Map(new_m))))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run<F: std::future::Future<Output = Result<Value, String>>>(f: F) -> Result<Value, String> {
+        tokio::runtime::Runtime::new().unwrap().block_on(f)
+    }
+
+    fn make_map(pairs: Vec<(Value, Value)>) -> Value {
+        let mut m = HashMap::new();
+        for (k, v) in pairs {
+            m.insert(k, v);
+        }
+        Value::Map(m)
+    }
+
+    #[test]
+    fn test_merge_basic() {
+        let m1 = make_map(vec![(Value::Keyword("a".to_string()), Value::Integer(1))]);
+        let m2 = make_map(vec![
+            (Value::Keyword("b".to_string()), Value::Integer(2)),
+            (Value::Keyword("a".to_string()), Value::Integer(10)),
+        ]);
+
+        let merged = run(merge(&[m1, m2])).unwrap();
+
+        if let Value::Map(m) = merged {
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(10))
+            );
+            assert_eq!(
+                m.get(&Value::Keyword("b".to_string())),
+                Some(&Value::Integer(2))
+            );
+        } else {
+            panic!("Expected Map");
+        }
+    }
+
+    #[test]
+    fn test_merge_with_nil() {
+        let m1 = make_map(vec![(Value::Keyword("a".to_string()), Value::Integer(1))]);
+
+        let merged = run(merge(&[m1.clone(), Value::Nil])).unwrap();
+        assert_eq!(merged, m1);
+
+        assert_eq!(
+            run(merge(&[Value::Nil, Value::Nil])).unwrap(),
+            Value::Map(HashMap::new())
+        );
+        assert_eq!(run(merge(&[])).unwrap(), Value::Map(HashMap::new()));
+    }
+
+    #[test]
+    fn test_merge_wrong_args() {
+        let m1 = make_map(vec![(Value::Keyword("a".to_string()), Value::Integer(1))]);
+        assert!(run(merge(&[m1, Value::Integer(42)])).is_err());
+    }
+
+    #[test]
+    fn test_select_keys_basic() {
+        let m1 = make_map(vec![
+            (Value::Keyword("a".to_string()), Value::Integer(1)),
+            (Value::Keyword("b".to_string()), Value::Integer(2)),
+            (Value::Keyword("c".to_string()), Value::Integer(3)),
+        ]);
+        let keys = Value::List(vec![
+            Value::Keyword("a".to_string()),
+            Value::Keyword("c".to_string()),
+        ]);
+
+        let selected = run(select_keys(&[m1, keys])).unwrap();
+        if let Value::Map(m) = selected {
+            assert_eq!(m.len(), 2);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+            assert_eq!(
+                m.get(&Value::Keyword("c".to_string())),
+                Some(&Value::Integer(3))
+            );
+            assert_eq!(m.get(&Value::Keyword("b".to_string())), None);
+        } else {
+            panic!("Expected Map");
+        }
+    }
+
+    #[test]
+    fn test_select_keys_missing_keys() {
+        let m1 = make_map(vec![(Value::Keyword("a".to_string()), Value::Integer(1))]);
+        let keys = Value::List(vec![
+            Value::Keyword("a".to_string()),
+            Value::Keyword("x".to_string()),
+        ]);
+
+        let selected = run(select_keys(&[m1, keys])).unwrap();
+        if let Value::Map(m) = selected {
+            assert_eq!(m.len(), 1);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+        } else {
+            panic!("Expected Map");
+        }
+    }
+
+    #[test]
+    fn test_select_keys_nil_args() {
+        let keys = Value::List(vec![Value::Keyword("a".to_string())]);
+        assert_eq!(run(select_keys(&[Value::Nil, keys])).unwrap(), Value::Nil);
+
+        let m1 = make_map(vec![(Value::Keyword("a".to_string()), Value::Integer(1))]);
+        assert_eq!(
+            run(select_keys(&[m1, Value::Nil])).unwrap(),
+            Value::Map(HashMap::new())
+        );
+    }
+
+    #[test]
+    fn test_select_keys_wrong_args() {
+        assert!(run(select_keys(&[Value::Integer(42), Value::List(vec![])])).is_err());
+        let m1 = make_map(vec![]);
+        assert!(run(select_keys(&[m1, Value::Integer(42)])).is_err());
+    }
+}

@@ -203,7 +203,9 @@ pub fn find_form<'a>(
         match list_val {
             Value::List(list) | Value::Vector(list) => {
                 for item in list {
-                    let val = interpreter.apply(func.clone(), vec![item.clone()], env).await?;
+                    let val = interpreter
+                        .apply(func.clone(), vec![item.clone()], env)
+                        .await?;
                     if val.is_truthy() {
                         return Ok(Some(item));
                     }
@@ -255,7 +257,9 @@ pub fn map_indexed_form<'a>(
 ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("map-indexed requires exactly 2 arguments: (map-indexed func list)".to_string());
+            return Err(
+                "map-indexed requires exactly 2 arguments: (map-indexed func list)".to_string(),
+            );
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -265,7 +269,9 @@ pub fn map_indexed_form<'a>(
             Value::List(list) => {
                 let mut result = Vec::with_capacity(list.len());
                 for (i, item) in list.into_iter().enumerate() {
-                    let val = interpreter.apply(func.clone(), vec![Value::Integer(i as i64), item], env).await?;
+                    let val = interpreter
+                        .apply(func.clone(), vec![Value::Integer(i as i64), item], env)
+                        .await?;
                     result.push(val);
                 }
                 Ok(Some(Value::List(result)))
@@ -273,7 +279,9 @@ pub fn map_indexed_form<'a>(
             Value::Vector(list) => {
                 let mut result = Vec::with_capacity(list.len());
                 for (i, item) in list.into_iter().enumerate() {
-                    let val = interpreter.apply(func.clone(), vec![Value::Integer(i as i64), item], env).await?;
+                    let val = interpreter
+                        .apply(func.clone(), vec![Value::Integer(i as i64), item], env)
+                        .await?;
                     result.push(val);
                 }
                 Ok(Some(Value::Vector(result)))
@@ -281,6 +289,115 @@ pub fn map_indexed_form<'a>(
             Value::Nil => Ok(Some(Value::Nil)),
             val => Err(format!(
                 "map-indexed expects a list or vector as the second argument, got: {}",
+                val
+            )),
+        }
+    })
+}
+
+// Map higher-order functions
+
+pub fn update_form<'a>(
+    interpreter: &'a mut Interpreter,
+    args: &'a [Value],
+    env: &'a mut Rc<RefCell<Environment>>,
+) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    Box::pin(async move {
+        if args.len() < 3 {
+            return Err(
+                "update requires at least 3 arguments: (update map key func arg1 ...)".to_string(),
+            );
+        }
+
+        let map_val = interpreter.eval(args[0].clone(), env).await?;
+        let key = interpreter.eval(args[1].clone(), env).await?;
+        let func = interpreter.eval(args[2].clone(), env).await?;
+
+        // Build func_args: [old_value, extra_arg1, extra_arg2, ...]
+        let old_val = match &map_val {
+            Value::Map(m) => m.get(&key).cloned().unwrap_or(Value::Nil),
+            Value::Nil => Value::Nil,
+            _ => return Err("update first argument must be a map or nil".to_string()),
+        };
+        let mut func_args = vec![old_val];
+
+        for arg in &args[3..] {
+            func_args.push(interpreter.eval(arg.clone(), env).await?);
+        }
+
+        let new_val = interpreter.apply(func, func_args, env).await?;
+
+        match map_val {
+            Value::Map(mut m) => {
+                m.insert(key, new_val);
+                Ok(Some(Value::Map(m)))
+            }
+            Value::Nil => {
+                let mut m = std::collections::HashMap::new();
+                m.insert(key, new_val);
+                Ok(Some(Value::Map(m)))
+            }
+            _ => unreachable!(),
+        }
+    })
+}
+
+pub fn map_keys_form<'a>(
+    interpreter: &'a mut Interpreter,
+    args: &'a [Value],
+    env: &'a mut Rc<RefCell<Environment>>,
+) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("map-keys requires exactly 2 arguments: (map-keys func map)".to_string());
+        }
+
+        let func = interpreter.eval(args[0].clone(), env).await?;
+        let map_val = interpreter.eval(args[1].clone(), env).await?;
+
+        match map_val {
+            Value::Map(m) => {
+                let mut new_m = std::collections::HashMap::new();
+                for (k, v) in m {
+                    let new_k = interpreter.apply(func.clone(), vec![k], env).await?;
+                    new_m.insert(new_k, v);
+                }
+                Ok(Some(Value::Map(new_m)))
+            }
+            Value::Nil => Ok(Some(Value::Nil)),
+            val => Err(format!(
+                "map-keys expects a map as the second argument, got: {}",
+                val
+            )),
+        }
+    })
+}
+
+pub fn map_vals_form<'a>(
+    interpreter: &'a mut Interpreter,
+    args: &'a [Value],
+    env: &'a mut Rc<RefCell<Environment>>,
+) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    Box::pin(async move {
+        if args.len() != 2 {
+            return Err("map-vals requires exactly 2 arguments: (map-vals func map)".to_string());
+        }
+
+        let func = interpreter.eval(args[0].clone(), env).await?;
+        let map_val = interpreter.eval(args[1].clone(), env).await?;
+
+        match map_val {
+            Value::Map(m) => {
+                let mut new_m = std::collections::HashMap::new();
+                for (k, v) in m {
+                    let new_v = interpreter.apply(func.clone(), vec![v], env).await?;
+                    new_m.insert(k, new_v);
+                }
+                Ok(Some(Value::Map(new_m)))
+            }
+            Value::Nil => Ok(Some(Value::Nil)),
+            val => Err(format!(
+                "map-vals expects a map as the second argument, got: {}",
                 val
             )),
         }

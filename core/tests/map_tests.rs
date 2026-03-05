@@ -174,3 +174,133 @@ async fn test_nested_map() {
         _ => panic!("Expected Map"),
     }
 }
+
+// --- merge integration tests ---
+
+#[tokio::test]
+async fn test_merge_basic() {
+    let val = eval_str("(merge {:a 1} {:b 2})").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(m.len(), 2);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+            assert_eq!(
+                m.get(&Value::Keyword("b".to_string())),
+                Some(&Value::Integer(2))
+            );
+        }
+        _ => panic!("Expected Map"),
+    }
+}
+
+#[tokio::test]
+async fn test_merge_overwrite() {
+    let val = eval_str("(merge {:a 1} {:a 99 :b 2})").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(99))
+            );
+            assert_eq!(
+                m.get(&Value::Keyword("b".to_string())),
+                Some(&Value::Integer(2))
+            );
+        }
+        _ => panic!("Expected Map"),
+    }
+}
+
+#[tokio::test]
+async fn test_merge_three_maps() {
+    let val = eval_str("(merge {:a 1} {:b 2} {:c 3})").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(m.len(), 3);
+        }
+        _ => panic!("Expected Map"),
+    }
+}
+
+#[tokio::test]
+async fn test_merge_with_nil() {
+    let val = eval_str("(merge {:a 1} nil)").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(m.len(), 1);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+        }
+        _ => panic!("Expected Map"),
+    }
+}
+
+#[tokio::test]
+async fn test_merge_empty() {
+    let val = eval_str("(merge)").await;
+    match val {
+        Value::Map(m) => assert_eq!(m.len(), 0),
+        _ => panic!("Expected Map"),
+    }
+}
+
+// --- select-keys integration tests ---
+
+#[tokio::test]
+async fn test_select_keys_basic() {
+    let val = eval_str("(select-keys {:a 1 :b 2 :c 3} '(:a :c))").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(m.len(), 2);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+            assert_eq!(
+                m.get(&Value::Keyword("c".to_string())),
+                Some(&Value::Integer(3))
+            );
+        }
+        _ => panic!("Expected Map"),
+    }
+}
+
+#[tokio::test]
+async fn test_select_keys_missing() {
+    let val = eval_str("(select-keys {:a 1} '(:a :x))").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(m.len(), 1);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+        }
+        _ => panic!("Expected Map"),
+    }
+}
+
+#[tokio::test]
+async fn test_select_keys_nil_map() {
+    assert_eq!(eval_str("(select-keys nil '(:a))").await, Value::Nil);
+}
+
+#[tokio::test]
+async fn test_select_keys_vector_keys() {
+    let val = eval_str("(select-keys {:a 1 :b 2} [:a])").await;
+    match val {
+        Value::Map(m) => {
+            assert_eq!(m.len(), 1);
+            assert_eq!(
+                m.get(&Value::Keyword("a".to_string())),
+                Some(&Value::Integer(1))
+            );
+        }
+        _ => panic!("Expected Map"),
+    }
+}

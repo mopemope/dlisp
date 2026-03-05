@@ -462,6 +462,54 @@ impl SpecialForm for LoadForm {
     }
 }
 
+pub struct UpdateForm;
+impl SpecialForm for UpdateForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::update_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct MapKeysForm;
+impl SpecialForm for MapKeysForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::map_keys_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
+pub struct MapValsForm;
+impl SpecialForm for MapValsForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::higher_order::map_vals_form(
+            interpreter,
+            args,
+            env,
+        ))
+    }
+}
+
 use crate::forms::try_catch::TryCatchForm;
 
 pub fn standard_registry() -> FormRegistry {
@@ -488,6 +536,9 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("find", FindForm);
     reg.register("for-each", ForEachForm);
     reg.register("map-indexed", MapIndexedForm);
+    reg.register("update", UpdateForm);
+    reg.register("map-keys", MapKeysForm);
+    reg.register("map-vals", MapValsForm);
     reg.register("eval", EvalForm);
     reg.register("apply", ApplyForm);
     reg.register("while", WhileForm);

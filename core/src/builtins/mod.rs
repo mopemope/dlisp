@@ -96,14 +96,8 @@ pub fn install(env: &mut Environment) {
     env.set("reverse".to_string(), Value::NativeFunc(list_ops::reverse));
     env.set("sort".to_string(), Value::NativeFunc(list_ops::sort));
     env.set("last".to_string(), Value::NativeFunc(list_ops::last));
-    env.set(
-        "butlast".to_string(),
-        Value::NativeFunc(list_ops::butlast),
-    );
-    env.set(
-        "flatten".to_string(),
-        Value::NativeFunc(list_ops::flatten),
-    );
+    env.set("butlast".to_string(), Value::NativeFunc(list_ops::butlast));
+    env.set("flatten".to_string(), Value::NativeFunc(list_ops::flatten));
     env.set("range".to_string(), Value::NativeFunc(list_ops::range_fn));
     env.set("take".to_string(), Value::NativeFunc(list_ops::take));
     env.set("drop".to_string(), Value::NativeFunc(list_ops::drop_fn));
@@ -123,6 +117,11 @@ pub fn install(env: &mut Environment) {
     env.set("keys".to_string(), Value::NativeFunc(map::keys));
     env.set("vals".to_string(), Value::NativeFunc(map::vals));
     env.set("contains?".to_string(), Value::NativeFunc(map::contains_q));
+    env.set("merge".to_string(), Value::NativeFunc(map::merge));
+    env.set(
+        "select-keys".to_string(),
+        Value::NativeFunc(map::select_keys),
+    );
 
     // Macro utils
     env.set("gensym".to_string(), Value::NativeFunc(macro_ops::gensym));
