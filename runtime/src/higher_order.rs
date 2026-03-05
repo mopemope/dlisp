@@ -13,8 +13,15 @@ type ClosureFunc2 = unsafe extern "C" fn(
     arg2: *mut DlispValue,
 ) -> *mut DlispValue;
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `func` is a valid `DlispValue` pointing to a closure,
+/// and `list` is a valid `DlispValue` pointing to a list or nil.
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_map(func: *mut DlispValue, list: *mut DlispValue) -> *mut DlispValue {
+pub unsafe extern "C" fn dlisp_map(
+    func: *mut DlispValue,
+    list: *mut DlispValue,
+) -> *mut DlispValue {
     unsafe {
         if func.is_null() || (*func).type_ != ValueType::Closure {
             return dlisp_make_nil(); // Error: func is not a closure
@@ -70,8 +77,15 @@ pub extern "C" fn dlisp_map(func: *mut DlispValue, list: *mut DlispValue) -> *mu
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `func` is a valid `DlispValue` pointing to a closure,
+/// and `list` is a valid `DlispValue` pointing to a list or nil.
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_filter(func: *mut DlispValue, list: *mut DlispValue) -> *mut DlispValue {
+pub unsafe extern "C" fn dlisp_filter(
+    func: *mut DlispValue,
+    list: *mut DlispValue,
+) -> *mut DlispValue {
     unsafe {
         if func.is_null() || (*func).type_ != ValueType::Closure {
             return dlisp_make_nil();
@@ -125,8 +139,12 @@ pub extern "C" fn dlisp_filter(func: *mut DlispValue, list: *mut DlispValue) -> 
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `func` is a valid `DlispValue` pointing to a closure,
+/// and `list` is a valid `DlispValue` pointing to a list or nil.
 #[unsafe(no_mangle)]
-pub extern "C" fn dlisp_reduce(
+pub unsafe extern "C" fn dlisp_reduce(
     func: *mut DlispValue,
     init: *mut DlispValue,
     list: *mut DlispValue,

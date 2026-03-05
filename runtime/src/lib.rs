@@ -323,7 +323,6 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
 }
 
 /// # Map Operations
-
 /// # Safety
 /// This function is unsafe because it uses raw pointers directly.
 #[unsafe(no_mangle)]
