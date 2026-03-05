@@ -1,5 +1,3 @@
-use std::ffi::c_void;
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueType {
@@ -10,7 +8,9 @@ pub enum ValueType {
     String,
     List,
     Vector,
+    Map,
     Symbol,
+    Keyword,
     Closure,
     NativePtr,
 }
@@ -24,7 +24,8 @@ pub union ValuePayload {
     pub str_val: *mut i8, // C-string
     pub list_val: *mut ListData,
     pub vector_val: *mut VectorData,
-    pub ptr_val: *mut c_void,
+    pub map_val: *mut MapData,
+    pub closure_val: *mut ClosureData,
 }
 
 #[repr(C)]
@@ -40,6 +41,19 @@ pub struct VectorData {
     pub len: usize,
     pub cap: usize,
     pub data: *mut *mut DlispValue,
+}
+
+#[repr(C)]
+pub struct ClosureData {
+    pub env: *mut DlispValue,
+    pub func_ptr: *const std::ffi::c_void,
+}
+
+#[repr(C)]
+pub struct MapData {
+    pub elements: *mut Option<(*mut DlispValue, *mut DlispValue)>,
+    pub len: usize,
+    pub cap: usize,
 }
 
 #[repr(C)]
@@ -67,6 +81,13 @@ impl DlispValue {
     pub fn new_symbol(s: *mut i8) -> Self {
         Self {
             type_: ValueType::Symbol,
+            payload: ValuePayload { str_val: s },
+        }
+    }
+
+    pub fn new_keyword(s: *mut i8) -> Self {
+        Self {
+            type_: ValueType::Keyword,
             payload: ValuePayload { str_val: s },
         }
     }

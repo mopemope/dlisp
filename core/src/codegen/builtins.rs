@@ -10,6 +10,10 @@ pub struct BuiltinDefinitions {
     pub dlisp_make_int: FuncId,
     pub dlisp_make_string: FuncId,
     pub dlisp_make_symbol: FuncId,
+    pub dlisp_make_keyword: FuncId,
+    pub dlisp_make_map: FuncId,
+    pub dlisp_map_assoc: FuncId,
+    pub dlisp_map_get: FuncId,
     pub dlisp_make_cons: FuncId,
     pub dlisp_make_float: FuncId,
     pub dlisp_make_bool: FuncId,
@@ -45,6 +49,8 @@ pub struct BuiltinDefinitions {
     pub dlisp_number_p: FuncId,
     pub dlisp_string_p: FuncId,
     pub dlisp_symbol_p: FuncId,
+    pub dlisp_keyword_p: FuncId,
+    pub dlisp_map_p: FuncId,
     pub dlisp_vector_p: FuncId,
     pub dlisp_type_of: FuncId,
     // Phase 3 additions (IO/SYS/OS)
@@ -119,6 +125,11 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_make_symbol", Linkage::Import, &make_symbol_sig)
         .map_err(|e| e.to_string())?;
 
+    // dlisp_make_keyword(char*) -> DlispValue*
+    let make_keyword_id = module
+        .declare_function("dlisp_make_keyword", Linkage::Import, &make_symbol_sig)
+        .map_err(|e| e.to_string())?;
+
     // dlisp_make_cons(DlispValue*, DlispValue*) -> DlispValue*
     let mut make_cons_sig = module.make_signature();
     make_cons_sig.params.push(AbiParam::new(int));
@@ -157,6 +168,13 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     make_vector_sig.returns.push(AbiParam::new(int));
     let make_vector_id = module
         .declare_function("dlisp_make_vector", Linkage::Import, &make_vector_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_make_map() -> DlispValue*
+    let mut make_map_sig = module.make_signature();
+    make_map_sig.returns.push(AbiParam::new(int));
+    let make_map_id = module
+        .declare_function("dlisp_make_map", Linkage::Import, &make_map_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_vector_push(vec: DlispValue*, val: DlispValue*)
@@ -213,6 +231,25 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     cdr_sig.returns.push(AbiParam::new(int));
     let cdr_id = module
         .declare_function("dlisp_cdr", Linkage::Import, &cdr_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_map_assoc(DlispValue*, DlispValue*, DlispValue*) -> DlispValue*
+    let mut map_assoc_sig = module.make_signature();
+    map_assoc_sig.params.push(AbiParam::new(int));
+    map_assoc_sig.params.push(AbiParam::new(int));
+    map_assoc_sig.params.push(AbiParam::new(int));
+    map_assoc_sig.returns.push(AbiParam::new(int));
+    let map_assoc_id = module
+        .declare_function("dlisp_map_assoc", Linkage::Import, &map_assoc_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_map_get(DlispValue*, DlispValue*) -> DlispValue*
+    let mut map_get_sig = module.make_signature();
+    map_get_sig.params.push(AbiParam::new(int));
+    map_get_sig.params.push(AbiParam::new(int));
+    map_get_sig.returns.push(AbiParam::new(int));
+    let map_get_id = module
+        .declare_function("dlisp_map_get", Linkage::Import, &map_get_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_add(DlispValue*, DlispValue*) -> DlispValue*
@@ -353,6 +390,12 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     let symbol_p_id = module
         .declare_function("dlisp_symbol_p", Linkage::Import, &car_sig)
         .map_err(|e| e.to_string())?;
+    let keyword_p_id = module
+        .declare_function("dlisp_keyword_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let map_p_id = module
+        .declare_function("dlisp_map_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
     let vector_p_id = module
         .declare_function("dlisp_vector_p", Linkage::Import, &car_sig)
         .map_err(|e| e.to_string())?;
@@ -434,6 +477,10 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_make_int: make_int_id,
         dlisp_make_string: make_string_id,
         dlisp_make_symbol: make_symbol_id,
+        dlisp_make_keyword: make_keyword_id,
+        dlisp_make_map: make_map_id,
+        dlisp_map_assoc: map_assoc_id,
+        dlisp_map_get: map_get_id,
         dlisp_make_cons: make_cons_id,
         dlisp_make_float: make_float_id,
         dlisp_make_bool: make_bool_id,
@@ -468,6 +515,8 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_number_p: number_p_id,
         dlisp_string_p: string_p_id,
         dlisp_symbol_p: symbol_p_id,
+        dlisp_keyword_p: keyword_p_id,
+        dlisp_map_p: map_p_id,
         dlisp_vector_p: vector_p_id,
         dlisp_type_of: type_of_id,
         dlisp_file_exists: file_exists_id,

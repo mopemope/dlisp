@@ -27,6 +27,9 @@ pub fn compile_builtin<M: Module>(
         "count" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_count, false),
         "nth" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_vector_get),
         "conj" => compile_conj(ctx, list),
+        "hash-map" => compile_hash_map(ctx, list),
+        "assoc" => compile_assoc(ctx, list),
+        "get" => compile_get(ctx, list),
         // Phase 2
         "/" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_div),
         "%" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_mod),
@@ -34,9 +37,9 @@ pub fn compile_builtin<M: Module>(
         ">=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_gte),
         "<=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_lte),
         "/=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_neq),
-        "str" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_str, true),
+        "str" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_str, false),
         "string-length" => {
-            compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_length, true)
+            compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_length, false)
         }
         "substring" => compile_substring(ctx, list), // Special case for 3 args
         "string-append" => {
@@ -46,13 +49,15 @@ pub fn compile_builtin<M: Module>(
         // But variadic arithmetic logic assumes the function takes 2 args (acc, next).
         // dlisp_string_append takes 2 args. So compile_variadic_arithmetic SHOULD work for string-append too!
         // predicates
-        "nil?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_nil_p, true),
-        "list?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_list_p, true),
-        "number?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_number_p, true),
-        "string?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_p, true),
-        "symbol?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_symbol_p, true),
-        "vector?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_p, true),
-        "type-of" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_type_of, true),
+        "nil?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_nil_p, false),
+        "list?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_list_p, false),
+        "number?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_number_p, false),
+        "string?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_p, false),
+        "symbol?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_symbol_p, false),
+        "keyword?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_keyword_p, false),
+        "map?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_map_p, false),
+        "vector?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_p, false),
+        "type-of" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_type_of, false),
         // Phase 3 additions
         "file-exists?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_file_exists, false),
         "is-dir?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_is_dir, false),
@@ -297,4 +302,68 @@ fn compile_substring<M: Module>(
         .ins()
         .call(local_func, &[s_val, start_val, end_val]);
     Ok(ctx.builder.inst_results(call)[0])
+}
+
+fn compile_hash_map<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if !(list.len() - 1).is_multiple_of(2) {
+        return Err("hash-map requires an even number of arguments".to_string());
+    }
+
+    let local_make_map = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_make_map, ctx.builder.func);
+    let make_map_call = ctx.builder.ins().call(local_make_map, &[]);
+    let mut map_ptr = ctx.builder.inst_results(make_map_call)[0];
+
+    let mut i = 1;
+    while i < list.len() {
+        let key_val = ctx.compile_expr(&list[i])?;
+        let val_val = ctx.compile_expr(&list[i + 1])?;
+
+        let local_assoc = ctx
+            .module
+            .declare_func_in_func(ctx.builtins.funcs.dlisp_map_assoc, ctx.builder.func);
+        let assoc_call = ctx
+            .builder
+            .ins()
+            .call(local_assoc, &[map_ptr, key_val, val_val]);
+        map_ptr = ctx.builder.inst_results(assoc_call)[0];
+        i += 2;
+    }
+
+    Ok(map_ptr)
+}
+
+fn compile_assoc<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if list.len() != 4 {
+        return Err("assoc requires 3 arguments (map key value)".to_string());
+    }
+    let map_val = ctx.compile_expr(&list[1])?;
+    let key_val = ctx.compile_expr(&list[2])?;
+    let val_val = ctx.compile_expr(&list[3])?;
+
+    let func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_map_assoc, ctx.builder.func);
+    let call = ctx.builder.ins().call(func, &[map_val, key_val, val_val]);
+    Ok(ctx.builder.inst_results(call)[0])
+}
+
+fn compile_get<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if list.len() < 3 || list.len() > 4 {
+        return Err("get requires 2 or 3 arguments (map key [default])".to_string());
+    }
+    if list.len() == 4 {
+        return Err("AOT compilation of get with default value not yet supported".to_string());
+    }
+    compile_binary_builtin(ctx, "get", list, ctx.builtins.funcs.dlisp_map_get)
 }

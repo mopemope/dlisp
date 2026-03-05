@@ -1,9 +1,10 @@
 use std::ffi::{CStr, c_char, c_void};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Write;
 use tokio::runtime::Runtime;
 
 pub mod value;
-use value::{DlispValue, ListData, ValueType};
+use value::{DlispValue, ListData, MapData, ValuePayload, ValueType};
 
 // Boehm GC bindings (Manual FFI)
 #[link(name = "gc")]
@@ -55,6 +56,18 @@ pub unsafe extern "C" fn dlisp_make_string(s: *mut c_char) -> *mut DlispValue {
     unsafe {
         let ptr = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
         *ptr = DlispValue::new_string(s);
+        ptr
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `s` points to a valid C string.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_make_keyword(s: *mut c_char) -> *mut DlispValue {
+    unsafe {
+        let ptr = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        *ptr = DlispValue::new_keyword(s);
         ptr
     }
 }
@@ -184,9 +197,6 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
     // Safety: we checked for null above.
     // However, since this is a recursive function dealing with raw pointers,
     // we must be careful. We rely on the GC and correct construction.
-    // Safety: we checked for null above.
-    // However, since this is a recursive function dealing with raw pointers,
-    // we must be careful. We rely on the GC and correct construction.
     unsafe {
         match (*val).type_ {
             ValueType::Int => {
@@ -240,6 +250,10 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
                 let c_str = CStr::from_ptr((*val).payload.str_val);
                 print!("{}", c_str.to_string_lossy());
             }
+            ValueType::Keyword => {
+                let c_str = CStr::from_ptr((*val).payload.str_val);
+                print!(":{}", c_str.to_string_lossy());
+            }
             ValueType::Vector => {
                 print!("[");
                 let vec_data = (*val).payload.vector_val;
@@ -261,6 +275,223 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
             }
             ValueType::NativePtr => {
                 print!("<native_ptr>");
+            }
+            ValueType::Map => {
+                print!("{{");
+                let map_data = (*val).payload.map_val;
+                if !map_data.is_null() {
+                    let cap = (*map_data).cap;
+                    let elements = (*map_data).elements;
+                    let mut first = true;
+                    for i in 0..cap {
+                        let opt_ptr = elements.add(i);
+                        if let Some((elem_k, elem_v)) = *opt_ptr {
+                            if !first {
+                                print!(" ");
+                            }
+                            dlisp_print_value(elem_k);
+                            print!(" ");
+                            dlisp_print_value(elem_v);
+                            first = false;
+                        }
+                    }
+                }
+                print!("}}");
+            }
+        }
+    }
+}
+
+/// # Map Operations
+
+/// # Safety
+/// This function is unsafe because it uses raw pointers directly.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_make_map() -> *mut DlispValue {
+    unsafe {
+        let cap = 8;
+        let map_val = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        let map_data = dlisp_gc_malloc(std::mem::size_of::<MapData>()) as *mut MapData;
+
+        let elements_size = cap * std::mem::size_of::<Option<(*mut DlispValue, *mut DlispValue)>>();
+        let elements =
+            dlisp_gc_malloc(elements_size) as *mut Option<(*mut DlispValue, *mut DlispValue)>;
+
+        // Initialize to None
+        for i in 0..cap {
+            std::ptr::write(elements.add(i), None);
+        }
+
+        (*map_data).len = 0;
+        (*map_data).cap = cap;
+        (*map_data).elements = elements;
+
+        *map_val = DlispValue {
+            type_: ValueType::Map,
+            payload: ValuePayload { map_val: map_data },
+        };
+        map_val
+    }
+}
+
+unsafe fn dlisp_hash_value(val: *mut DlispValue) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    if val.is_null() {
+        return 0;
+    }
+    unsafe {
+        match (*val).type_ {
+            ValueType::Int => {
+                (*val).payload.int_val.hash(&mut hasher);
+            }
+            ValueType::Bool => {
+                (*val).payload.bool_val.hash(&mut hasher);
+            }
+            ValueType::String | ValueType::Symbol | ValueType::Keyword => {
+                let c_str = CStr::from_ptr((*val).payload.str_val);
+                c_str.to_bytes().hash(&mut hasher);
+            }
+            _ => {
+                // For now, simpler hash based on pointer address for other types
+                (val as usize).hash(&mut hasher);
+            }
+        }
+    }
+    hasher.finish()
+}
+
+unsafe fn dlisp_map_insert(map_data: *mut MapData, key: *mut DlispValue, val: *mut DlispValue) {
+    unsafe {
+        let cap = (*map_data).cap;
+        let hash = dlisp_hash_value(key) as usize;
+        let mut idx = hash % cap;
+
+        // Linear probing
+        loop {
+            let opt_ptr = (*map_data).elements.add(idx);
+            if (*opt_ptr).is_none() {
+                std::ptr::write(opt_ptr, Some((key, val)));
+                (*map_data).len += 1;
+                return;
+            } else if let Some((existing_key, _)) = *opt_ptr {
+                let eq_val = dlisp_eq(existing_key, key);
+                if !eq_val.is_null()
+                    && (*eq_val).type_ == ValueType::Bool
+                    && (*eq_val).payload.bool_val
+                {
+                    // Update existing
+                    std::ptr::write(opt_ptr, Some((key, val)));
+                    return;
+                }
+            }
+            idx = (idx + 1) % cap;
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it uses raw pointers directly.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_map_assoc(
+    map_val: *mut DlispValue,
+    key: *mut DlispValue,
+    val: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if map_val.is_null() || (*map_val).type_ != ValueType::Map {
+            eprintln!("Type Error: assoc requires a map as first argument");
+            std::process::abort();
+        }
+
+        let old_map_data = (*map_val).payload.map_val;
+        let old_cap = (*old_map_data).cap;
+        let old_len = (*old_map_data).len;
+
+        // Check if this key already exists to avoid over-counting
+        let existing = dlisp_map_get(map_val, key);
+        let is_update = !existing.is_null() && (*existing).type_ != ValueType::Nil;
+        let new_len = if is_update { old_len } else { old_len + 1 };
+
+        let new_cap = if new_len * 2 > old_cap {
+            old_cap * 2
+        } else {
+            old_cap
+        };
+
+        let result_map_val = dlisp_gc_malloc(std::mem::size_of::<DlispValue>()) as *mut DlispValue;
+        let result_map_data = dlisp_gc_malloc(std::mem::size_of::<MapData>()) as *mut MapData;
+        let elements_size =
+            new_cap * std::mem::size_of::<Option<(*mut DlispValue, *mut DlispValue)>>();
+        let elements =
+            dlisp_gc_malloc(elements_size) as *mut Option<(*mut DlispValue, *mut DlispValue)>;
+
+        for i in 0..new_cap {
+            std::ptr::write(elements.add(i), None);
+        }
+
+        (*result_map_data).len = 0;
+        (*result_map_data).cap = new_cap;
+        (*result_map_data).elements = elements;
+
+        // Copy existing elements
+        for i in 0..old_cap {
+            let opt_ptr = (*old_map_data).elements.add(i);
+            if let Some((k, v)) = *opt_ptr {
+                dlisp_map_insert(result_map_data, k, v);
+            }
+        }
+
+        // Insert new element
+        dlisp_map_insert(result_map_data, key, val);
+
+        *result_map_val = DlispValue {
+            type_: ValueType::Map,
+            payload: ValuePayload {
+                map_val: result_map_data,
+            },
+        };
+        result_map_val
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it uses raw pointers directly.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_map_get(
+    map_val: *mut DlispValue,
+    key: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if map_val.is_null() || (*map_val).type_ != ValueType::Map {
+            // Like core/src/builtins/map.rs `get`, return nil if not map
+            return dlisp_make_nil();
+        }
+        let map_data = (*map_val).payload.map_val;
+        if map_data.is_null() || (*map_data).len == 0 {
+            return dlisp_make_nil();
+        }
+
+        let cap = (*map_data).cap;
+        let hash = dlisp_hash_value(key) as usize;
+        let mut idx = hash % cap;
+        let start_idx = idx;
+
+        loop {
+            let opt_ptr = (*map_data).elements.add(idx);
+            if (*opt_ptr).is_none() {
+                return dlisp_make_nil();
+            } else if let Some((existing_key, existing_val)) = *opt_ptr {
+                let eq_val = dlisp_eq(existing_key, key);
+                if !eq_val.is_null()
+                    && (*eq_val).type_ == ValueType::Bool
+                    && (*eq_val).payload.bool_val
+                {
+                    return existing_val;
+                }
+            }
+            idx = (idx + 1) % cap;
+            if idx == start_idx {
+                return dlisp_make_nil();
             }
         }
     }
@@ -422,7 +653,41 @@ pub unsafe extern "C" fn dlisp_eq(a: *mut DlispValue, b: *mut DlispValue) -> *mu
             (ValueType::Float, ValueType::Int) => {
                 ((*a).payload.float_val - (*b).payload.int_val as f64).abs() < f64::EPSILON
             }
+            (ValueType::Map, ValueType::Map) => {
+                let m1 = (*a).payload.map_val;
+                let m2 = (*b).payload.map_val;
+                if m1 == m2 {
+                    true
+                } else if m1.is_null() || m2.is_null() || (*m1).len != (*m2).len {
+                    false
+                } else {
+                    let len1 = (*m1).len;
+                    let mut matches = 0;
+                    for i in 0..(*m1).cap {
+                        if let Some((k1, v1)) = *(*m1).elements.add(i) {
+                            let v2 = dlisp_map_get(b, k1);
+                            if v2.is_null() || (*v2).type_ == ValueType::Nil {
+                                break;
+                            }
+                            let eq_val = dlisp_eq(v1, v2);
+                            if eq_val.is_null()
+                                || (*eq_val).type_ != ValueType::Bool
+                                || !(*eq_val).payload.bool_val
+                            {
+                                break;
+                            }
+                            matches += 1;
+                        }
+                    }
+                    matches == len1
+                }
+            }
             (ValueType::Symbol, ValueType::Symbol) => {
+                let s1 = CStr::from_ptr((*a).payload.str_val);
+                let s2 = CStr::from_ptr((*b).payload.str_val);
+                s1 == s2
+            }
+            (ValueType::Keyword, ValueType::Keyword) => {
                 let s1 = CStr::from_ptr((*a).payload.str_val);
                 let s2 = CStr::from_ptr((*b).payload.str_val);
                 s1 == s2
@@ -758,11 +1023,16 @@ pub unsafe extern "C" fn dlisp_str(val: *mut DlispValue) -> *mut DlispValue {
                 let c_str = CStr::from_ptr((*val).payload.str_val);
                 c_str.to_string_lossy().to_string()
             }
+            ValueType::Keyword => {
+                let c_str = CStr::from_ptr((*val).payload.str_val);
+                format!(":{}", c_str.to_string_lossy())
+            }
             ValueType::List => {
                 // Simplified representation for now
                 "list".to_string()
             }
             ValueType::Vector => "vector".to_string(),
+            ValueType::Map => "map".to_string(),
             _ => "unknown".to_string(),
         };
         let c_str = std::ffi::CString::new(s).unwrap();
@@ -887,8 +1157,22 @@ pub unsafe extern "C" fn dlisp_symbol_p(val: *mut DlispValue) -> *mut DlispValue
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_keyword_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::Keyword) }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_vector_p(val: *mut DlispValue) -> *mut DlispValue {
     unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::Vector) }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_map_p(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe { dlisp_make_bool(!val.is_null() && (*val).type_ == ValueType::Map) }
 }
 
 /// # Safety
@@ -906,8 +1190,10 @@ pub unsafe extern "C" fn dlisp_type_of(val: *mut DlispValue) -> *mut DlispValue 
                 ValueType::Nil => "nil",
                 ValueType::String => "string",
                 ValueType::Symbol => "symbol",
+                ValueType::Keyword => "keyword",
                 ValueType::List => "cons",
                 ValueType::Vector => "vector",
+                ValueType::Map => "map",
                 ValueType::Closure => "closure",
                 ValueType::NativePtr => "native_ptr",
             }

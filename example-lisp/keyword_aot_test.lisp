@@ -1,0 +1,8 @@
+(defun main ()
+  (let ((k :hello-keyword))
+    (print k)
+    (print (keyword? k))
+    (print (keyword? :other-keyword))
+    (print (type-of :test))
+    (print (= k :hello-keyword))
+    (print (= k :other-keyword))))

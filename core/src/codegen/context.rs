@@ -111,6 +111,37 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 Ok(self.builder.inst_results(call)[0])
             }
             Value::Symbol(s) => self.resolve_variable(s),
+            Value::Keyword(s) => {
+                let mut hasher = DefaultHasher::new();
+                s.hash(&mut hasher);
+                let hash = hasher.finish();
+
+                let mut data_ctx = cranelift_module::DataDescription::new();
+                let mut bytes = s.clone().into_bytes();
+                bytes.push(0); // Null terminator
+                data_ctx.define(bytes.into_boxed_slice());
+
+                let ptr_addr = s.as_ptr() as usize;
+                let unique_name = format!("key_{}_{}", hash, ptr_addr);
+                let data_id = self
+                    .module
+                    .declare_data(&unique_name, Linkage::Local, false, false)
+                    .map_err(|e| e.to_string())?;
+
+                self.module
+                    .define_data(data_id, &data_ctx)
+                    .map_err(|e| e.to_string())?;
+
+                let global_val = self.module.declare_data_in_func(data_id, self.builder.func);
+                let ptr = self.builder.ins().global_value(self.ptr_type, global_val);
+
+                let func = self.module.declare_func_in_func(
+                    self.builtins.funcs.dlisp_make_keyword,
+                    self.builder.func,
+                );
+                let call = self.builder.ins().call(func, &[ptr]);
+                Ok(self.builder.inst_results(call)[0])
+            }
             Value::List(list) => self.compile_list(list),
             Value::Vector(vec) => {
                 let capacity = vec.len();
@@ -119,17 +150,40 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     .module
                     .declare_func_in_func(self.builtins.funcs.dlisp_make_vector, self.builder.func);
                 let call = self.builder.ins().call(func, &[cap_val]);
-                let vec_ptr = self.builder.inst_results(call)[0];
+                let mut vec_ptr = self.builder.inst_results(call)[0];
 
-                for item in vec {
-                    let val = self.compile_expr(item)?;
+                for arg in vec {
+                    let arg_val = self.compile_expr(arg)?;
                     let push_func = self.module.declare_func_in_func(
                         self.builtins.funcs.dlisp_vector_push,
                         self.builder.func,
                     );
-                    self.builder.ins().call(push_func, &[vec_ptr, val]);
+                    let push_call = self.builder.ins().call(push_func, &[vec_ptr, arg_val]);
+                    vec_ptr = self.builder.inst_results(push_call)[0];
                 }
                 Ok(vec_ptr)
+            }
+            Value::Map(map) => {
+                let func = self
+                    .module
+                    .declare_func_in_func(self.builtins.funcs.dlisp_make_map, self.builder.func);
+                let call = self.builder.ins().call(func, &[]);
+                let mut map_ptr = self.builder.inst_results(call)[0];
+
+                for (k, v) in map.iter() {
+                    let k_val = self.compile_expr(k)?;
+                    let v_val = self.compile_expr(v)?;
+                    let assoc_func = self.module.declare_func_in_func(
+                        self.builtins.funcs.dlisp_map_assoc,
+                        self.builder.func,
+                    );
+                    let assoc_call = self
+                        .builder
+                        .ins()
+                        .call(assoc_func, &[map_ptr, k_val, v_val]);
+                    map_ptr = self.builder.inst_results(assoc_call)[0]; // Updated map
+                }
+                Ok(map_ptr)
             }
             _ => Err(format!("Unsupported Value type for JIT: {:?}", val)),
         }
@@ -228,8 +282,8 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr"
                 | "read-file" | "vector" | "nth" | "count" | "conj"
                 | "/" | "%" | "mod" | ">=" | "<=" | "/=" | "str" | "string-length" | "substring"
-                | "string-append" | "nil?" | "list?" | "number?" | "string?" | "symbol?"
-                | "vector?" | "type-of"
+                | "string-append" | "hash-map" | "assoc" | "get" | "map?" | "nil?" | "list?" | "number?" | "string?" | "symbol?"
+                | "keyword?" | "vector?" | "type-of"
                 // Phase 3 Additions
                 | "file-exists?" | "is-dir?" | "is-file?" | "list-dir" | "delete-file"
                 | "getenv" | "setenv" | "cwd" | "set-cwd" | "args" | "exit" | "sh" => {
@@ -346,6 +400,37 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 let func = self
                     .module
                     .declare_func_in_func(self.builtins.funcs.dlisp_make_symbol, self.builder.func);
+                let call = self.builder.ins().call(func, &[ptr]);
+                Ok(self.builder.inst_results(call)[0])
+            }
+            Value::Keyword(s) => {
+                let mut hasher = DefaultHasher::new();
+                s.hash(&mut hasher);
+                let hash = hasher.finish();
+
+                let mut data_ctx = cranelift_module::DataDescription::new();
+                let mut bytes = s.clone().into_bytes();
+                bytes.push(0); // Null terminator
+                data_ctx.define(bytes.into_boxed_slice());
+
+                let ptr_addr = s.as_ptr() as usize;
+                let unique_name = format!("key_{}_{}", hash, ptr_addr);
+                let data_id = self
+                    .module
+                    .declare_data(&unique_name, Linkage::Local, false, false)
+                    .map_err(|e| e.to_string())?;
+
+                self.module
+                    .define_data(data_id, &data_ctx)
+                    .map_err(|e| e.to_string())?;
+
+                let global_val = self.module.declare_data_in_func(data_id, self.builder.func);
+                let ptr = self.builder.ins().global_value(self.ptr_type, global_val);
+
+                let func = self.module.declare_func_in_func(
+                    self.builtins.funcs.dlisp_make_keyword,
+                    self.builder.func,
+                );
                 let call = self.builder.ins().call(func, &[ptr]);
                 Ok(self.builder.inst_results(call)[0])
             }
