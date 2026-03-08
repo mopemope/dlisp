@@ -26,6 +26,7 @@ pub enum Value {
     },
     Macro {
         args: Vec<String>,
+        rest_param: Option<String>,
         body: Vec<Value>,
     },
     List(Vec<Value>),
@@ -106,13 +107,15 @@ impl PartialEq for Value {
             (
                 Value::Macro {
                     args: a_args,
+                    rest_param: a_rest,
                     body: a_body,
                 },
                 Value::Macro {
                     args: b_args,
+                    rest_param: b_rest,
                     body: b_body,
                 },
-            ) => a_args == b_args && a_body == b_body,
+            ) => a_args == b_args && a_rest == b_rest && a_body == b_body,
             _ => false,
         }
     }
@@ -162,8 +165,13 @@ impl Hash for Value {
                     0usize.hash(state);
                 }
             }
-            Value::Macro { args, body } => {
+            Value::Macro {
+                args,
+                rest_param,
+                body,
+            } => {
                 args.hash(state);
+                rest_param.hash(state);
                 body.hash(state);
             }
         }
@@ -215,25 +223,35 @@ impl Ord for Value {
             (
                 Value::UserFunc {
                     args: a_a,
+                    rest_param: a_r,
                     body: a_b,
                     ..
                 },
                 Value::UserFunc {
                     args: b_a,
+                    rest_param: b_r,
                     body: b_b,
                     ..
                 },
-            ) => a_a.cmp(b_a).then_with(|| a_b.cmp(b_b)),
+            ) => a_a
+                .cmp(b_a)
+                .then_with(|| a_r.cmp(b_r))
+                .then_with(|| a_b.cmp(b_b)),
             (
                 Value::Macro {
                     args: a_a,
+                    rest_param: a_r,
                     body: a_b,
                 },
                 Value::Macro {
                     args: b_a,
+                    rest_param: b_r,
                     body: b_b,
                 },
-            ) => a_a.cmp(b_a).then_with(|| a_b.cmp(b_b)),
+            ) => a_a
+                .cmp(b_a)
+                .then_with(|| a_r.cmp(b_r))
+                .then_with(|| a_b.cmp(b_b)),
             _ => Ordering::Equal, // Should be covered by discriminant check
         }
     }

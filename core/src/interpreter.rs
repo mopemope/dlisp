@@ -204,15 +204,26 @@ impl Interpreter {
 
                     // Check environment for macro definition
                     let resolved_opt = env.borrow().get(s);
-                    if let Some(Value::Macro { args, body }) = resolved_opt {
+                    if let Some(Value::Macro {
+                        args,
+                        rest_param,
+                        body,
+                    }) = resolved_opt
+                    {
                         // It IS a macro!
                         let macro_args_vals = list[1..].to_vec(); // Unevaluated args
 
-                        if macro_args_vals.len() != args.len() {
+                        let expected_len = args.len();
+                        let has_rest = rest_param.is_some();
+
+                        if (!has_rest && macro_args_vals.len() != expected_len)
+                            || (has_rest && macro_args_vals.len() < expected_len)
+                        {
                             return Err(format!(
-                                "Macro {} expects {} arguments, got {}",
+                                "Macro {} expects {} arguments{}, got {}",
                                 s,
-                                args.len(),
+                                expected_len,
+                                if has_rest { " or more" } else { "" },
                                 macro_args_vals.len()
                             ));
                         }
@@ -220,9 +231,24 @@ impl Interpreter {
                         // Execute macro body
                         // Create macro environment
                         let mut macro_env = Environment::new(Some(env.clone()));
-                        for (name, val) in args.iter().zip(macro_args_vals.iter()) {
-                            macro_env.set(name.clone(), val.clone());
+                        for (i, name) in args.iter().enumerate() {
+                            macro_env.set(name.clone(), macro_args_vals[i].clone());
                         }
+
+                        if let Some(rest_name) = rest_param {
+                            let rest_vals = if macro_args_vals.len() > expected_len {
+                                macro_args_vals[expected_len..].to_vec()
+                            } else {
+                                Vec::new()
+                            };
+                            let rest_list = if rest_vals.is_empty() {
+                                Value::Nil
+                            } else {
+                                Value::List(rest_vals)
+                            };
+                            macro_env.set(rest_name.clone(), rest_list);
+                        }
+
                         let mut macro_env_rc = Rc::new(RefCell::new(macro_env));
 
                         // Eval body

@@ -183,6 +183,64 @@ async fn test_eval_let_parallel_binding() {
     let res = interpreter.eval(let_expr, &mut env.clone()).await;
     assert_eq!(res.unwrap(), Value::Integer(100));
 }
+
+#[tokio::test]
+async fn test_eval_let_destructuring() {
+    let env = default_env();
+    let mut interpreter = Interpreter::new();
+    // (let (((x y) '(10 20))) (+ x y))
+    let let_expr = Value::List(vec![
+        Value::Symbol("let".to_string()),
+        Value::List(vec![Value::List(vec![
+            Value::List(vec![
+                Value::Symbol("x".to_string()),
+                Value::Symbol("y".to_string()),
+            ]),
+            Value::List(vec![
+                Value::Symbol("quote".to_string()),
+                Value::List(vec![Value::Integer(10), Value::Integer(20)]),
+            ]),
+        ])]),
+        Value::List(vec![
+            Value::Symbol("+".to_string()),
+            Value::Symbol("x".to_string()),
+            Value::Symbol("y".to_string()),
+        ]),
+    ]);
+    let res = interpreter.eval(let_expr, &mut env.clone()).await;
+    assert_eq!(res.unwrap(), Value::Integer(30));
+}
+
+#[tokio::test]
+async fn test_eval_let_destructuring_rest() {
+    let env = default_env();
+    let mut interpreter = Interpreter::new();
+    // (let (((x &rest y) '(1 2 3))) y) => (2 3)
+    let let_expr = Value::List(vec![
+        Value::Symbol("let".to_string()),
+        Value::List(vec![Value::List(vec![
+            Value::List(vec![
+                Value::Symbol("x".to_string()),
+                Value::Symbol("&rest".to_string()),
+                Value::Symbol("y".to_string()),
+            ]),
+            Value::List(vec![
+                Value::Symbol("quote".to_string()),
+                Value::List(vec![
+                    Value::Integer(1),
+                    Value::Integer(2),
+                    Value::Integer(3),
+                ]),
+            ]),
+        ])]),
+        Value::Symbol("y".to_string()),
+    ]);
+    let res = interpreter.eval(let_expr, &mut env.clone()).await;
+    assert_eq!(
+        res.unwrap(),
+        Value::List(vec![Value::Integer(2), Value::Integer(3)])
+    );
+}
 #[tokio::test]
 async fn test_eval_let_empty_bindings() {
     let env = default_env();

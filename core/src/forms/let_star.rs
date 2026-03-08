@@ -35,22 +35,24 @@ pub async fn let_star_form(
             Value::List(bind_pair) => {
                 if bind_pair.len() != 2 {
                     return Err(
-                        "let* binding must be a list of two elements: (symbol value)".to_string(),
+                        "let* binding must be a list of two elements: (pattern value)".to_string(),
                     );
                 }
-                let symbol = match &bind_pair[0] {
-                    Value::Symbol(s) => s.clone(),
-                    _ => return Err("let* binding key must be a symbol".to_string()),
-                };
+                let pattern = &bind_pair[0];
 
                 // Evaluate in the current environment
                 let val = interpreter
                     .eval(bind_pair[1].clone(), &mut current_env)
                     .await?;
 
+                let mut new_bindings = Vec::new();
+                crate::forms::destructure::bind_destructure(pattern, &val, &mut new_bindings)?;
+
                 // Create a new scope for the next bindings and body, extending the current one
                 let mut new_scope = Environment::new(Some(current_env.clone()));
-                new_scope.set(symbol, val);
+                for (sym, v) in new_bindings {
+                    new_scope.set(sym, v);
+                }
                 current_env = Rc::new(RefCell::new(new_scope));
             }
             _ => return Err("let* binding must be a list".to_string()),

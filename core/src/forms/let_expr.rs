@@ -29,16 +29,18 @@ pub async fn let_form(
             Value::List(bind_pair) => {
                 if bind_pair.len() != 2 {
                     return Err(
-                        "let binding must be a list of two elements: (symbol value)".to_string()
+                        "let binding must be a list of two elements: (pattern value)".to_string(),
                     );
                 }
-                let symbol = match &bind_pair[0] {
-                    Value::Symbol(s) => s.clone(),
-                    _ => return Err("let binding key must be a symbol".to_string()),
-                };
+                let pattern = &bind_pair[0];
                 let val_expr = &bind_pair[1];
                 let val = interpreter.eval(val_expr.clone(), env).await?;
-                evaluated_bindings.push((symbol, val));
+
+                crate::forms::destructure::bind_destructure(
+                    pattern,
+                    &val,
+                    &mut evaluated_bindings,
+                )?;
             }
             _ => return Err("let binding must be a list".to_string()),
         }

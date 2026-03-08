@@ -116,3 +116,40 @@ async fn test_macroexpand_with_backquote_macro() {
         ])
     );
 }
+
+#[tokio::test]
+async fn test_macroexpand_with_rest_param() {
+    let code = r#"
+        (defmacro my-list (name &rest items)
+          `(list ,name ,@items))
+        (macroexpand '(my-list "nums" 1 2 3))
+    "#;
+    let res = run_code(code).await.unwrap();
+    assert_eq!(
+        res,
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::String("nums".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ])
+    );
+}
+
+#[tokio::test]
+async fn test_macroexpand_with_rest_param_empty() {
+    let code = r#"
+        (defmacro my-list (name &rest items)
+          `(list ,name ,@items))
+        (macroexpand '(my-list "empty"))
+    "#;
+    let res = run_code(code).await.unwrap();
+    assert_eq!(
+        res,
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::String("empty".to_string()),
+        ])
+    );
+}

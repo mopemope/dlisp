@@ -63,3 +63,24 @@ async fn test_setq_undefined_error() {
     let res = interpreter.eval(exprs[0].clone(), &mut env).await;
     assert!(res.is_err());
 }
+
+#[tokio::test]
+async fn test_setq_multiple_pairs() {
+    let (mut interpreter, mut env) = setup();
+
+    // (let ((x 1) (y 2)) (setq x 10 y 20) (+ x y)) -> 30
+    let src = "(let ((x 1) (y 2)) (setq x 10 y 20) (+ x y))";
+    let res = eval_str(src, &mut interpreter, &mut env).await;
+    assert_eq!(res, Value::Integer(30));
+}
+
+#[tokio::test]
+async fn test_setq_odd_args_error() {
+    let (mut interpreter, mut env) = setup();
+
+    // (setq x 10 y) -> Error
+    let src = "(let ((x 1) (y 2)) (setq x 10 y))";
+    let exprs = parse(src).unwrap();
+    let res = interpreter.eval(exprs[0].clone(), &mut env).await;
+    assert!(res.is_err());
+}

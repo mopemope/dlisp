@@ -11,20 +11,25 @@ pub fn setq<'a>(
     env: &'a mut Rc<RefCell<Environment>>,
 ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
     Box::pin(async move {
-        if args.len() != 2 {
-            return Err("setq requires exactly 2 arguments (symbol, value)".to_string());
+        let len = args.len();
+        if len == 0 || !len.is_multiple_of(2) {
+            return Err("setq requires pairs of (symbol value) arguments".to_string());
         }
 
-        let symbol_name = match &args[0] {
-            Value::Symbol(s) => s.clone(),
-            _ => return Err("setq first argument must be a symbol".to_string()),
-        };
+        let mut last_val = Value::Nil;
+        for i in (0..len).step_by(2) {
+            let symbol_name = match &args[i] {
+                Value::Symbol(s) => s.clone(),
+                _ => return Err("setq even arguments must be symbols".to_string()),
+            };
 
-        let val = interpreter.eval(args[1].clone(), env).await?;
+            let val = interpreter.eval(args[i + 1].clone(), env).await?;
 
-        // Attempt to update existing variable in env or its parents
-        env.borrow_mut().assign(&symbol_name, val.clone())?;
+            // Attempt to update existing variable in env or its parents
+            env.borrow_mut().assign(&symbol_name, val.clone())?;
+            last_val = val;
+        }
 
-        Ok(Some(val))
+        Ok(Some(last_val))
     })
 }

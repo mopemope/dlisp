@@ -3,6 +3,7 @@ pub mod apply;
 pub mod cond;
 pub mod defun;
 pub mod defvar;
+pub mod destructure;
 pub mod dolist;
 pub mod dotimes;
 pub mod eval;
