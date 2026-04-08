@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Language Surface"
+  short_description: "Update dlisp docs from code-first sources."
+  default_prompt: "Use $dlisp-language-surface to update dlisp language docs from the real source of truth in code and tests, while keeping prose concise."

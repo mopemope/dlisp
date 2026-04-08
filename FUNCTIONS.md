@@ -1,54 +1,63 @@
-# 実装済み関数一覧 (Implemented Functions)
+# Functions and Special Forms Index
 
-現在 `dlisp` インタプリタで利用可能な特殊形式および関数の一覧です。
+このファイルは `dlisp` の surface を素早く確認するための索引です。完全な source of truth ではありません。
 
-## 特殊形式 (Special Forms)
+## Source of truth
+- special forms: `core/src/forms/registry.rs`
+- builtins: `core/src/builtins/mod.rs`
+- snapshot helper: `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh`
 
-インタプリタによって特別に処理される構文です。
+## Special forms
 
-- **`defun`**: ユーザー定義関数を作成します。
-  - 書式: `(defun <名前> (<引数>...) <本体>...)`
-  - 例: `(defun add2 (x) (+ x 2))`
-  - **JITコンパイル**: 関数本体が整数演算のみで構成される場合、Craneliftを使用してネイティブコードにJITコンパイルされ、高速に実行されます。
+定義と束縛:
+- `defun`, `defvar`, `setq`, `lambda`, `let`, `let*`
 
-## 組み込み関数 (Native Functions)
+制御:
+- `if`, `cond`, `and`, `or`, `progn`, `do`, `when`, `unless`, `while`
 
-Rustで実装され、デフォルト環境に登録されている関数です。
+反復:
+- `dotimes`, `dolist`
 
-- **`+`**: 数値の加算を行います。
-  - 書式: `(+ <数値>...)`
-  - 型: 整数 (Integer) および 浮動小数点数 (Float) をサポートします。
-  - 例: `(+ 1 2)` => `3`, `(+ 1.5 2.5)` => `4.0`
+評価と適用:
+- `eval`, `apply`, `quote`, `macroexpand`, `load`
 
-- **`-`**: 数値の減算または符号反転を行います。
-  - 書式: `(- <数値>...)` または `(- <数値>)`
-  - 型: 整数 (Integer) および 浮動小数点数 (Float) をサポートします。
-  - 単項演算（引数が1つ）の場合は符号を反転します。
-  - 例: `(- 10 3)` => `7`, `(- 5)` => `-5`
+高階操作:
+- `map`, `filter`, `reduce`, `some`, `every`, `find`, `for-each`, `map-indexed`, `update`, `map-keys`, `map-vals`
 
-### ファイルシステム・I/O操作
-- **`read-file` / `write-file`**: ファイルの読み書き
-- **`file-exists?` / `is-dir?` / `is-file?`**: ファイルやディレクトリの存在・種類判定
-- **`delete-file`**: ファイル削除
-- **`list-dir`**: ディレクトリ一覧取得
+非同期と例外:
+- `spawn`, `try`, `throw`
 
-### 環境・システム情報
-- **`getenv` / `setenv`**: 環境変数の操作
-- **`cwd` / `set-cwd`**: カレントディレクトリの操作
-- **`args`**: 起動引数の取得
-- **`exit`**: インタプリタの終了
+補足:
+- `defmacro` は registry ではなく evaluator 側で特別扱いされる
 
-### OS / 外部プロセス
-- **`sh` / `exec`**: 外部OSコマンドを実行し、ステータス、標準出力、標準エラーをMapとして返します。
+## Builtins
 
-## データ型
+算術:
+- `+`, `-`, `*`, `/`, `%`, `mod`, `max`, `min`, `abs`, `pow`
 
-- **Integer**: 64ビット整数 (`i64`)
-- **Float**: 64ビット浮動小数点数 (`f64`)
-- **Symbol**: 識別子 (`String`)
-- **List**: S式 (`Vec<Value>`)
-- **Nil**: 空リストまたは偽
+比較:
+- `>`, `<`, `=`, `>=`, `<=`, `/=`
 
-- **`map`**: 各要素に関数を適用
-- **`filter`**: 条件に合う要素を抽出
-- **`reduce`**: リストを畳み込み
+表示と文字列化:
+- `print`, `println`, `print-str`, `eprintln`, `format`, `str`
+
+ファイルと OS:
+- `read-file`, `write-file`, `file-exists?`, `is-dir?`, `is-file?`, `delete-file`, `list-dir`, `sh`, `exec`
+
+環境:
+- `getenv`, `setenv`, `cwd`, `set-cwd`, `args`, `exit`, `sleep`
+
+List:
+- `list`, `not`, `car`, `first`, `cdr`, `rest`, `cons`, `append`, `reverse`, `sort`, `last`, `butlast`, `flatten`, `range`, `take`, `drop`, `zip`
+
+Vector:
+- `vector`, `nth`, `count`, `conj`
+
+Map:
+- `hash-map`, `get`, `assoc`, `dissoc`, `keys`, `vals`, `contains?`, `merge`, `select-keys`
+
+String:
+- `string-length`, `substring`, `string-append`, `string-split`, `string-replace`, `string-upper`, `string-lower`, `string-trim`, `string-trim-left`, `string-trim-right`, `string-starts-with?`, `string-ends-with?`, `string-contains?`, `string-index-of`, `string->number`, `number->string`, `char-at`
+
+Type / error:
+- `nil?`, `error?`, `empty?`, `list?`, `number?`, `string?`, `symbol?`, `keyword?`, `vector?`, `map?`, `type-of`, `error-value`

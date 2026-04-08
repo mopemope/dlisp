@@ -1,105 +1,83 @@
-# doge-lisp
+# dlisp
 
-A JIT-compiling Lisp interpreter written in Rust.
+Cranelift を使った JIT/AOT 対応の Lisp interpreter です。REPL 実行、スクリプト実行、ネイティブ実行ファイル生成を同じ workspace で扱います。
 
-## Development Environment
-- **OS**: Linux
-- **Language**: Rust (Cargo)
+## Workspace
+- `cli`: `dlisp` コマンド本体、REPL、ファイル実行、AOT compile サブコマンド
+- `core`: parser、evaluator、special forms、builtins、JIT/AOT codegen
+- `runtime`: AOT/JIT 実行時のランタイムと Boehm GC 連携
+- `stdlib`: 最小の補助 crate
 
-## Technology Stack
-The project leverages the following key libraries:
+## Requirements
+- Rust stable
+- `cc`
+- Boehm GC 開発パッケージ
+- `pkg-config`
 
-### Core Code Generation & JIT
-- **[Cranelift](https://cranelift.dev)** : Used for Just-In-Time compilation of Lisp code to native machine code.
-  - `cranelift`: Core code generator.
-  - `cranelift-jit`: JIT execution engine.
-  - `cranelift-module`: Module management for JIT.
-  - `cranelift-frontend`: IR construction.
-
-### Parsing
-- **[Chumsky](https://github.com/zesterer/chumsky)** : A parser combinator library used for parsing Lisp syntax.
-
-### CLI & Interaction
-- **[Rustyline](https://github.com/kkawakam/rustyline)** : Provides a readline implementation for the REPL with history support.
-- **[Dirs](https://github.com/dirs-dev/dirs-rs)** : Used to handle XDG-compliant path resolution for history and logs.
-
-### Logging & Utilities
-- **[Tracing](https://github.com/tokio-rs/tracing)**: Framework for instrumenting Rust programs to collect structured, event-based diagnostic information.
-- **[Anyhow](https://github.com/dtolnay/anyhow)** & **[Thiserror](https://github.com/dtolnay/thiserror)**: Error handling.
-
-## System Requirements
-
-To build and run `doge-lisp`, you need the following dependencies installed on your system:
-
-- **Rust**: Latest stable version (via rustup).
-- **Boehm GC**: `libgc-dev` (Debian/Ubuntu) or `bdwgc` (others).
+Ubuntu / Debian:
 
 ```bash
-# Ubuntu/Debian
-sudo apt-get install libgc-dev pkg-config
+sudo apt-get install libgc-dev pkg-config build-essential
 ```
 
-## Usage
+## Build / Run
 
-### Build
+Build:
+
 ```bash
 cargo build --workspace
 ```
 
-### Run REPL
-Start the interactive Read-Eval-Print Loop:
+Run REPL:
+
 ```bash
 cargo run --bin dlisp
 ```
 
-### Run Script
-Execute a Lisp script file:
+Run a script:
+
 ```bash
 cargo run --bin dlisp -- path/to/script.lisp
 ```
 
-### Compile to Native Executable
-Compile a Lisp script into a standalone native executable:
+Compile to a native executable:
+
 ```bash
-cargo run --bin dlisp compile path/to/script.lisp -o my_app
+cargo run --bin dlisp -- compile path/to/script.lisp -o my_app
 ./my_app
 ```
 
-## Command-line Options
+Run all tests:
+
+```bash
+cargo test --workspace --quiet
+```
+
+## CLI
 
 ```text
 dlisp [FILE] [COMMAND]
 
-Arguments:
-  [FILE]  Optional script file to execute if no subcommand is given
-
 Commands:
   compile  Compile a script to a native executable
-  help     Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help     Print help
-  -V, --version  Print version
+```
 
 Compile options:
-  -o, --output <OUTPUT>  Output filename
+
+```text
+-o, --output <OUTPUT>
+-O, --optimize
+    --release
 ```
 
-## Configuration & Data
+## Runtime Notes
+- REPL history: `~/.local/state/dlisp/history.txt`
+- Debug log: `~/.local/state/dlisp/debug.log`
+- `RUST_LOG=debug cargo run --bin dlisp` で tracing を有効化できる
+- `runtime/build.rs` で `gc` を link する
 
-`dlisp` follows the XDG Base Directory Specification on Linux:
+## Quick Example
 
-- **History**: REPL command history is saved in `~/.local/state/dlisp/history.txt`.
-- **Logs**: Debug logs are stored in `~/.local/state/dlisp/debug.log`.
-
-You can control logging levels via the `RUST_LOG` environment variable:
-```bash
-RUST_LOG=debug cargo run --bin dlisp
-```
-
-## Quick Examples
-
-### Arithmetic & Functions
 ```lisp
 user> (+ 1 2 (* 3 4))
 => 15
@@ -109,47 +87,8 @@ user> (square 5)
 => 25
 ```
 
-### Concurrent Tasks
-```lisp
-user> (defun async-task () (print "Hello from thread!"))
-=> <user-func:async-task>
-user> (spawn async-task)
-=> nil
-```
-
-## Language Features
-
-### Data Types
-- **Integers**: `1`, `42`, `-10`
-- **Floats**: `3.14`, `-0.5`
-- **Booleans**: `true`, `false`
-- **Strings**: `"hello world"`, `"foo"`
-- **Symbols**: `x`, `foo-bar`, `+`
-- **Lists**: `(1 2 3)`, `(print "hello")`
-- **Nil**: `nil`
-
-### Special Forms
-- **`defun`**: Define global functions.
-- **`let`**: Bind local variables.
-- **`lambda`**: Create anonymous functions (closures).
-- **`if`**: Conditional execution.
-- **`spawn`**: Spawn a new concurrent thread for a task.
-
-### Built-in Functions
-- **Arithmetic**: `+`, `-`, `*`
-- **Comparison**: `>`, `<`, `=`
-- **I/O**: `print`
-- **System**: `sleep`
-
-## Architecture Highlights
-
-- **Garbage Collection**: Uses **Boehm GC** (`libgc`) for automatic memory management, ensuring thread safety and preventing leaks in both interpreted and compiled code.
-- **JIT & AOT**: Shares a common Cranelift backend for both Just-In-Time execution in the REPL and Ahead-of-Time compilation to native binaries.
-- **Concurrency**: Native OS threads spawned via `spawn`, heavily stress-tested for GC safety across thread boundaries.
-
-## Features
-- Interactive REPL with history support.
-- JIT compilation for immediate feedback.
-- AOT compilation to standalone executables.
-- Asynchronous threaded execution.
-- XDG-compliant configuration.
+## More Docs
+- 言語の意味論: `spec.md`
+- 特殊形式と組み込み関数の索引: `FUNCTIONS.md`
+- AI / Skill 運用: `docs/ai/README.md`
+- repo 内での最短探索ルール: `AGENTS.md`

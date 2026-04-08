@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Repo"
+  short_description: "Navigate dlisp code and validate narrowly."
+  default_prompt: "Use $dlisp-repo to inspect this repository, find the smallest correct edit surface, and choose the narrowest validation command."

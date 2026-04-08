@@ -1,33 +1,49 @@
-# AI Agent Guide for dlisp
+# Agent Guide
 
-## Project Overview
-`dlisp` is a JIT-compiling Lisp interpreter written in Rust. It aims to provide a performant Lisp environment by compiling user-defined functions to native machine code using Cranelift.
+このリポジトリでは、token 消費を抑えるために「最小探索・最小検証」を徹底すること。
 
-## Project Structure
-The project is organized as a Cargo workspace with two members:
+## 基本方針
+- チャットは日本語で行う。
+- Python 実行は禁止。補助スクリプトは shell を使う。
+- まず `rg --files` / `rg -n` で当たりを付け、必要なファイルだけ読む。
+- `README.md` 全文を最初から読まない。ユーザー向け挙動、公開文書、導入手順を触るときだけ必要箇所を開く。
+- 言語仕様や関数一覧を直すときも、最初に prose docs を読むのではなく `core/src/forms/registry.rs` と `core/src/builtins/mod.rs` を見る。
+- 変更後は関係する最小コマンドで検証し、ワークスペース全体テストは最後に限定する。
 
-- **`cli`**: The command-line interface crate. Handles REPL, argument parsing, and file execution.
-- **`core`**: The library crate containing the core interpreter logic.
+## 探索順
+1. `Cargo.toml` で workspace 境界を確認する。
+2. `rg -n "<symbol>|<feature>" cli core runtime stdlib` で実装位置を絞る。
+3. repo 固有の案内が必要なら `docs/ai/skills/` 以下を読む。
+4. 文書がコードと食い違う場合は、コードとテストを優先する。
 
-### Core Modules (`core/src/`)
-- **`ast.rs`**: Defines the `Value` enum, representing Lisp data types (Integer, Float, Bool, Symbol, String, List, Nil, NativeFunc, UserFunc).
-- **`interpreter.rs`**: implementation of the `Interpreter` struct. Contains the `eval` loop, function application logic, and special form handling (`defun`, `spawn`).
-- **`jit.rs`**: Manages JIT compilation using generic `cranelift`. Compiles arithmetic operations in user functions to native code.
-- **`environment.rs`**: Manages variable scopes and bindings.
-- **`parser.rs`**: Implements the parser using the `chumsky` library.
-- **`builtins/`**: Contains built-in native functions (e.g., arithmetic operations).
+## 主要クレート
+- `cli`: CLI、REPL、ファイル実行、AOT compile エントリポイント。起点は `cli/src/main.rs`。
+- `core`: evaluator、special forms、builtins、parser、JIT/AOT codegen。
+- `runtime`: AOT/JIT 実行時の FFI、GC、OS/IO 補助。
+- `stdlib`: 現状は最小のプレースホルダ crate。
 
-## Build and execution
-- **Build**: `cargo build`
-- **Run REPL**: `cargo run --bin cli`
-- **Run Script**: `cargo run --bin cli -- <filename>`
-- **Test**: `cargo test`
+## 主要入口
+- 評価とデフォルト環境: `core/src/interpreter.rs`
+- 特殊形式の登録: `core/src/forms/registry.rs`
+- 組み込み関数の登録: `core/src/builtins/mod.rs`
+- AOT compile: `core/src/compiler.rs`, `cli/src/compile.rs`
+- REPL: `cli/src/repl.rs`
+- runtime / GC / FFI: `runtime/src/lib.rs`, `runtime/build.rs`
 
-### ⚠️ Testing Requirements After Code Modifications
-**IMPORTANT**: After applying code modifications in any task, you must explicitly verify that all features work correctly in both **JIT Compilation** and **Native (Interpreter) Execution** modes. Ensure that `cargo test` passes completely, specifically checking that both the normal AST evaluation and the Cranelift JIT compiled execution paths are unaffected.
+## 検証の最小単位
+- インタプリタ評価系: `cargo test -p dlisp-core --test interpreter_tests --quiet`
+- JIT / codegen 系: `cargo test -p dlisp-core --test jit_phase3_tests --quiet`
+- CLI / example / AOT 系: `cargo test -p dlisp --test integration_tests --quiet`
+- runtime crate 単体: `cargo test -p dlisp_runtime --quiet`
+- 複数クレートを跨いだ変更だけ: `cargo test --workspace --quiet`
 
-## Key Concepts
-- **Values**: All Lisp values are represented by the `Value` enum. `UserFunc` stores both the AST body and an optional JIT-compiled code pointer.
-- **Async Execution**: The interpreter is async-first, leveraging `tokio` and `async_recursion`. The `spawn` special form allows concurrent execution.
-- **JIT Compilation**: When `defun` is called, the interpreter attempts to compile the function body using Cranelift. If successful, subsequent calls use the native code path for performance.
-- **REPL**: Powered by `rustyline`, supporting history and standard readline keybindings.
+## Skill 運用
+- canonical source は `docs/ai/skills/` に置く。
+- Codex runtime 配置先は `~/.codex/skills/`。
+- 導入や更新は `scripts/install-runtime-skills.sh` を使う。
+- repo 調査とコード変更では `docs/ai/skills/dlisp-repo/` を使う。
+- 言語仕様と関数一覧の更新では `docs/ai/skills/dlisp-language-surface/` を使う。
+
+## テスト要件
+- コード変更後は interpreter path と JIT / compile path の両方を確認する。
+- 最終確認では `cargo test --workspace --quiet` を通す。
