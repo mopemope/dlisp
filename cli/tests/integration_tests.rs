@@ -1,7 +1,9 @@
 use assert_cmd::cargo_bin_cmd;
 use assert_cmd::Command;
 use predicates::prelude::*;
+use std::fs;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 fn get_example_path(name: &str) -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -13,6 +15,14 @@ fn get_example_path(name: &str) -> PathBuf {
 
 fn dlisp_cmd() -> Command {
     cargo_bin_cmd!("dlisp")
+}
+
+fn write_temp_script(name: &str, content: &str) -> (TempDir, PathBuf, PathBuf) {
+    let dir = tempfile::tempdir().expect("failed to create tempdir");
+    let script = dir.path().join(format!("{}.lisp", name));
+    let output = dir.path().join(name);
+    fs::write(&script, content).expect("failed to write script");
+    (dir, script, output)
 }
 
 #[test]
@@ -123,4 +133,72 @@ fn test_syntax_error() {
     // Compiler
     let mut cmd = dlisp_cmd();
     cmd.arg("compile").arg(path).assert().failure().code(1);
+}
+
+#[test]
+fn test_compile_executes_top_level_and_global_state() {
+    let (_dir, script, output) = write_temp_script(
+        "compiled_globals",
+        r#"
+(defvar greeting "hello from global")
+(setq greeting "hello from setq")
+(print "Top level init")
+
+(defun main ()
+  (print greeting))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Top level init"))
+        .stdout(predicate::str::contains("hello from setq"));
+}
+
+#[test]
+fn test_compile_supports_rest_let_star_destructure_and_collection_parity() {
+    let (_dir, script, output) = write_temp_script(
+        "compiled_surface_parity",
+        r#"
+(defun summarize (head &rest tail)
+  (print head)
+  (print tail))
+
+(defun main ()
+  (let* ((parts '(10 20 30))
+         ((first &rest rest) parts)
+         (picked (get {:a 1} :missing 99))
+         (lst (conj '(1 2) 3 4)))
+    (summarize first picked)
+    (print rest)
+    (print lst)))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("10"))
+        .stdout(predicate::str::contains("(99)"))
+        .stdout(predicate::str::contains("(20 30)"))
+        .stdout(predicate::str::contains("(4 3 1 2)"));
 }

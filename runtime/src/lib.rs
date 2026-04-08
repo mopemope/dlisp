@@ -518,6 +518,84 @@ pub unsafe extern "C" fn dlisp_map_get(
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_get(
+    collection: *mut DlispValue,
+    key: *mut DlispValue,
+    default: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if collection.is_null() {
+            return default;
+        }
+
+        match (*collection).type_ {
+            ValueType::Map => {
+                let map_data = (*collection).payload.map_val;
+                if map_data.is_null() || (*map_data).len == 0 {
+                    return default;
+                }
+
+                let cap = (*map_data).cap;
+                let hash = dlisp_hash_value(key) as usize;
+                let mut idx = hash % cap;
+                let start_idx = idx;
+
+                loop {
+                    let opt_ptr = (*map_data).elements.add(idx);
+                    if (*opt_ptr).is_none() {
+                        return default;
+                    } else if let Some((existing_key, existing_val)) = *opt_ptr {
+                        let eq_val = dlisp_eq(existing_key, key);
+                        if !eq_val.is_null()
+                            && (*eq_val).type_ == ValueType::Bool
+                            && (*eq_val).payload.bool_val
+                        {
+                            return existing_val;
+                        }
+                    }
+                    idx = (idx + 1) % cap;
+                    if idx == start_idx {
+                        return default;
+                    }
+                }
+            }
+            ValueType::Vector => vectors::dlisp_vector_get(collection, key),
+            ValueType::Nil => default,
+            _ => dlisp_make_nil(),
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_conj(
+    collection: *mut DlispValue,
+    item: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if collection.is_null() || (*collection).type_ == ValueType::Nil {
+            return dlisp_make_cons(item, dlisp_make_nil());
+        }
+
+        match (*collection).type_ {
+            ValueType::List => dlisp_make_cons(item, collection),
+            ValueType::Vector => {
+                let copied = vectors::dlisp_vector_copy(collection);
+                vectors::dlisp_vector_push(copied, item);
+                copied
+            }
+            _ => {
+                eprintln!("Type Error: conj requires list, vector, or nil");
+                std::process::abort();
+            }
+        }
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
 /// The caller must ensure that `a` and `b` point to valid `DlispValue` structs.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_add(a: *mut DlispValue, b: *mut DlispValue) -> *mut DlispValue {
@@ -944,15 +1022,31 @@ pub struct Closure {
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `closure_ptr` points to a valid `Closure` struct.
+/// The caller must ensure that `closure_ptr` points to a valid closure `DlispValue`.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn dlisp_spawn(closure_ptr: *mut Closure) {
-    // Safety: We assume closure_ptr is valid.
-    let closure = unsafe { &*closure_ptr };
-    let func = closure.func;
-    let env = closure.env;
-    let func_ptr_val = func as usize;
-    let env_ptr_val = env as usize;
+pub unsafe extern "C" fn dlisp_spawn(closure_ptr: *mut DlispValue) {
+    if closure_ptr.is_null() {
+        eprintln!("Type Error: spawn requires a closure");
+        std::process::abort();
+    }
+
+    let closure_data = unsafe {
+        if (*closure_ptr).type_ != ValueType::Closure {
+            eprintln!("Type Error: spawn requires a closure");
+            std::process::abort();
+        }
+
+        let closure_data = (*closure_ptr).payload.closure_val;
+        if closure_data.is_null() {
+            eprintln!("Runtime Error: closure data is null");
+            std::process::abort();
+        }
+
+        &*closure_data
+    };
+
+    let func_ptr_val = closure_data.func_ptr as usize;
+    let env_ptr_val = closure_data.env as usize;
 
     tokio::task::spawn_blocking(move || {
         let func: extern "C" fn(*mut c_void) -> i64 = unsafe { std::mem::transmute(func_ptr_val) };

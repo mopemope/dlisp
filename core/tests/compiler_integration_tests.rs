@@ -100,7 +100,8 @@ fn test_add_lambda_jit() {
         captured_vars: HashMap::new(),
         env_param: None,
         ptr_type: int,
-        global_signatures: &HashMap::new(),
+        global_functions: &HashMap::new(),
+        global_variables: &HashMap::new(),
     };
 
     // Compile lambda returns a Closure Pointer (simulated)

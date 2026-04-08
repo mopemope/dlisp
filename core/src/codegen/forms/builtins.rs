@@ -257,30 +257,18 @@ fn compile_conj_builtin<M: Module>(
     ctx: &mut FunctionTranslationContext<M>,
     list: &[Value],
 ) -> Result<IrValue, String> {
-    // (conj col item1 item2 ...)
     if list.len() < 3 {
         return Err("conj requires at least collection and one item".to_string());
     }
-    let col_expr = &list[1];
-    let items = &list[2..];
-
-    let col_eval = ctx.compile_expr(col_expr)?;
-
-    // TODO: Currently Vector-only. A generic dlisp_conj runtime function
-    // would be needed for List support.
-    let copy_func = ctx
+    let mut col_val = ctx.compile_expr(&list[1])?;
+    let conj_func = ctx
         .module
-        .declare_func_in_func(ctx.builtins.funcs.dlisp_vector_copy, ctx.builder.func);
-    let call = ctx.builder.ins().call(copy_func, &[col_eval]);
-    let col_val = ctx.builder.inst_results(call)[0];
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_conj, ctx.builder.func);
 
-    let push_func = ctx
-        .module
-        .declare_func_in_func(ctx.builtins.funcs.dlisp_vector_push, ctx.builder.func);
-
-    for item in items {
+    for item in &list[2..] {
         let item_val = ctx.compile_expr(item)?;
-        ctx.builder.ins().call(push_func, &[col_val, item_val]);
+        let call = ctx.builder.ins().call(conj_func, &[col_val, item_val]);
+        col_val = ctx.builder.inst_results(call)[0];
     }
 
     Ok(col_val)
@@ -365,8 +353,20 @@ fn compile_get<M: Module>(
     if list.len() < 3 || list.len() > 4 {
         return Err("get requires 2 or 3 arguments (map key [default])".to_string());
     }
-    if list.len() == 4 {
-        return Err("AOT compilation of get with default value not yet supported".to_string());
-    }
-    compile_binary_builtin(ctx, "get", list, ctx.builtins.funcs.dlisp_map_get)
+    let col_val = ctx.compile_expr(&list[1])?;
+    let key_val = ctx.compile_expr(&list[2])?;
+    let default_val = if list.len() == 4 {
+        ctx.compile_expr(&list[3])?
+    } else {
+        ctx.make_nil()?
+    };
+
+    let func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_get, ctx.builder.func);
+    let call = ctx
+        .builder
+        .ins()
+        .call(func, &[col_val, key_val, default_val]);
+    Ok(ctx.builder.inst_results(call)[0])
 }

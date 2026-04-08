@@ -5,6 +5,67 @@ use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
 
+fn find_runtime_staticlib(release: bool) -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    let profile = if release { "release" } else { "debug" };
+    candidates.push(PathBuf::from(format!(
+        "target/{}/libdlisp_runtime.a",
+        profile
+    )));
+    candidates.push(PathBuf::from(format!("target/{}/deps", profile)));
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(exe_dir.join("libdlisp_runtime.a"));
+            candidates.push(exe_dir.join("deps"));
+            if let Some(parent) = exe_dir.parent() {
+                candidates.push(parent.join("libdlisp_runtime.a"));
+                candidates.push(parent.join("deps"));
+            }
+        }
+    }
+
+    for candidate in candidates {
+        if candidate.is_file()
+            && candidate
+                .file_name()
+                .is_some_and(|n| n == "libdlisp_runtime.a")
+        {
+            return Some(candidate);
+        }
+        if candidate.is_dir() {
+            if let Ok(entries) = fs::read_dir(&candidate) {
+                let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or_default();
+                    if name.starts_with("libdlisp_runtime-") && name.ends_with(".a") {
+                        let modified = entry
+                            .metadata()
+                            .and_then(|m| m.modified())
+                            .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                        let should_replace = match &best {
+                            Some((current, _)) => modified > *current,
+                            None => true,
+                        };
+                        if should_replace {
+                            best = Some((modified, path));
+                        }
+                    }
+                }
+                if let Some((_, path)) = best {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    None
+}
+
 pub async fn compile_file(
     file: PathBuf,
     output: Option<PathBuf>,
@@ -33,15 +94,9 @@ pub async fn compile_file(
 
                     info!("Linking object file {:?} to {:?}", object_file, output_file);
 
-                    let mut lib_path = PathBuf::from("target/debug/libdlisp_runtime.a");
-                    if !lib_path.exists() {
-                        if let Ok(exe_path) = std::env::current_exe() {
-                            let candidate = exe_path.parent().unwrap().join("libdlisp_runtime.a");
-                            if candidate.exists() {
-                                lib_path = candidate;
-                            }
-                        }
-                    }
+                    let lib_path = find_runtime_staticlib(release).ok_or_else(|| {
+                        anyhow::anyhow!("failed to locate libdlisp_runtime static library")
+                    })?;
 
                     let status = Command::new("cc")
                         .arg("-no-pie")

@@ -75,6 +75,7 @@ Compile options:
 - Debug log: `~/.local/state/dlisp/debug.log`
 - `RUST_LOG=debug cargo run --bin dlisp` で tracing を有効化できる
 - `runtime/build.rs` で `gc` を link する
+- interpreter 実行では `defun` の一部が JIT 化される。固定引数、`&rest`、自己再帰、相互再帰、`spawn` を含む関数が対象で、`spawn f arg...` は zero-arg thunk に lower して実行する
 
 ## Quick Example
 

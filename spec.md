@@ -36,7 +36,8 @@
 ### `defun`
 - グローバル関数を定義する。
 - 関数本体は最後の式の値を返す。
-- 実行形が単純な場合、JIT compile path が使われることがある。
+- 固定引数、`&rest`、自己再帰、後続定義で解決される相互再帰、`spawn` を含む関数は JIT compile path に乗り得る。
+- `spawn f arg...` は zero-arg thunk に lower して実行する。JIT 時点で未解決の呼び出しを含む関数は interpreter path にフォールバックする。
 
 ### `lambda`
 - 現在の environment をキャプチャした関数値を作る。
@@ -81,5 +82,6 @@
 
 ## JIT / AOT
 - `defun` された関数は interpreter path と JIT path の両方を持ち得る
+- JIT 実行では boxed runtime value ABI を使って interpreter の `Value` と相互変換する
 - `dlisp compile` は Cranelift backend を使って object を作り、`cc` で `runtime` と link する
 - 変更後は interpreter 系テストと JIT / compile 系テストの両方で確認する

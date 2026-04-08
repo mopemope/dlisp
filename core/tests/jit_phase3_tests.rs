@@ -137,7 +137,8 @@ fn compile_expr_in_function(module: &mut JITModule, ast: &Value, func_name: &str
         captured_vars: HashMap::new(),
         env_param: None,
         ptr_type: int,
-        global_signatures: &HashMap::new(),
+        global_functions: &HashMap::new(),
+        global_variables: &HashMap::new(),
     };
 
     let result = trans_ctx.compile_expr(ast).unwrap();

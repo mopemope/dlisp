@@ -25,11 +25,27 @@ pub fn compile_lambda<M: Module>(
     };
 
     let mut arg_names = Vec::new();
-    for param in params {
-        match param {
+    let mut rest_param = None;
+    let mut i = 0;
+    while i < params.len() {
+        match &params[i] {
+            Value::Symbol(s) if s == "&rest" => {
+                if i + 1 >= params.len() {
+                    return Err("&rest requires a parameter name".to_string());
+                }
+                match &params[i + 1] {
+                    Value::Symbol(rest_name) => rest_param = Some(rest_name.clone()),
+                    _ => return Err("&rest parameter must be a symbol".to_string()),
+                }
+                if i + 2 < params.len() {
+                    return Err("&rest parameter must be last in the parameter list".to_string());
+                }
+                break;
+            }
             Value::Symbol(s) => arg_names.push(s.clone()),
             _ => return Err("lambda param must be a symbol".to_string()),
         }
+        i += 1;
     }
 
     // 1. Analyze Free Variables
@@ -73,6 +89,9 @@ pub fn compile_lambda<M: Module>(
     for _ in &arg_names {
         inner_ctx.func.signature.params.push(AbiParam::new(int));
     }
+    if rest_param.is_some() {
+        inner_ctx.func.signature.params.push(AbiParam::new(int));
+    }
     inner_ctx.func.signature.returns.push(AbiParam::new(int));
 
     {
@@ -100,6 +119,12 @@ pub fn compile_lambda<M: Module>(
             builder.def_var(var, val);
             initial_scope.insert(arg_name.clone(), var);
         }
+        if let Some(rest_name) = rest_param.clone() {
+            let val = builder.block_params(entry_block)[arg_names.len() + 1];
+            let var = builder.declare_var(int);
+            builder.def_var(var, val);
+            initial_scope.insert(rest_name, var);
+        }
 
         let mut result_val = builder.ins().iconst(int, 0);
 
@@ -112,7 +137,8 @@ pub fn compile_lambda<M: Module>(
                 captured_vars: captured_offsets,
                 env_param: Some(env_param),
                 ptr_type: int,
-                global_signatures: ctx.global_signatures,
+                global_functions: ctx.global_functions,
+                global_variables: ctx.global_variables,
             };
 
             for expr in body {

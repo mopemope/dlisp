@@ -7,16 +7,27 @@ pub fn compile_spawn<M: Module>(
     ctx: &mut FunctionTranslationContext<M>,
     list: &[Value],
 ) -> Result<IrValue, String> {
-    if list.len() != 2 {
-        return Err("spawn requires exactly one argument (function call)".to_string());
+    if list.len() < 2 {
+        return Err("spawn requires a function or function call".to_string());
     }
 
-    // Compile the argument to get a closure_ptr (or function logic)
-    // Interpreter expects a function and runs it.
-    // So we evaluate the argument, which should yield a Closure* (via resolve_variable or lambda).
-    let closure_ptr = ctx.compile_expr(&list[1])?;
+    let closure_ptr = if list.len() == 2 {
+        ctx.compile_expr(&list[1])?
+    } else {
+        let mut thunk_body = Vec::with_capacity(list.len() - 1);
+        thunk_body.push(list[1].clone());
+        thunk_body.extend_from_slice(&list[2..]);
 
-    // Call dlisp_spawn(closure_ptr)
+        let thunk = Value::List(vec![
+            Value::Symbol("lambda".to_string()),
+            Value::List(vec![]),
+            Value::List(thunk_body),
+        ]);
+
+        ctx.compile_expr(&thunk)?
+    };
+
+    // Call dlisp_spawn(closure_value_ptr)
     let local_spawn = ctx
         .module
         .declare_func_in_func(ctx.builtins.funcs.dlisp_spawn, ctx.builder.func);

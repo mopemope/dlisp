@@ -83,6 +83,7 @@ impl AOTCompiler {
 
     pub async fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
         let mut has_main = false;
+        let mut expanded_ast = Vec::new();
 
         #[allow(clippy::collapsible_if)]
         for expr in ast {
@@ -107,46 +108,121 @@ impl AOTCompiler {
                 }
             }
 
-            if let Value::List(ref l) = expanded {
-                if let Some(Value::Symbol(s)) = l.first() {
-                    if s == "defun" {
-                        // (defun name (args) body...)
-                        if l.len() < 3 {
-                            return Err("defun requires at least 3 arguments".to_string());
-                        }
-                        let mut name = match &l[1] {
-                            Value::Symbol(n) => n.clone(),
-                            _ => return Err("defun name must be a symbol".to_string()),
-                        };
-                        let args_list = match &l[2] {
-                            Value::List(args) => args,
-                            _ => return Err("defun args must be a list".to_string()),
-                        };
-                        let body = &l[3..];
+            expanded_ast.push(expanded);
+        }
 
-                        let mut arg_names = Vec::new();
-                        for arg in args_list {
-                            match arg {
-                                Value::Symbol(n) => arg_names.push(n.clone()),
-                                _ => return Err("defun arg must be a symbol".to_string()),
+        for expr in &expanded_ast {
+            if let Value::List(l) = expr
+                && let Some(Value::Symbol(s)) = l.first()
+            {
+                match s.as_str() {
+                    "defvar" => {
+                        if let Some(Value::Symbol(name)) = l.get(1) {
+                            self.codegen
+                                .declare_global_variable(&mut self.module, name)?;
+                        }
+                    }
+                    "setq" => {
+                        for idx in (1..l.len()).step_by(2) {
+                            if let Some(Value::Symbol(name)) = l.get(idx) {
+                                self.codegen
+                                    .declare_global_variable(&mut self.module, name)?;
                             }
                         }
-
-                        if name == "main" {
-                            name = "dlisp_user_main".to_string();
-                            has_main = true;
-                        }
-
-                        self.codegen
-                            .compile(&mut self.module, &name, &arg_names, body)?;
                     }
+                    _ => {}
                 }
             }
         }
 
-        if has_main {
-            self.codegen
-                .compile_entry_point(&mut self.module, "dlisp_user_main")?;
+        let mut init_exprs = Vec::new();
+        for expr in expanded_ast {
+            if let Value::List(ref l) = expr
+                && let Some(Value::Symbol(s)) = l.first()
+                && s == "defun"
+            {
+                // (defun name (args) body...)
+                if l.len() < 3 {
+                    return Err("defun requires at least 3 arguments".to_string());
+                }
+                let mut name = match &l[1] {
+                    Value::Symbol(n) => n.clone(),
+                    _ => return Err("defun name must be a symbol".to_string()),
+                };
+                let args_list = match &l[2] {
+                    Value::List(args) => args,
+                    _ => return Err("defun args must be a list".to_string()),
+                };
+                let body = &l[3..];
+
+                let mut arg_names = Vec::new();
+                let mut rest_param = None;
+                let mut idx = 0;
+                while idx < args_list.len() {
+                    match &args_list[idx] {
+                        Value::Symbol(n) if n == "&rest" => {
+                            if idx + 1 >= args_list.len() {
+                                return Err("&rest requires a parameter name".to_string());
+                            }
+                            match &args_list[idx + 1] {
+                                Value::Symbol(rest_name) => {
+                                    rest_param = Some(rest_name.clone());
+                                }
+                                _ => {
+                                    return Err("&rest parameter must be a symbol".to_string());
+                                }
+                            }
+                            if idx + 2 < args_list.len() {
+                                return Err("&rest parameter must be last in the parameter list"
+                                    .to_string());
+                            }
+                            break;
+                        }
+                        Value::Symbol(n) => arg_names.push(n.clone()),
+                        _ => return Err("defun arg must be a symbol".to_string()),
+                    }
+                    idx += 1;
+                }
+
+                if name == "main" {
+                    name = "dlisp_user_main".to_string();
+                    has_main = true;
+                }
+
+                self.codegen.compile_with_rest(
+                    &mut self.module,
+                    &name,
+                    &arg_names,
+                    rest_param,
+                    body,
+                )?;
+                continue;
+            }
+
+            init_exprs.push(expr);
+        }
+
+        let has_init = !init_exprs.is_empty();
+        if has_init {
+            self.codegen.compile_top_level_init(
+                &mut self.module,
+                "dlisp_user_init",
+                &init_exprs,
+            )?;
+        }
+
+        if has_main || has_init {
+            self.codegen.compile_program_entry(
+                &mut self.module,
+                "dlisp_user_entry",
+                has_init.then_some("dlisp_user_init"),
+                has_main.then_some("dlisp_user_main"),
+            )?;
+            self.codegen.compile_entry_point(
+                &mut self.module,
+                has_main.then_some("dlisp_user_main"),
+                has_init.then_some("dlisp_user_init"),
+            )?;
         }
 
         let product = self.module.finish();

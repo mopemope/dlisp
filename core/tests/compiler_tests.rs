@@ -1,6 +1,7 @@
 use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{Interpreter, default_env};
 use dlisp_core::parser::parse;
+use dlisp_runtime as _;
 
 #[tokio::test]
 async fn test_jit_print() {
@@ -46,6 +47,11 @@ async fn test_jit_if_gt() {
     ]);
 
     interpreter.eval(defun_max, &mut env.clone()).await.unwrap();
+
+    match env.borrow().get("max_val") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
 
     let call_1 = Value::List(vec![
         Value::Symbol("max_val".to_string()),
@@ -149,7 +155,45 @@ async fn test_jit_recursion_fibonacci() {
         result = interpreter.eval(val, &mut env).await.unwrap();
     }
 
+    match env.borrow().get("fib") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
+
     assert_eq!(result, Value::Integer(55));
+}
+
+#[tokio::test]
+async fn test_jit_rest_param_compilation_and_execution() {
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+
+    let code = "
+    (defun pack (head &rest tail)
+        (conj tail head))
+
+    (pack 1 2 3)
+    ";
+
+    let vals = parse(code).unwrap();
+    let mut result = Value::Nil;
+    for val in vals {
+        result = interpreter.eval(val, &mut env).await.unwrap();
+    }
+
+    match env.borrow().get("pack") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
+
+    assert_eq!(
+        result,
+        Value::List(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ])
+    );
 }
 
 #[tokio::test]
@@ -177,6 +221,15 @@ async fn test_jit_mutual_recursion() {
         result = interpreter.eval(val, &mut env).await.unwrap();
     }
 
+    match env.borrow().get("is_even") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
+    match env.borrow().get("is_odd") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
+
     // 1 is truthy in our dummy logical context for now
     assert_eq!(result, Value::Integer(1));
 
@@ -187,4 +240,84 @@ async fn test_jit_mutual_recursion() {
         result_odd = interpreter.eval(val, &mut env).await.unwrap();
     }
     assert_eq!(result_odd, Value::Integer(0));
+}
+
+#[tokio::test]
+async fn test_jit_spawn_function() {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            let mut env = default_env();
+            let mut interpreter = Interpreter::new();
+
+            let code = "
+            (defun task ()
+                (print 42)
+                (sleep 1))
+
+            (defun launch_task ()
+                (spawn task))
+
+            (launch_task)
+            ";
+
+            let mut result = Value::Nil;
+            let vals = parse(code).unwrap();
+            for val in vals {
+                result = interpreter.eval(val, &mut env).await.unwrap();
+            }
+
+            match env.borrow().get("task") {
+                Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+                other => panic!("expected compiled user func, got {:?}", other),
+            }
+            match env.borrow().get("launch_task") {
+                Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+                other => panic!("expected compiled user func, got {:?}", other),
+            }
+
+            assert_eq!(result, Value::Nil);
+            tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+        })
+        .await;
+}
+
+#[tokio::test]
+async fn test_jit_spawn_function_with_arguments() {
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            let mut env = default_env();
+            let mut interpreter = Interpreter::new();
+
+            let code = "
+            (defun task (x y)
+                (print (+ x y))
+                (sleep 1))
+
+            (defun launch_task ()
+                (spawn task 10 20))
+
+            (launch_task)
+            ";
+
+            let mut result = Value::Nil;
+            let vals = parse(code).unwrap();
+            for val in vals {
+                result = interpreter.eval(val, &mut env).await.unwrap();
+            }
+
+            match env.borrow().get("task") {
+                Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+                other => panic!("expected compiled user func, got {:?}", other),
+            }
+            match env.borrow().get("launch_task") {
+                Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+                other => panic!("expected compiled user func, got {:?}", other),
+            }
+
+            assert_eq!(result, Value::Nil);
+            tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+        })
+        .await;
 }
