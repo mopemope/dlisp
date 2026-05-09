@@ -321,3 +321,100 @@ async fn test_jit_spawn_function_with_arguments() {
         })
         .await;
 }
+
+#[tokio::test]
+async fn test_jit_phase4_control_forms_and_list_builtins() {
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+
+    let code = "
+    (defun phase4 (x)
+        (progn
+            (when (> x 0)
+                (print (list 1 2)))
+            (unless (< x 0)
+                (print (first (cons 9 (list 8)))))
+            (cond
+                ((and (> x 3) (not nil))
+                    (rest (list 1 2 3)))
+                ((or false 0)
+                    (list 100))
+                (true
+                    (list 0)))))
+
+    (phase4 5)
+    ";
+
+    let vals = parse(code).unwrap();
+    let mut result = Value::Nil;
+    for val in vals {
+        result = interpreter.eval(val, &mut env).await.unwrap();
+    }
+
+    match env.borrow().get("phase4") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
+
+    assert_eq!(
+        result,
+        Value::List(vec![Value::Integer(2), Value::Integer(3)])
+    );
+}
+
+#[tokio::test]
+async fn test_jit_compiled_cons_matches_interpreter_for_non_list_cdr() {
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+
+    let code = "
+    (defun compiled-cons ()
+        (cons 1 2))
+
+    (compiled-cons)
+    ";
+
+    let vals = parse(code).unwrap();
+    let mut result = Value::Nil;
+    for val in vals {
+        result = interpreter.eval(val, &mut env).await.unwrap();
+    }
+
+    match env.borrow().get("compiled-cons") {
+        Some(Value::UserFunc { jit_code, .. }) => assert!(jit_code.is_some()),
+        other => panic!("expected compiled user func, got {:?}", other),
+    }
+
+    assert_eq!(
+        result,
+        Value::List(vec![Value::Integer(1), Value::Integer(2)])
+    );
+}
+
+#[tokio::test]
+async fn test_aot_phase4_control_forms_and_list_builtins() {
+    use dlisp_core::compiler::AOTCompiler;
+
+    let code = "
+    (defun phase4 (x)
+        (progn
+            (when (> x 0)
+                (print (list 1 2)))
+            (unless (< x 0)
+                (print (first (cons 9 (list 8)))))
+            (cond
+                ((and (> x 3) (not nil))
+                    (rest (list 1 2 3)))
+                ((or false 0)
+                    (list 100))
+                (true
+                    (list 0)))))
+
+    (defun main ()
+        (print (phase4 5)))
+    ";
+
+    let vals = parse(code).unwrap();
+    let compiler = AOTCompiler::new();
+    compiler.compile(vals).await.expect("Compilation failed");
+}

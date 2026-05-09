@@ -2,7 +2,7 @@
 mod tests {
     use crate::value::{DlispValue, ValueType};
     use crate::{
-        dlisp_eq, dlisp_gc_init, dlisp_keyword_p, dlisp_make_cons, dlisp_make_int,
+        dlisp_cons, dlisp_eq, dlisp_gc_init, dlisp_keyword_p, dlisp_make_cons, dlisp_make_int,
         dlisp_make_keyword, dlisp_make_map, dlisp_make_string, dlisp_map_assoc, dlisp_map_get,
         dlisp_map_p, dlisp_type_of,
     };
@@ -64,6 +64,25 @@ mod tests {
 
             assert_eq!(car.payload.int_val, 1);
             assert_eq!(cdr.payload.int_val, 2);
+        }
+    }
+
+    #[test]
+    fn test_cons_to_non_list_makes_proper_list() {
+        dlisp_gc_init();
+        let val1 = dlisp_make_int(1);
+        let val2 = dlisp_make_int(2);
+
+        let cons = unsafe { dlisp_cons(val1, val2) };
+        unsafe {
+            assert_eq!((*cons).type_, ValueType::List);
+            let first = *(*cons).payload.list_val;
+            assert_eq!((*first.car).payload.int_val, 1);
+            assert_eq!((*first.cdr).type_, ValueType::List);
+
+            let second = *(*first.cdr).payload.list_val;
+            assert_eq!((*second.car).payload.int_val, 2);
+            assert_eq!((*second.cdr).type_, ValueType::Nil);
         }
     }
 

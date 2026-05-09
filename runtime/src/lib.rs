@@ -122,6 +122,26 @@ pub unsafe extern "C" fn dlisp_make_cons(
     }
 }
 
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `car` and `cdr` point to valid `DlispValue` structs.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_cons(car: *mut DlispValue, cdr: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if cdr.is_null() {
+            return dlisp_make_cons(car, dlisp_make_nil());
+        }
+
+        match (*cdr).type_ {
+            ValueType::List | ValueType::Nil => dlisp_make_cons(car, cdr),
+            _ => {
+                let tail = dlisp_make_cons(cdr, dlisp_make_nil());
+                dlisp_make_cons(car, tail)
+            }
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn dlisp_make_float(val: f64) -> *mut DlispValue {
     unsafe {

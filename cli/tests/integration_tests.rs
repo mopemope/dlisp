@@ -250,3 +250,46 @@ fn test_compile_supports_require_core() {
         .stdout(predicate::str::contains("5"))
         .stdout(predicate::str::contains("7"));
 }
+
+#[test]
+fn test_compile_supports_phase4_control_surface() {
+    let (_dir, script, output) = write_temp_script(
+        "compiled_phase4_surface",
+        r#"
+(require "core")
+
+(defun main ()
+  (print
+    (progn
+      (when true
+        (print (list 1 2)))
+      (unless false
+        (print (first (cons 9 (list 8)))))
+      (cond
+        ((and (positive? 3) (not nil))
+          (rest (list 1 2 3)))
+        (true
+          (list 0)))))
+  (print (cons 11 22))
+  (print (when-let (x 4) (inc x))))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("(1 2)"))
+        .stdout(predicate::str::contains("9"))
+        .stdout(predicate::str::contains("(2 3)"))
+        .stdout(predicate::str::contains("(11 22)"))
+        .stdout(predicate::str::contains("5"));
+}

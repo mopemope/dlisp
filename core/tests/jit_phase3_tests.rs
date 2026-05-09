@@ -68,6 +68,7 @@ fn create_jit_module() -> JITModule {
     let binary_symbols = [
         "dlisp_setenv",
         "dlisp_make_cons",
+        "dlisp_cons",
         "dlisp_add",
         "dlisp_sub",
         "dlisp_mul",

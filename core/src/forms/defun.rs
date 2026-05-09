@@ -8,7 +8,20 @@ use std::rc::Rc;
 fn is_codegen_special_form(name: &str) -> bool {
     matches!(
         name,
-        "if" | "let" | "let*" | "lambda" | "spawn" | "quote" | "setq" | "defvar"
+        "if" | "let"
+            | "let*"
+            | "lambda"
+            | "spawn"
+            | "quote"
+            | "setq"
+            | "defvar"
+            | "progn"
+            | "do"
+            | "when"
+            | "unless"
+            | "and"
+            | "or"
+            | "cond"
     )
 }
 

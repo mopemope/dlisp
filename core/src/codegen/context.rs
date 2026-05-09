@@ -284,6 +284,12 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 "setq" => self.compile_setq(list),
                 "defvar" => self.compile_defvar(list),
                 "if" => crate::codegen::forms::if_expr::compile_if(self, list),
+                "progn" | "do" => crate::codegen::forms::control::compile_progn(self, list),
+                "when" => crate::codegen::forms::control::compile_when(self, list, false),
+                "unless" => crate::codegen::forms::control::compile_when(self, list, true),
+                "and" => crate::codegen::forms::control::compile_and(self, list),
+                "or" => crate::codegen::forms::control::compile_or(self, list),
+                "cond" => crate::codegen::forms::control::compile_cond(self, list),
                 "lambda" => crate::codegen::forms::lambda::compile_lambda(self, list),
                 "spawn" => crate::codegen::forms::spawn::compile_spawn(self, list),
                 "quote" => {
@@ -292,8 +298,8 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     }
                     self.compile_quoted_value(&list[1])
                 }
-                "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "car" | "cdr"
-                | "read-file" | "vector" | "nth" | "count" | "conj"
+                "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "not" | "car" | "first"
+                | "cdr" | "rest" | "cons" | "list" | "read-file" | "vector" | "nth" | "count" | "conj"
                 | "/" | "%" | "mod" | ">=" | "<=" | "/=" | "str" | "string-length" | "substring"
                 | "string-append" | "hash-map" | "assoc" | "get" | "map?" | "nil?" | "list?" | "number?" | "string?" | "symbol?"
                 | "keyword?" | "vector?" | "type-of" | "map" | "filter" | "reduce"

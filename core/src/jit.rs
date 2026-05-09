@@ -40,6 +40,7 @@ impl Default for JIT {
             "dlisp_make_cons",
             dlisp_runtime::dlisp_make_cons as *const u8,
         );
+        builder.symbol("dlisp_cons", dlisp_runtime::dlisp_cons as *const u8);
         builder.symbol(
             "dlisp_make_closure",
             dlisp_runtime::dlisp_make_closure as *const u8,

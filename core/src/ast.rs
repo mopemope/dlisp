@@ -141,7 +141,7 @@ impl Hash for Value {
                 // HashMap is not Hash, need custom strategy.
                 // Sort entries by key (Value implements Ord) and hash.
                 let mut entries: Vec<_> = m.iter().collect();
-                entries.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                entries.sort_by_key(|(k1, _)| *k1);
                 for (k, v) in entries {
                     k.hash(state);
                     v.hash(state);
@@ -205,8 +205,8 @@ impl Ord for Value {
                 // To compare maps, we can sort them and compare entries
                 let mut entries_a: Vec<_> = a.iter().collect();
                 let mut entries_b: Vec<_> = b.iter().collect();
-                entries_a.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-                entries_b.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                entries_a.sort_by_key(|(k1, _)| *k1);
+                entries_b.sort_by_key(|(k1, _)| *k1);
                 // Lexicographical comparison of sorted entries
                 for ((k1, v1), (k2, v2)) in entries_a.iter().zip(entries_b.iter()) {
                     match k1.cmp(k2) {

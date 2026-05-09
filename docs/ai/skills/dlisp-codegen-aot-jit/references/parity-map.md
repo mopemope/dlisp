@@ -14,10 +14,15 @@ Compiled form lowering is selected in `core/src/codegen/context.rs` and implemen
 
 Currently represented compiled builtins include:
 - Arithmetic/comparison: `+`, `-`, `*`, `/`, `%`, `mod`, `>`, `<`, `=`, `>=`, `<=`, `/=`
-- Core values/collections: `print`, `car`, `cdr`, `vector`, `nth`, `count`, `conj`, `hash-map`, `assoc`, `get`
+- Core values/collections: `print`, `not`, `list`, `cons`, `car`, `first`, `cdr`, `rest`, `vector`, `nth`, `count`, `conj`, `hash-map`, `assoc`, `get`
 - Strings/types: `str`, `string-length`, `substring`, `string-append`, `nil?`, `list?`, `number?`, `string?`, `symbol?`, `keyword?`, `map?`, `vector?`, `type-of`
 - Higher-order/runtime-backed: `map`, `filter`, `reduce`
 - IO/sys/os subset: `read-file`, `file-exists?`, `is-dir?`, `is-file?`, `list-dir`, `delete-file`, `getenv`, `setenv`, `cwd`, `set-cwd`, `args`, `exit`, `sh`, `sleep`
+
+Compiled special forms include:
+- Binding/functions: `let`, `let*`, `setq`, `defvar`, `lambda`
+- Control: `if`, `progn`, `do`, `when`, `unless`, `and`, `or`, `cond`
+- Quoting/concurrency: `quote`, `spawn`
 
 ## Interpreter-only by default
 Treat builtins absent from compiled dispatch as interpreter-only until codegen, runtime export, and tests prove otherwise. Common examples include extended list/map/string helpers such as `append`, `reverse`, `sort`, `keys`, `vals`, `select-keys`, `string-split`, and `string-replace`.

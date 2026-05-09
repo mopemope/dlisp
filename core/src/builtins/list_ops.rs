@@ -85,8 +85,8 @@ pub fn append(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> 
         let mut result_list = Vec::new();
         for arg in args {
             match arg {
-                Value::List(l) => result_list.extend(l.into_iter()),
-                Value::Vector(v) => result_list.extend(v.into_iter()),
+                Value::List(l) => result_list.extend(l),
+                Value::Vector(v) => result_list.extend(v),
                 Value::Nil => {} // treat nil as empty list
                 _ => return Err("append requires lists or vectors".to_string()),
             }

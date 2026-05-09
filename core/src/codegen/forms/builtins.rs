@@ -15,7 +15,12 @@ pub fn compile_builtin<M: Module>(
         "print" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_print, true),
         "read-file" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_read_file, false),
         "car" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_car, false),
+        "first" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_car, false),
         "cdr" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_cdr, false),
+        "rest" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_cdr, false),
+        "cons" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_cons),
+        "list" => compile_list_builtin(ctx, list),
+        "not" => compile_not(ctx, list),
         "+" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_add),
         "-" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_sub),
         "*" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_mul),
@@ -77,6 +82,50 @@ pub fn compile_builtin<M: Module>(
         "sh" => compile_variadic_list_call(ctx, op, list, ctx.builtins.funcs.dlisp_sh),
         _ => unreachable!("Unknown builtin: {}", op),
     }
+}
+
+fn compile_list_builtin<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    let mut current = ctx.make_nil()?;
+    let cons_func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_make_cons, ctx.builder.func);
+
+    for arg in list[1..].iter().rev() {
+        let arg_val = ctx.compile_expr(arg)?;
+        let call = ctx.builder.ins().call(cons_func, &[arg_val, current]);
+        current = ctx.builder.inst_results(call)[0];
+    }
+
+    Ok(current)
+}
+
+fn compile_not<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if list.len() != 2 {
+        return Err("not requires exactly 1 argument".to_string());
+    }
+
+    let arg_val = ctx.compile_expr(&list[1])?;
+    let truthy_func = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_is_truthy, ctx.builder.func);
+    let truthy_call = ctx.builder.ins().call(truthy_func, &[arg_val]);
+    let truthy = ctx.builder.inst_results(truthy_call)[0];
+    let is_falsy = ctx.builder.ins().icmp_imm(IntCC::Equal, truthy, 0);
+    let one = ctx.builder.ins().iconst(types::I8, 1);
+    let zero = ctx.builder.ins().iconst(types::I8, 0);
+    let bool_int = ctx.builder.ins().select(is_falsy, one, zero);
+
+    let make_bool = ctx
+        .module
+        .declare_func_in_func(ctx.builtins.funcs.dlisp_make_bool, ctx.builder.func);
+    let call = ctx.builder.ins().call(make_bool, &[bool_int]);
+    Ok(ctx.builder.inst_results(call)[0])
 }
 
 fn compile_variadic_list_call<M: Module>(

@@ -17,6 +17,7 @@ pub struct BuiltinDefinitions {
     pub dlisp_map_get: FuncId,
     pub dlisp_get: FuncId,
     pub dlisp_make_cons: FuncId,
+    pub dlisp_cons: FuncId,
     pub dlisp_make_float: FuncId,
     pub dlisp_make_bool: FuncId,
     pub dlisp_make_nil: FuncId,
@@ -152,6 +153,9 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     make_cons_sig.returns.push(AbiParam::new(int));
     let make_cons_id = module
         .declare_function("dlisp_make_cons", Linkage::Import, &make_cons_sig)
+        .map_err(|e| e.to_string())?;
+    let cons_id = module
+        .declare_function("dlisp_cons", Linkage::Import, &make_cons_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_make_float(f64) -> DlispValue*
@@ -541,6 +545,7 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_map_get: map_get_id,
         dlisp_get: get_id,
         dlisp_make_cons: make_cons_id,
+        dlisp_cons: cons_id,
         dlisp_make_float: make_float_id,
         dlisp_make_bool: make_bool_id,
         dlisp_make_nil: make_nil_id,
