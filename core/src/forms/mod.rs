@@ -17,6 +17,7 @@ pub mod macroexpand;
 pub mod progn;
 pub mod quote;
 pub mod registry;
+pub mod require;
 pub mod setq;
 pub mod spawn;
 pub mod throw;

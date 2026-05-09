@@ -1,14 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+pub fn get_module(name: &str) -> Option<&'static str> {
+    match name {
+        "core" => Some(include_str!("core.lisp")),
+        _ => None,
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub fn module_names() -> &'static [&'static str] {
+    &["core"]
 }

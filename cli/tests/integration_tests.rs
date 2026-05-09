@@ -202,3 +202,51 @@ fn test_compile_supports_rest_let_star_destructure_and_collection_parity() {
         .stdout(predicate::str::contains("(20 30)"))
         .stdout(predicate::str::contains("(4 3 1 2)"));
 }
+
+#[test]
+fn test_script_supports_require_core() {
+    let (_dir, script, _output) = write_temp_script(
+        "require_core_script",
+        r#"
+(require "core")
+(print (inc 4))
+(print (when-let (x 6) (inc x)))
+"#,
+    );
+
+    let mut cmd = dlisp_cmd();
+    cmd.arg(&script)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("5"))
+        .stdout(predicate::str::contains("7"));
+}
+
+#[test]
+fn test_compile_supports_require_core() {
+    let (_dir, script, output) = write_temp_script(
+        "require_core_compiled",
+        r#"
+(require "core")
+
+(defun main ()
+  (print (inc 4))
+  (print (when-let (x 6) (inc x))))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("5"))
+        .stdout(predicate::str::contains("7"));
+}

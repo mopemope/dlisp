@@ -1,12 +1,13 @@
 use crate::ast::Value;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Environment {
     pub parent: Option<Rc<RefCell<Environment>>>,
     pub values: HashMap<String, Value>,
+    pub loaded_modules: HashSet<String>,
 }
 
 impl Environment {
@@ -14,6 +15,7 @@ impl Environment {
         Environment {
             parent,
             values: HashMap::new(),
+            loaded_modules: HashSet::new(),
         }
     }
 
@@ -40,5 +42,17 @@ impl Environment {
         } else {
             Err(format!("Undefined variable '{}'", name))
         }
+    }
+
+    pub fn has_loaded_module(&self, name: &str) -> bool {
+        self.loaded_modules.contains(name)
+            || self
+                .parent
+                .as_ref()
+                .is_some_and(|parent| parent.borrow().has_loaded_module(name))
+    }
+
+    pub fn mark_loaded_module(&mut self, name: &str) {
+        self.loaded_modules.insert(name.to_string());
     }
 }

@@ -30,5 +30,6 @@ tokio = { workspace = true }
 futures = { workspace = true }
 async-recursion = { workspace = true }
 dlisp_runtime = { path = "../runtime" }
+dlisp-stdlib = { path = "../stdlib" }
 
 [dev-dependencies]

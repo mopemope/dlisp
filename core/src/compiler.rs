@@ -1,6 +1,7 @@
 use crate::ast::Value;
 use crate::codegen::CodeGen;
 use crate::environment::Environment;
+use crate::forms::require;
 use crate::interpreter::{Interpreter, default_env};
 use cranelift::prelude::{Configurable, settings};
 use cranelift_module::default_libcall_names;
@@ -85,30 +86,15 @@ impl AOTCompiler {
         let mut has_main = false;
         let mut expanded_ast = Vec::new();
 
-        #[allow(clippy::collapsible_if)]
         for expr in ast {
-            // Expand macros first!
-            let expanded = self
-                .interpreter
-                .expand(expr, &mut self.env)
-                .await
-                .map_err(|e| format!("Macro expansion error: {}", e))?;
-
-            // If it's a defmacro, we EVALUATE it in the compiler's interpreter so subsequent code can use it.
-            // But we do NOT emit code for it (macros are compile-time).
-            if let Value::List(ref l) = expanded {
-                if let Some(Value::Symbol(s)) = l.first() {
-                    if s == "defmacro" {
-                        self.interpreter
-                            .eval(expanded, &mut self.env)
-                            .await
-                            .map_err(|e| format!("Macro definition error: {}", e))?;
-                        continue;
-                    }
-                }
+            if let Some(module) = require::required_module_from_expr(&expr)? {
+                self.collect_required_module(&module, &mut expanded_ast)
+                    .await?;
+                continue;
             }
 
-            expanded_ast.push(expanded);
+            self.collect_expanded_expr(expr, &mut expanded_ast, false)
+                .await?;
         }
 
         for expr in &expanded_ast {
@@ -228,6 +214,57 @@ impl AOTCompiler {
         let product = self.module.finish();
         let bytes = product.emit().map_err(|e| e.to_string())?;
         Ok(bytes)
+    }
+
+    async fn collect_required_module(
+        &mut self,
+        module: &str,
+        expanded_ast: &mut Vec<Value>,
+    ) -> Result<(), String> {
+        if self.env.borrow().has_loaded_module(module) {
+            return Ok(());
+        }
+
+        let forms = require::module_forms(module)?;
+        self.env.borrow_mut().mark_loaded_module(module);
+        for form in forms {
+            self.collect_expanded_expr(form, expanded_ast, true).await?;
+        }
+        Ok(())
+    }
+
+    async fn collect_expanded_expr(
+        &mut self,
+        expr: Value,
+        expanded_ast: &mut Vec<Value>,
+        eval_in_compiler_env: bool,
+    ) -> Result<(), String> {
+        let expanded = self
+            .interpreter
+            .expand(expr, &mut self.env)
+            .await
+            .map_err(|e| format!("Macro expansion error: {}", e))?;
+
+        if let Value::List(ref l) = expanded
+            && let Some(Value::Symbol(s)) = l.first()
+            && s == "defmacro"
+        {
+            self.interpreter
+                .eval(expanded, &mut self.env)
+                .await
+                .map_err(|e| format!("Macro definition error: {}", e))?;
+            return Ok(());
+        }
+
+        if eval_in_compiler_env {
+            self.interpreter
+                .eval(expanded.clone(), &mut self.env)
+                .await
+                .map_err(|e| format!("Stdlib module evaluation error: {}", e))?;
+        }
+
+        expanded_ast.push(expanded);
+        Ok(())
     }
 }
 

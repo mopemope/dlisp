@@ -71,6 +71,7 @@
 - `eval` は式を再評価する
 - `apply` はリスト状の引数で関数適用を行う
 - `load` はファイルから式を読み込み順に評価する
+- `require` は同梱 stdlib module を一度だけ読み込む。v1 では `(require "core")` のみを提供する
 
 ## コレクションと高階操作
 - List、Vector、Map を扱う builtins がある

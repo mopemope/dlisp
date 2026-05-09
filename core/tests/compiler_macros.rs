@@ -22,3 +22,19 @@ async fn test_aot_macro_compilation() {
     // (otherwise 'when' would be treated as an undefined function call or fail generation).
     assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
 }
+
+#[tokio::test]
+async fn test_aot_require_core_macro_compilation() {
+    let code = r#"
+    (require "core")
+
+    (defun main ()
+        (print (when-let (x 41) (inc x))))
+    "#;
+
+    let vals = parse(code).unwrap();
+    let compiler = AOTCompiler::new();
+    let result = compiler.compile(vals).await;
+
+    assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+}

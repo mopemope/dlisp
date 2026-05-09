@@ -462,6 +462,18 @@ impl SpecialForm for LoadForm {
     }
 }
 
+pub struct RequireForm;
+impl SpecialForm for RequireForm {
+    fn call<'a>(
+        &self,
+        interpreter: &'a mut Interpreter,
+        args: &'a [Value],
+        env: &'a mut Rc<RefCell<Environment>>,
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+        Box::pin(crate::forms::require::require_form(interpreter, args, env))
+    }
+}
+
 pub struct UpdateForm;
 impl SpecialForm for UpdateForm {
     fn call<'a>(
@@ -548,6 +560,7 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("dolist", DolistForm);
     reg.register("macroexpand", MacroExpandForm);
     reg.register("load", LoadForm);
+    reg.register("require", RequireForm);
     reg.register("try", TryCatchForm);
     reg.register("throw", ThrowForm);
     reg

@@ -528,6 +528,7 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
+ "dlisp-stdlib",
  "dlisp_runtime",
  "futures",
  "thiserror",

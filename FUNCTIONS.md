@@ -19,7 +19,7 @@
 - `dotimes`, `dolist`
 
 評価と適用:
-- `eval`, `apply`, `quote`, `macroexpand`, `load`
+- `eval`, `apply`, `quote`, `macroexpand`, `load`, `require`
 
 高階操作:
 - `map`, `filter`, `reduce`, `some`, `every`, `find`, `for-each`, `map-indexed`, `update`, `map-keys`, `map-vals`
@@ -64,3 +64,12 @@ Macro utils:
 
 Type / error:
 - `nil?`, `error?`, `empty?`, `list?`, `number?`, `string?`, `symbol?`, `keyword?`, `vector?`, `map?`, `type-of`, `error-value`
+
+## Bundled stdlib
+
+`(require "core")` で同梱標準ライブラリを一度だけ読み込む。
+
+`core` module:
+- `inc`, `dec`, `identity`, `constantly`, `second`, `third`
+- `zero?`, `positive?`, `negative?`, `empty-list?`
+- `when-let`
