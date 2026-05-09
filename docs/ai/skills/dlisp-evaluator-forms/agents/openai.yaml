@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Evaluator Forms"
+  short_description: "Change evaluator, forms, macros, and scope behavior."
+  default_prompt: "Use $dlisp-evaluator-forms to modify dlisp evaluator or special form semantics from code-first sources and validate the narrow behavior path."

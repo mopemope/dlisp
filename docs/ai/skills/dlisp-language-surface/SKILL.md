@@ -7,6 +7,7 @@ description: Use when updating dlisp language docs, builtins, special forms, exa
 
 - Start with `core/src/forms/registry.rs` and `core/src/builtins/mod.rs`.
 - Run [scripts/extract-surface.sh](scripts/extract-surface.sh) before editing `FUNCTIONS.md` or `spec.md`.
+- Run `scripts/extract-surface.sh check` after editing `FUNCTIONS.md` (`--check` also works).
 - Read [references/source-of-truth.md](references/source-of-truth.md) when behavior is unclear.
 - Read [references/doc-ownership.md](references/doc-ownership.md) before adding or moving prose.
 - Keep docs short; avoid copying the same function list into multiple files.

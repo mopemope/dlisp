@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Codegen AOT JIT"
+  short_description: "Change Cranelift JIT/AOT and compiled parity."
+  default_prompt: "Use $dlisp-codegen-aot-jit to update dlisp compiled execution paths, runtime declarations, and parity tests without assuming interpreter behavior compiles."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Builtins Surface"
+  short_description: "Add or update builtins and public surface docs."
+  default_prompt: "Use $dlisp-builtins-surface to change dlisp builtins, keep registration and docs aligned, and avoid confusing interpreter support with compiled support."

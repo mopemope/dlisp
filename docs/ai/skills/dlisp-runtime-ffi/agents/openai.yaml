@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Runtime FFI"
+  short_description: "Change runtime ABI, GC, and FFI exports."
+  default_prompt: "Use $dlisp-runtime-ffi to update dlisp runtime value layout or exported symbols while keeping JIT/AOT declarations and tests aligned."

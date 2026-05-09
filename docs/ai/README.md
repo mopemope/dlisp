@@ -20,9 +20,14 @@
 ## 収録 Skill
 - `dlisp-repo`: クレートやモジュールの当たりを最短で付ける。
 - `dlisp-language-surface`: 特殊形式、組み込み関数、仕様文書を更新するときの source of truth を案内する。
+- `dlisp-parser-syntax`: parser、AST、reader syntax の変更。
+- `dlisp-evaluator-forms`: evaluator、special forms、environment の変更。
+- `dlisp-builtins-surface`: builtin 実装、登録、surface docs の変更。
+- `dlisp-codegen-aot-jit`: JIT/AOT/codegen と runtime ABI 接続の変更。
+- `dlisp-runtime-ffi`: runtime value ABI、GC、FFI export、OS/IO runtime の変更。
 
 ## 導入
-- sample Skill の runtime 配置には `scripts/install-runtime-skills.sh` を使う。
+- Skill の runtime 配置には `scripts/install-runtime-skills.sh` を使う。
 
 ```bash
 scripts/install-runtime-skills.sh
@@ -32,4 +37,4 @@ scripts/install-runtime-skills.sh
 - trigger 条件は frontmatter の `description` に集約する。
 - `SKILL.md` 本文には長い「when to use」を書かない。
 - 詳細は `references/` に逃がす。
-- shell / Rust / reference で済むなら、新しい長文ドキュメントを増やさない。
+- shell / Python / Rust / reference で済むなら、新しい長文ドキュメントを増やさない。

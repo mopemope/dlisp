@@ -59,5 +59,8 @@ Map:
 String:
 - `string-length`, `substring`, `string-append`, `string-split`, `string-replace`, `string-upper`, `string-lower`, `string-trim`, `string-trim-left`, `string-trim-right`, `string-starts-with?`, `string-ends-with?`, `string-contains?`, `string-index-of`, `string->number`, `number->string`, `char-at`
 
+Macro utils:
+- `gensym`
+
 Type / error:
 - `nil?`, `error?`, `empty?`, `list?`, `number?`, `string?`, `symbol?`, `keyword?`, `vector?`, `map?`, `type-of`, `error-value`

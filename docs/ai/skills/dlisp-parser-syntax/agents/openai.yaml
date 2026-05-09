@@ -1,0 +1,4 @@
+interface:
+  display_name: "dlisp Parser Syntax"
+  short_description: "Change parser, AST, and reader syntax narrowly."
+  default_prompt: "Use $dlisp-parser-syntax to update dlisp parser or syntax behavior from the parser and AST source of truth, with the smallest relevant tests."

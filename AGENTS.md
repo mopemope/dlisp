@@ -4,7 +4,7 @@
 
 ## 基本方針
 - チャットは日本語で行う。
-- Python 実行は禁止。補助スクリプトは shell を使う。
+- Python 実行は使用可。単純な探索は `rg` / shell を優先し、繰り返す検証や正確な抽出は Python 補助スクリプトを使ってよい。
 - まず `rg --files` / `rg -n` で当たりを付け、必要なファイルだけ読む。
 - `README.md` 全文を最初から読まない。ユーザー向け挙動、公開文書、導入手順を触るときだけ必要箇所を開く。
 - 言語仕様や関数一覧を直すときも、最初に prose docs を読むのではなく `core/src/forms/registry.rs` と `core/src/builtins/mod.rs` を見る。
@@ -15,6 +15,14 @@
 2. `rg -n "<symbol>|<feature>" cli core runtime stdlib` で実装位置を絞る。
 3. repo 固有の案内が必要なら `docs/ai/skills/` 以下を読む。
 4. 文書がコードと食い違う場合は、コードとテストを優先する。
+
+## タスク別ルーティング
+- parser / syntax: `core/src/parser.rs`, `core/src/ast.rs` -> `core/tests/*parser*`, syntax 関連テスト。必要なら `docs/ai/skills/dlisp-parser-syntax/`。
+- evaluator / special forms: `core/src/interpreter.rs`, `core/src/forms/registry.rs`, `core/src/forms/` -> 対象 form の `core/tests/*`。必要なら `docs/ai/skills/dlisp-evaluator-forms/`。
+- builtins / language surface: `core/src/builtins/mod.rs`, 対象 `core/src/builtins/*.rs` -> 対象 builtin の単体/統合テスト。必要なら `docs/ai/skills/dlisp-builtins-surface/`。
+- JIT / AOT / codegen: `core/src/codegen/`, `core/src/jit.rs`, `core/src/compiler.rs`, `cli/src/compile.rs` -> JIT/codegen/CLI compile テスト。必要なら `docs/ai/skills/dlisp-codegen-aot-jit/`。
+- runtime / FFI / GC: `runtime/src/value.rs`, `runtime/src/lib.rs`, `runtime/src/{io,sys,os,vectors,higher_order}.rs` -> `cargo test -p dlisp_runtime --quiet` と必要な compile 経路。必要なら `docs/ai/skills/dlisp-runtime-ffi/`。
+- docs / public surface: 先に code と test を確認し、`FUNCTIONS.md` / `spec.md` / `README.md` の責務に合わせて編集する。必要なら `docs/ai/skills/dlisp-language-surface/`。
 
 ## 主要クレート
 - `cli`: CLI、REPL、ファイル実行、AOT compile エントリポイント。起点は `cli/src/main.rs`。
@@ -43,6 +51,7 @@
 - 導入や更新は `scripts/install-runtime-skills.sh` を使う。
 - repo 調査とコード変更では `docs/ai/skills/dlisp-repo/` を使う。
 - 言語仕様と関数一覧の更新では `docs/ai/skills/dlisp-language-surface/` を使う。
+- 領域が明確な実装では、上記タスク別 skill を優先して読む。
 
 ## テスト要件
 - コード変更後は interpreter path と JIT / compile path の両方を確認する。

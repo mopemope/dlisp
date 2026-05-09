@@ -21,5 +21,6 @@
 - `README.md` は導入、実行、CLI 利用に絞る。
 
 ## Search hints
-- special forms を一覧したいとき: `sed -n 's/.*reg.register(\"\\([^\"]*\\)\".*/\\1/p' core/src/forms/registry.rs`
-- builtins を一覧したいとき: `sed -n 's/.*env.set(\"\\([^\"]*\\)\".*/\\1/p' core/src/builtins/mod.rs`
+- surface を一覧したいとき: `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh`
+- `FUNCTIONS.md` との差分を確認したいとき: `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh check`
+- script は Python を使う。複数行の `env.set(...)` と evaluator 側の `defmacro` 特別扱いを拾う。
