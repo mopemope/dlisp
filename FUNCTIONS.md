@@ -69,6 +69,8 @@ Type / error:
 
 `(require "core")` で同梱標準ライブラリを一度だけ読み込む。
 
+`(require "./lib/foo.lisp")` のように file module も一度だけ読み込める。相対 path は呼び出し元ファイルのディレクトリ、REPL では current working directory を基準に解決する。
+
 `core` module:
 - `inc`, `dec`, `identity`, `constantly`, `second`, `third`
 - `zero?`, `positive?`, `negative?`, `empty-list?`

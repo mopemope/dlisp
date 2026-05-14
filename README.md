@@ -40,6 +40,12 @@ Run a script:
 cargo run --bin dlisp -- path/to/script.lisp
 ```
 
+Split code across files with `require`:
+
+```lisp
+(require "./lib/math.lisp")
+```
+
 Compile to a native executable:
 
 ```bash

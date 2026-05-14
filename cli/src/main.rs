@@ -5,6 +5,7 @@ mod repl;
 use clap::{Parser, Subcommand};
 use config::setup_logging;
 use dlisp_core::ast::Value;
+use dlisp_core::forms::require::normalize_source_dir;
 use dlisp_core::interpreter::{default_env, Interpreter};
 use dlisp_core::parser::parse;
 use std::fs;
@@ -66,8 +67,12 @@ async fn main() -> anyhow::Result<()> {
     local
         .run_until(async move {
             if let Some(file) = args.file {
-                let content = fs::read_to_string(file)?;
+                let content = fs::read_to_string(&file)?;
                 let mut env = default_env();
+                if let Some(parent) = file.parent() {
+                    env.borrow_mut()
+                        .push_source_dir(normalize_source_dir(parent));
+                }
                 let mut interpreter = Interpreter::new();
                 match parse(&content) {
                     Ok(vals) => {

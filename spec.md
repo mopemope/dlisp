@@ -70,8 +70,9 @@
 - `macroexpand` は macro の展開結果を確認する
 - `eval` は式を再評価する
 - `apply` はリスト状の引数で関数適用を行う
-- `load` はファイルから式を読み込み順に評価する
-- `require` は同梱 stdlib module を一度だけ読み込む。v1 では `(require "core")` のみを提供する
+- `load` はファイルから式を読み込み順に評価する。相対 path は現在評価中のファイルのディレクトリ、または REPL/current working directory を基準に解決する
+- `require` は module を一度だけ読み込む。`(require "core")` は同梱 stdlib module を読み込み、`./`、`../`、absolute path、または `.lisp` を含む文字列は file module として読み込む
+- file `require` の相対 path は、呼び出し元ファイルのディレクトリを基準に解決する。AOT compile では required file の式を呼び出し元へ include したものとして扱う
 
 ## コレクションと高階操作
 - List、Vector、Map を扱う builtins がある

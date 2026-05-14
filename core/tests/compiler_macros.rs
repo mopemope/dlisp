@@ -1,5 +1,21 @@
 use dlisp_core::compiler::AOTCompiler;
 use dlisp_core::parser::parse;
+use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+fn temp_dir(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "dlisp_compiler_macros_{}_{}_{}",
+        name,
+        std::process::id(),
+        unique
+    ))
+}
 
 #[tokio::test]
 async fn test_aot_macro_compilation() {
@@ -37,4 +53,36 @@ async fn test_aot_require_core_macro_compilation() {
     let result = compiler.compile(vals).await;
 
     assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+}
+
+#[tokio::test]
+async fn test_aot_file_require_macro_can_call_required_helper() {
+    let dir = temp_dir("file_require_helper");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("macros.lisp"),
+        r#"
+        (defun macro-add-one (x)
+          (list '+ x 1))
+
+        (defmacro plus-one (x)
+          (macro-add-one x))
+        "#,
+    )
+    .unwrap();
+
+    let code = r#"
+    (require "./macros.lisp")
+
+    (defun main ()
+        (print (plus-one 6)))
+    "#;
+
+    let vals = parse(code).unwrap();
+    let compiler = AOTCompiler::new();
+    let result = compiler.compile_with_base_dir(vals, &dir).await;
+
+    assert!(result.is_ok(), "Compilation failed: {:?}", result.err());
+
+    let _ = fs::remove_dir_all(&dir);
 }

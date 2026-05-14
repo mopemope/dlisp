@@ -223,6 +223,34 @@ fn test_script_supports_require_core() {
 }
 
 #[test]
+fn test_script_supports_relative_file_require() {
+    let (dir, script, _output) = write_temp_script(
+        "require_file_script",
+        r#"
+(require "./lib/math.lisp")
+
+(defun main ()
+  (print (triple 4)))
+"#,
+    );
+    let lib_dir = dir.path().join("lib");
+    fs::create_dir_all(&lib_dir).expect("failed to create lib dir");
+    fs::write(
+        lib_dir.join("math.lisp"),
+        r#"
+(defun triple (x) (* x 3))
+"#,
+    )
+    .expect("failed to write required file");
+
+    let mut cmd = dlisp_cmd();
+    cmd.arg(&script)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("12"));
+}
+
+#[test]
 fn test_compile_supports_require_core() {
     let (_dir, script, output) = write_temp_script(
         "require_core_compiled",
@@ -249,6 +277,49 @@ fn test_compile_supports_require_core() {
         .success()
         .stdout(predicate::str::contains("5"))
         .stdout(predicate::str::contains("7"));
+}
+
+#[test]
+fn test_compile_supports_relative_file_require_with_macro() {
+    let (dir, script, output) = write_temp_script(
+        "require_file_compiled",
+        r#"
+(require "./lib/macros.lisp")
+
+(defun main ()
+  (print (twice (plus-one 6))))
+"#,
+    );
+    let lib_dir = dir.path().join("lib");
+    fs::create_dir_all(&lib_dir).expect("failed to create lib dir");
+    fs::write(
+        lib_dir.join("macros.lisp"),
+        r#"
+(defun macro-add-one (x)
+  (list '+ x 1))
+
+(defmacro plus-one (x)
+  (macro-add-one x))
+
+(defun twice (x)
+  (* x 2))
+"#,
+    )
+    .expect("failed to write required file");
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("14"));
 }
 
 #[test]

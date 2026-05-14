@@ -2,7 +2,10 @@ use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{default_env, default_interpreter};
 use dlisp_core::parser::parse;
 use std::cell::RefCell;
+use std::fs;
+use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 async fn eval_str(
     src: &str,
@@ -22,6 +25,19 @@ fn setup() -> (
     Rc<RefCell<dlisp_core::environment::Environment>>,
 ) {
     (default_interpreter(), default_env())
+}
+
+fn temp_dir(name: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "dlisp_require_{}_{}_{}",
+        name,
+        std::process::id(),
+        unique
+    ))
 }
 
 #[tokio::test]
@@ -108,4 +124,149 @@ async fn test_require_requires_string_module_name() {
     let err = interp.eval(exprs[0].clone(), &mut env).await.unwrap_err();
 
     assert!(err.contains("require requires a string module name"));
+}
+
+#[tokio::test]
+async fn test_require_file_loads_once_by_canonical_path() {
+    let dir = temp_dir("once");
+    fs::create_dir_all(&dir).unwrap();
+    let module = dir.join("counter.lisp");
+    fs::write(
+        &module,
+        r#"
+        (defvar loaded-count 0)
+        (setq loaded-count (+ loaded-count 1))
+        (defun add-ten (x) (+ x 10))
+        "#,
+    )
+    .unwrap();
+
+    let (mut interp, mut env) = setup();
+    let res = eval_str(
+        &format!(
+            r#"
+            (require "{}")
+            (require "{}")
+            (list loaded-count (add-ten 5))
+            "#,
+            module.display(),
+            module.display()
+        ),
+        &mut interp,
+        &mut env,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        Value::List(vec![Value::Integer(1), Value::Integer(15)])
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn test_require_file_failure_rolls_back_loaded_marker() {
+    let dir = temp_dir("retry");
+    fs::create_dir_all(&dir).unwrap();
+    let module = dir.join("flaky.lisp");
+    fs::write(
+        &module,
+        r#"
+        (defvar partial-load 1)
+        missing-symbol
+        "#,
+    )
+    .unwrap();
+
+    let (mut interp, mut env) = setup();
+    let first = eval_str(
+        &format!(r#"(require "{}")"#, module.display()),
+        &mut interp,
+        &mut env,
+    )
+    .await;
+    assert!(first.is_err());
+
+    fs::write(
+        &module,
+        r#"
+        (defun recovered () 42)
+        "#,
+    )
+    .unwrap();
+    let res = eval_str(
+        &format!(
+            r#"
+            (require "{}")
+            (recovered)
+            "#,
+            module.display()
+        ),
+        &mut interp,
+        &mut env,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(res, Value::Integer(42));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn test_require_file_resolves_nested_relative_to_required_file() {
+    let dir = temp_dir("nested");
+    let nested = dir.join("nested");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(
+        nested.join("math.lisp"),
+        r#"
+        (defun triple (x) (* x 3))
+        "#,
+    )
+    .unwrap();
+    fs::write(
+        dir.join("main.lisp"),
+        r#"
+        (require "./nested/math.lisp")
+        (defun from-main (x) (triple x))
+        "#,
+    )
+    .unwrap();
+
+    let (mut interp, mut env) = setup();
+    env.borrow_mut().push_source_dir(dir.clone());
+    let res = eval_str(
+        r#"
+        (require "./main.lisp")
+        (from-main 7)
+        "#,
+        &mut interp,
+        &mut env,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(res, Value::Integer(21));
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn test_require_missing_file_error_contains_resolved_path() {
+    let dir = temp_dir("missing");
+    fs::create_dir_all(&dir).unwrap();
+
+    let (mut interp, mut env) = setup();
+    env.borrow_mut().push_source_dir(dir.clone());
+    let exprs = parse(r#"(require "./missing.lisp")"#).unwrap();
+    let err = interp.eval(exprs[0].clone(), &mut env).await.unwrap_err();
+
+    assert!(err.contains("Failed to resolve required file"));
+    assert!(err.contains(&dir.display().to_string()));
+    assert!(err.contains("missing.lisp"));
+
+    let _ = fs::remove_dir_all(&dir);
 }

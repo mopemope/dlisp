@@ -3,10 +3,12 @@ use crate::codegen::CodeGen;
 use crate::environment::Environment;
 use crate::forms::require;
 use crate::interpreter::{Interpreter, default_env};
+use async_recursion::async_recursion;
 use cranelift::prelude::{Configurable, settings};
 use cranelift_module::default_libcall_names;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 pub enum OptimizationLevel {
@@ -34,6 +36,13 @@ pub struct AOTCompiler {
     module: ObjectModule,
     interpreter: Interpreter,
     env: Rc<RefCell<Environment>>,
+}
+
+#[derive(Clone, Copy)]
+enum CompileTimeMode {
+    None,
+    EvalAll,
+    FileRequire,
 }
 
 impl AOTCompiler {
@@ -82,18 +91,35 @@ impl AOTCompiler {
         }
     }
 
-    pub async fn compile(mut self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
+    pub async fn compile(self, ast: Vec<Value>) -> Result<Vec<u8>, String> {
+        self.compile_impl(ast, None).await
+    }
+
+    pub async fn compile_with_base_dir<P: AsRef<Path>>(
+        self,
+        ast: Vec<Value>,
+        base_dir: P,
+    ) -> Result<Vec<u8>, String> {
+        self.compile_impl(ast, Some(base_dir.as_ref().to_path_buf()))
+            .await
+    }
+
+    async fn compile_impl(
+        mut self,
+        ast: Vec<Value>,
+        base_dir: Option<PathBuf>,
+    ) -> Result<Vec<u8>, String> {
+        if let Some(base_dir) = base_dir {
+            self.env
+                .borrow_mut()
+                .push_source_dir(require::normalize_source_dir(&base_dir));
+        }
+
         let mut has_main = false;
         let mut expanded_ast = Vec::new();
 
         for expr in ast {
-            if let Some(module) = require::required_module_from_expr(&expr)? {
-                self.collect_required_module(&module, &mut expanded_ast)
-                    .await?;
-                continue;
-            }
-
-            self.collect_expanded_expr(expr, &mut expanded_ast, false)
+            self.collect_expanded_expr(expr, &mut expanded_ast, CompileTimeMode::None)
                 .await?;
         }
 
@@ -216,11 +242,51 @@ impl AOTCompiler {
         Ok(bytes)
     }
 
+    #[async_recursion(?Send)]
     async fn collect_required_module(
         &mut self,
         module: &str,
         expanded_ast: &mut Vec<Value>,
     ) -> Result<(), String> {
+        if require::is_file_module_name(module) {
+            let (canonical, key, forms) = {
+                let borrowed = self.env.borrow();
+                require::file_module_forms(module, &borrowed)?
+            };
+
+            if self.env.borrow().has_loaded_module(&key) {
+                return Ok(());
+            }
+
+            self.env.borrow_mut().mark_loaded_module(&key);
+            if let Some(parent) = canonical.parent() {
+                self.env
+                    .borrow_mut()
+                    .push_source_dir(require::normalize_source_dir(parent));
+            }
+
+            let mut result = Ok(());
+            for form in forms {
+                if let Err(err) = self
+                    .collect_expanded_expr(form, expanded_ast, CompileTimeMode::FileRequire)
+                    .await
+                {
+                    result = Err(err);
+                    break;
+                }
+            }
+
+            if canonical.parent().is_some() {
+                self.env.borrow_mut().pop_source_dir();
+            }
+
+            if result.is_err() {
+                self.env.borrow_mut().unmark_loaded_module(&key);
+            }
+
+            return result;
+        }
+
         if self.env.borrow().has_loaded_module(module) {
             return Ok(());
         }
@@ -228,22 +294,29 @@ impl AOTCompiler {
         let forms = require::module_forms(module)?;
         self.env.borrow_mut().mark_loaded_module(module);
         for form in forms {
-            self.collect_expanded_expr(form, expanded_ast, true).await?;
+            self.collect_expanded_expr(form, expanded_ast, CompileTimeMode::EvalAll)
+                .await?;
         }
         Ok(())
     }
 
+    #[async_recursion(?Send)]
     async fn collect_expanded_expr(
         &mut self,
         expr: Value,
         expanded_ast: &mut Vec<Value>,
-        eval_in_compiler_env: bool,
+        compile_time_mode: CompileTimeMode,
     ) -> Result<(), String> {
         let expanded = self
             .interpreter
             .expand(expr, &mut self.env)
             .await
             .map_err(|e| format!("Macro expansion error: {}", e))?;
+
+        if let Some(module) = require::required_module_from_expr(&expanded)? {
+            self.collect_required_module(&module, expanded_ast).await?;
+            return Ok(());
+        }
 
         if let Value::List(ref l) = expanded
             && let Some(Value::Symbol(s)) = l.first()
@@ -256,11 +329,24 @@ impl AOTCompiler {
             return Ok(());
         }
 
-        if eval_in_compiler_env {
-            self.interpreter
-                .eval(expanded.clone(), &mut self.env)
-                .await
-                .map_err(|e| format!("Stdlib module evaluation error: {}", e))?;
+        match compile_time_mode {
+            CompileTimeMode::None => {}
+            CompileTimeMode::EvalAll => {
+                self.interpreter
+                    .eval(expanded.clone(), &mut self.env)
+                    .await
+                    .map_err(|e| format!("Stdlib module evaluation error: {}", e))?;
+            }
+            CompileTimeMode::FileRequire => {
+                if let Value::List(ref l) = expanded
+                    && matches!(l.first(), Some(Value::Symbol(s)) if s == "defun")
+                {
+                    self.interpreter
+                        .eval(expanded.clone(), &mut self.env)
+                        .await
+                        .map_err(|e| format!("File module definition error: {}", e))?;
+                }
+            }
         }
 
         expanded_ast.push(expanded);

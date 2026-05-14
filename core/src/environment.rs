@@ -1,6 +1,7 @@
 use crate::ast::Value;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -8,6 +9,7 @@ pub struct Environment {
     pub parent: Option<Rc<RefCell<Environment>>>,
     pub values: HashMap<String, Value>,
     pub loaded_modules: HashSet<String>,
+    pub source_dirs: Vec<PathBuf>,
 }
 
 impl Environment {
@@ -16,6 +18,7 @@ impl Environment {
             parent,
             values: HashMap::new(),
             loaded_modules: HashSet::new(),
+            source_dirs: Vec::new(),
         }
     }
 
@@ -54,5 +57,29 @@ impl Environment {
 
     pub fn mark_loaded_module(&mut self, name: &str) {
         self.loaded_modules.insert(name.to_string());
+    }
+
+    pub fn unmark_loaded_module(&mut self, name: &str) {
+        self.loaded_modules.remove(name);
+    }
+
+    pub fn current_source_dir(&self) -> PathBuf {
+        if let Some(dir) = self.source_dirs.last() {
+            return dir.clone();
+        }
+
+        if let Some(parent) = &self.parent {
+            return parent.borrow().current_source_dir();
+        }
+
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    }
+
+    pub fn push_source_dir(&mut self, dir: PathBuf) {
+        self.source_dirs.push(dir);
+    }
+
+    pub fn pop_source_dir(&mut self) {
+        self.source_dirs.pop();
     }
 }

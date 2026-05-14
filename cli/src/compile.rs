@@ -1,6 +1,7 @@
 use dlisp_core::compiler::{AOTCompiler, CompilerOptions, OptimizationLevel};
 use dlisp_core::parser::parse;
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
@@ -83,7 +84,8 @@ pub async fn compile_file(
                 options.optimization_level = OptimizationLevel::Speed;
             }
             let compiler = AOTCompiler::with_options(options);
-            match compiler.compile(vals).await {
+            let base_dir = file.parent().unwrap_or_else(|| Path::new("."));
+            match compiler.compile_with_base_dir(vals, base_dir).await {
                 Ok(bytes) => {
                     let object_file = file.with_extension("o");
                     fs::write(&object_file, bytes)?;
