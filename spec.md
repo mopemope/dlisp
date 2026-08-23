@@ -23,6 +23,8 @@
 
 条件式では `nil` と整数 `0` を偽として扱い、それ以外は真として扱う。
 
+比較 builtins(`>`, `<`, `=`, `>=`, `<=`, `/=`)はすべて `Bool` を返す。interpreter / JIT / AOT の全経路で同一である。
+
 ## 評価モデル
 - Symbol は現在の environment から解決する。
 - Keyword と数値、文字列などの self-evaluating な値はそのまま返る。

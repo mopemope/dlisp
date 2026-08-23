@@ -10,3 +10,6 @@ crate-type = ["staticlib", "rlib"]
 [dependencies]
 tokio = { workspace = true }
 libc = { workspace = true }
+
+[lints]
+workspace = true

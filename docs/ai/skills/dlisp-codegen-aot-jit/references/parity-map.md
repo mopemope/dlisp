@@ -38,9 +38,11 @@ Builtins absent from `COMPILED_BUILTINS` are interpreter-only. The JIT gate
 keeps such functions on the interpreter automatically; AOT compilation fails
 with an explicit error naming the function and builtin.
 
-Still interpreter-only examples include `sort`, `zip`, `range`, `format`,
+Still interpreter-only examples include `sort`, `zip`, `format`,
 `gensym`, `write-file`, `exec`, `select-keys`, `dissoc`, `merge`, `keys`,
 `vals`, and the numeric helpers `abs`, `min`, `max`, `pow`.
+`range` used to be an interpreter-only builtin; it now lives in the bundled
+stdlib (`stdlib/src/core.lisp`) as Lisp code and compiles on every path.
 
 Interpreter-only special forms (`try`, `throw`, `eval`, `apply`,
 `macroexpand`, `load`, `require`, `defmacro`, `map-indexed`, `update`,
@@ -61,10 +63,21 @@ the interpreter in their failure mode (value-level results match):
   code runs zero iterations.
 - `(some/every/find/for-each f coll)` with a non-collection: interpreter
   errors; compiled code returns the neutral value (nil, or true for every).
-- Comparison return types: interpreter `>`/`<`/`=` builtins return Integer
-  1/0 while compiled comparisons return Bool. Truthiness is identical.
+- Concurrent `spawn` output: compiled tasks run on OS threads, so stdout
+  writes can interleave between the text and its newline. The interpreter's
+  cooperative scheduler keeps each `(print ...)` atomic. Line content is
+  identical; ordering/interleaving is not guaranteed in either path.
+  Pinned by the order-insensitive comparison for `spawn.lisp` in
+  `cli/tests/parity_golden_tests.rs`.
 
-Avoid relying on these errors inside functions that get JIT/AOT compiled.
+Comparison builtins (`>`, `<`, `=`, `>=`, `<=`, `/=`) return `Bool` on all
+paths (unified; previously the interpreter returned Integer 1/0 for
+`>`, `<`, `=`). Byte-exact interpreter-vs-AOT parity for all bundled
+examples except spawn interleaving is enforced by
+`cli/tests/parity_golden_tests.rs`.
+
+Avoid relying on error divergences inside functions that get JIT/AOT
+compiled.
 
 ## Parity fixes (verified)
 These previously diverged and now match the interpreter; regression tests
@@ -112,6 +125,22 @@ This is a pre-existing dispatch design; avoid shadowing compiled builtin names.
 5. name added to `COMPILED_BUILTINS` (`core/src/codegen/mod.rs`)
 6. dummy symbol in `core/tests/jit_phase3_tests.rs` + compile test
 7. behavior check via REPL defun (auto-JIT) and AOT compile
+
+`scripts/check_codegen_parity.py` statically verifies steps 1-5 stay in sync.
+
+## Defining stdlib functions instead of builtins
+Interpreter-only surface can move to `stdlib/src/core.lisp` as Lisp code;
+`(require "core")` forms are compiled into AOT output by
+`collect_required_module` (`core/src/compiler.rs`). Constraints learned from
+the `range` migration:
+- Define callees before callers: each defun eagerly JIT-compiles at
+  definition time, and forward references leave the caller unresolvable
+  ("can't resolve symbol ..." panic when a later function is JIT-compiled).
+- `nth` is vector-only; use `first`/`second`/`third` (car/cdr) for lists.
+- Avoid interpreter-only special forms (`try`, `throw`, `apply`, ...) inside
+  stdlib defuns; they make the definition uncompilable.
+- Degenerate inputs should yield neutral values (e.g. nil) since compiled
+  code cannot raise catchable errors.
 
 ## Runtime export check
 - Runtime exported symbols: `rg -n "extern \"C\" fn dlisp_" runtime/src`

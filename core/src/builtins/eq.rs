@@ -53,11 +53,7 @@ pub fn eq(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Val
             }
         }
 
-        Ok(Value::Integer(if is_equal(&args[0], &args[1]) {
-            1
-        } else {
-            0
-        }))
+        Ok(Value::Bool(is_equal(&args[0], &args[1])))
     })
 }
 
@@ -69,11 +65,11 @@ mod tests {
     async fn test_eq_integers() {
         assert_eq!(
             eq(&[Value::Integer(1), Value::Integer(1)]).await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
         assert_eq!(
             eq(&[Value::Integer(1), Value::Integer(2)]).await,
-            Ok(Value::Integer(0))
+            Ok(Value::Bool(false))
         );
     }
 
@@ -81,11 +77,11 @@ mod tests {
     async fn test_eq_floats() {
         assert_eq!(
             eq(&[Value::Float(1.0), Value::Float(1.0)]).await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
         assert_eq!(
             eq(&[Value::Float(1.0), Value::Float(2.0)]).await,
-            Ok(Value::Integer(0))
+            Ok(Value::Bool(false))
         );
     }
 
@@ -93,11 +89,11 @@ mod tests {
     async fn test_eq_mixed() {
         assert_eq!(
             eq(&[Value::Integer(1), Value::Float(1.0)]).await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
         assert_eq!(
             eq(&[Value::Float(1.0), Value::Integer(1)]).await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
     }
 
@@ -109,7 +105,7 @@ mod tests {
                 Value::Symbol("a".to_string())
             ])
             .await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
         assert_eq!(
             eq(&[
@@ -117,12 +113,12 @@ mod tests {
                 Value::String("a".to_string())
             ])
             .await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
-        assert_eq!(eq(&[Value::Nil, Value::Nil]).await, Ok(Value::Integer(1)));
+        assert_eq!(eq(&[Value::Nil, Value::Nil]).await, Ok(Value::Bool(true)));
         assert_eq!(
             eq(&[Value::Nil, Value::Integer(0)]).await,
-            Ok(Value::Integer(0))
+            Ok(Value::Bool(false))
         );
     }
 
@@ -134,7 +130,7 @@ mod tests {
                 Value::Keyword("a".to_string())
             ])
             .await,
-            Ok(Value::Integer(1))
+            Ok(Value::Bool(true))
         );
         assert_eq!(
             eq(&[
@@ -142,7 +138,7 @@ mod tests {
                 Value::Keyword("b".to_string())
             ])
             .await,
-            Ok(Value::Integer(0))
+            Ok(Value::Bool(false))
         );
         // Keyword != Symbol
         assert_eq!(
@@ -151,7 +147,7 @@ mod tests {
                 Value::Symbol("a".to_string())
             ])
             .await,
-            Ok(Value::Integer(0))
+            Ok(Value::Bool(false))
         );
     }
 }

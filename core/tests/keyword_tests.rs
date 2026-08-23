@@ -88,8 +88,8 @@ async fn test_type_of_keyword() {
 
 #[tokio::test]
 async fn test_keyword_equality() {
-    assert_eq!(eval_str("(= :a :a)").await, Value::Integer(1));
-    assert_eq!(eval_str("(= :a :b)").await, Value::Integer(0));
+    assert_eq!(eval_str("(= :a :a)").await, Value::Bool(true));
+    assert_eq!(eval_str("(= :a :b)").await, Value::Bool(false));
 }
 
 // --- Keyword as map key ---

@@ -28,7 +28,12 @@
 - `cli`: CLI、REPL、ファイル実行、AOT compile エントリポイント。起点は `cli/src/main.rs`。
 - `core`: evaluator、special forms、builtins、parser、JIT/AOT codegen。
 - `runtime`: AOT/JIT 実行時の FFI、GC、OS/IO 補助。
-- `stdlib`: 現状は最小のプレースホルダ crate。
+- `stdlib`: `(require "core")` で読む Lisp 実装の標準ライブラリ(`stdlib/src/core.lisp`)。interpreter-only builtin の移管先。
+
+## 生成物とチェック
+- `docs/ai/generated/`(`surface.md`, `symbol-index.md`)は生成物。編集しない。言語 surface を変えたら `scripts/check.sh --regenerate` で再生成する。
+- symbol 一覧や定義位置を知りたいときは registry を開く前に `docs/ai/generated/surface.md` / `symbol-index.md` を見る。
+- commit 前の高速ゲートは `scripts/check.sh`(fmt / clippy / surface check / codegen parity / 生成物鮮度)。テストは含まない。
 
 ## 主要入口
 - 評価とデフォルト環境: `core/src/interpreter.rs`

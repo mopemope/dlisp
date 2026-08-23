@@ -136,17 +136,17 @@ async fn test_map_equality() {
     // Order shouldn't matter
     assert_eq!(
         eval_str("(= {:a 1 :b 2} {:b 2 :a 1})").await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
-    assert_eq!(eval_str("(= {:a 1} {:a 2})").await, Value::Integer(0));
+    assert_eq!(eval_str("(= {:a 1} {:a 2})").await, Value::Bool(false));
 
     // Recursion with floats
-    assert_eq!(eval_str("(= {:a 1.0} {:a 1.0})").await, Value::Integer(1));
-    assert_eq!(eval_str("(= {:a 1.0} {:a 1.1})").await, Value::Integer(0));
+    assert_eq!(eval_str("(= {:a 1.0} {:a 1.0})").await, Value::Bool(true));
+    assert_eq!(eval_str("(= {:a 1.0} {:a 1.1})").await, Value::Bool(false));
     // Nested collections
     assert_eq!(
         eval_str("(= {:a [1 2]} {:a [1 2]})").await,
-        Value::Integer(1)
+        Value::Bool(true)
     );
 }
 

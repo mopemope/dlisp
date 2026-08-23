@@ -31,8 +31,17 @@ rustyline = "17.0"
 tracing = "0.1"
 libc = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tokio = { version = "1", features = ["full", "rt-multi-thread"] }
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "macros", "time", "fs", "process"] }
 futures = { version = "0.3" }
 async-recursion = { version = "1" }
 dirs = "6.0"
 # ... and other deps shared across crates if desired
+
+[workspace.lints.rust]
+rust_2018_idioms = { level = "warn", priority = -1 }
+# The codebase consistently uses elided lifetimes on generic paths;
+# annotating all of them would be high-churn with no safety benefit.
+elided_lifetimes_in_paths = "allow"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

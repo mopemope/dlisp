@@ -279,7 +279,7 @@ async fn test_reduce_vector() {
 async fn test_some_basic() {
     let (mut i, mut e) = setup();
     let res = eval_str("(some (lambda (x) (> x 2)) '(1 2 3))", &mut i, &mut e).await;
-    assert_eq!(res, Value::Integer(1));
+    assert_eq!(res, Value::Bool(true));
 
     let res2 = eval_str("(some (lambda (x) (> x 5)) '(1 2 3))", &mut i, &mut e).await;
     assert_eq!(res2, Value::Nil);
@@ -392,7 +392,7 @@ async fn test_some_nil() {
 async fn test_some_vector() {
     let (mut i, mut e) = setup();
     let res = eval_str("(some (lambda (x) (> x 2)) [1 2 3])", &mut i, &mut e).await;
-    assert_eq!(res, Value::Integer(1));
+    assert_eq!(res, Value::Bool(true));
 }
 
 #[tokio::test]

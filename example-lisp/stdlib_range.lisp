@@ -1,0 +1,11 @@
+;; stdlib range (Lisp implementation loaded via (require "core"))
+(require "core")
+
+(defun main ()
+  (print (range 4))
+  (print (range 1 5))
+  (print (range 10 0 -3))
+  (print (range 0))
+  (print (range 5 0 -1))
+  (print (range 1 2 0))
+  (print (count (range 100))))

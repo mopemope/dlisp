@@ -8,3 +8,6 @@ edition.workspace = true
 version.workspace = true
 
 [dependencies]
+
+[lints]
+workspace = true

@@ -33,3 +33,6 @@ dlisp_runtime = { path = "../runtime" }
 dlisp-stdlib = { path = "../stdlib" }
 
 [dev-dependencies]
+
+[lints]
+workspace = true

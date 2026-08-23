@@ -228,53 +228,6 @@ pub fn flatten(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>>
     Box::pin(async move { Ok(result) })
 }
 
-/// (range end)
-/// (range start end)
-/// (range start end step)
-pub fn range_fn(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
-    let args = args.to_vec();
-    Box::pin(async move {
-        if args.is_empty() || args.len() > 3 {
-            return Err("range requires 1 to 3 arguments".to_string());
-        }
-
-        let mut int_args = Vec::new();
-        for arg in args {
-            match arg {
-                Value::Integer(i) => int_args.push(i),
-                _ => return Err("range arguments must be integers".to_string()),
-            }
-        }
-
-        let (start, end, step) = match int_args.len() {
-            1 => (0, int_args[0], 1),
-            2 => (int_args[0], int_args[1], 1),
-            3 => (int_args[0], int_args[1], int_args[2]),
-            _ => unreachable!(),
-        };
-
-        if step == 0 {
-            return Err("range step cannot be zero".to_string());
-        }
-
-        let mut res = Vec::new();
-        let mut curr = start;
-        if step > 0 {
-            while curr < end {
-                res.push(Value::Integer(curr));
-                curr += step;
-            }
-        } else {
-            while curr > end {
-                res.push(Value::Integer(curr));
-                curr += step;
-            }
-        }
-
-        Ok(Value::List(res))
-    })
-}
-
 /// (take n list)
 /// Returns a list of the first n elements of the list/vector.
 pub fn take(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
@@ -584,40 +537,6 @@ mod tests {
     }
 
     #[test]
-    fn test_range_basic() {
-        assert_eq!(
-            run(range_fn(&[Value::Integer(3)])).unwrap(),
-            Value::List(vec![
-                Value::Integer(0),
-                Value::Integer(1),
-                Value::Integer(2)
-            ])
-        );
-        assert_eq!(
-            run(range_fn(&[Value::Integer(1), Value::Integer(4)])).unwrap(),
-            Value::List(vec![
-                Value::Integer(1),
-                Value::Integer(2),
-                Value::Integer(3)
-            ])
-        );
-        assert_eq!(
-            run(range_fn(&[
-                Value::Integer(10),
-                Value::Integer(0),
-                Value::Integer(-3)
-            ]))
-            .unwrap(),
-            Value::List(vec![
-                Value::Integer(10),
-                Value::Integer(7),
-                Value::Integer(4),
-                Value::Integer(1)
-            ])
-        );
-    }
-
-    #[test]
     fn test_take_basic() {
         let list = Value::List(vec![
             Value::Integer(1),
@@ -740,40 +659,6 @@ mod tests {
             run(flatten(&[v])).unwrap(),
             Value::List(vec![Value::Integer(1), Value::Integer(2)])
         );
-    }
-
-    #[test]
-    fn test_range_zero() {
-        assert_eq!(
-            run(range_fn(&[Value::Integer(0)])).unwrap(),
-            Value::List(vec![])
-        );
-    }
-
-    #[test]
-    fn test_range_negative_end() {
-        // (range -3) → empty because 0 >= -3
-        assert_eq!(
-            run(range_fn(&[Value::Integer(-3)])).unwrap(),
-            Value::List(vec![])
-        );
-    }
-
-    #[test]
-    fn test_range_step_zero_error() {
-        assert!(
-            run(range_fn(&[
-                Value::Integer(0),
-                Value::Integer(5),
-                Value::Integer(0)
-            ]))
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn test_range_wrong_type() {
-        assert!(run(range_fn(&[Value::String("a".to_string())])).is_err());
     }
 
     #[test]

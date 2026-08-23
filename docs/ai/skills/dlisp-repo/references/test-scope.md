@@ -14,6 +14,7 @@
 | map / vector / format / io / sys / os builtin | `map_tests`, `vector_tests`, `format_tests`, `io_tests`, `sys_tests`, `os_tests` | 対象の1つ |
 | JIT / codegen surface | `core/tests/jit_phase3_tests.rs`(他に `jit_phase2_tests`) | `cargo test -p dlisp-core --test jit_phase3_tests --quiet` |
 | AOT / compiler | `compiler_tests`, `compiler_integration_tests` | 各 `--test <名前>` |
+| interpreter ↔ AOT parity | `cli/tests/parity_golden_tests.rs` | `cargo test -p dlisp --test parity_golden_tests --quiet` |
 | parser / syntax | `core/tests/parser_comments_tests.rs`, `backquote_tests` | `cargo test -p dlisp-core --test parser_comments_tests --quiet` |
 | runtime crate 単体 | `runtime/src/verify_tests.rs`(lib内) | `cargo test -p dlisp_runtime --quiet` |
 | CLI / examples / AOT 導線 | `cli/tests/integration_tests.rs` | `cargo test -p dlisp --test integration_tests --quiet` |

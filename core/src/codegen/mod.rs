@@ -339,7 +339,7 @@ impl CodeGen {
         builder.seal_all_blocks();
         builder.finalize();
 
-        println!(
+        tracing::debug!(
             "Declaring function: {} with {} params",
             name,
             self.ctx.func.signature.params.len()

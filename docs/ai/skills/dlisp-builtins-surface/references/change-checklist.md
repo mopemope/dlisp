@@ -20,5 +20,6 @@
 
 ## Validation
 - Focused builtin tests first, e.g. `map_tests`, `vector_tests`, `format_tests`, `io_tests`, `sys_tests`, `os_tests`.
-- Public surface: `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh check`
+- Public surface + codegen sync: `scripts/check.sh` (fmt / clippy / surface check / codegen parity / generated docs freshness). Regenerate docs with `scripts/check.sh --regenerate`.
 - Compiled path only when touched: `cargo test -p dlisp-core --test compiler_tests --quiet` or `cargo test -p dlisp --test integration_tests --quiet`
+- Interpreter ↔ AOT behavior parity for examples: `cargo test -p dlisp --test parity_golden_tests --quiet`

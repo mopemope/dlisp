@@ -4,7 +4,7 @@
 - `cli`: CLI、REPL、ファイル実行、AOT compile の入口
 - `core`: evaluator、special forms、builtins、parser、JIT/AOT codegen
 - `runtime`: Boehm GC、FFI export、OS/IO/runtime helper
-- `stdlib`: 最小 crate。現状の変更頻度は低い
+- `stdlib`: `(require "core")` で読む Lisp 実装の標準ライブラリ(`stdlib/src/core.lisp`)。interpreter-only builtin の移管先
 
 ## Common entry points
 - CLI 起動: `cli/src/main.rs`

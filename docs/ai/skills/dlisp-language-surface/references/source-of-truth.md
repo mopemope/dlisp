@@ -21,6 +21,8 @@
 - `README.md` は導入、実行、CLI 利用に絞る。
 
 ## Search hints
-- surface を一覧したいとき: `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh`
-- `FUNCTIONS.md` との差分を確認したいとき: `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh check`
-- script は Python を使う。複数行の `env.set(...)` と evaluator 側の `defmacro` 特別扱いを拾う。
+- surface を一覧したいとき: `docs/ai/generated/surface.md`(生成物、読むだけならこれで十分)
+- 定義位置を調べたいとき: `docs/ai/generated/symbol-index.md`(symbol → file:line)
+- `FUNCTIONS.md` との差分を確認したいとき: `scripts/check.sh`(surface check を内包)
+- 生成物を再生成するとき: `scripts/check.sh --regenerate`
+- 抽出 script の実体: `docs/ai/skills/dlisp-language-surface/scripts/extract_surface.py`。複数行の `env.set(...)` と evaluator 側の `defmacro` 特別扱いを拾い、`spec.md` の backtick 参照が実在する symbol かも検査する。

@@ -36,7 +36,7 @@
 - `+`, `-`, `*`, `/`, `%`, `mod`, `max`, `min`, `abs`, `pow`
 
 比較:
-- `>`, `<`, `=`, `>=`, `<=`, `/=`
+- `>`, `<`, `=`, `>=`, `<=`, `/=` — すべて Bool を返す(interpreter / JIT / AOT で同一)
 
 表示と文字列化:
 - `print`, `println`, `print-str`, `eprintln`, `format`, `str`
@@ -48,7 +48,7 @@
 - `getenv`, `setenv`, `cwd`, `set-cwd`, `args`, `exit`, `sleep`
 
 List:
-- `list`, `not`, `car`, `first`, `cdr`, `rest`, `cons`, `append`, `reverse`, `sort`, `last`, `butlast`, `flatten`, `range`, `take`, `drop`, `zip`
+- `list`, `not`, `car`, `first`, `cdr`, `rest`, `cons`, `append`, `reverse`, `sort`, `last`, `butlast`, `flatten`, `take`, `drop`, `zip`
 
 Vector:
 - `vector`, `nth`, `count`, `conj`
@@ -75,5 +75,6 @@ Type / error:
 - `inc`, `dec`, `identity`, `constantly`, `second`, `third`
 - `zero?`, `positive?`, `negative?`, `empty-list?`
 - `when-let`
+- `range` — `(range end)` / `(range start end)` / `(range start end step)`。非整数引数や step 0 は `nil`。内部 helper として `range-build`, `range-iter` も定義される
 - `thread-first-step`, `thread-last-step`
 - Threading macros: `->`, `->>`, `as->`, `some->`
