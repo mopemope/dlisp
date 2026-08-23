@@ -54,6 +54,10 @@ impl Default for JIT {
         builder.symbol("dlisp_get", dlisp_runtime::dlisp_get as *const u8);
         builder.symbol("dlisp_car", dlisp_runtime::dlisp_car as *const u8);
         builder.symbol("dlisp_cdr", dlisp_runtime::dlisp_cdr as *const u8);
+        builder.symbol(
+            "dlisp_vector_to_list",
+            dlisp_runtime::lists::dlisp_vector_to_list as *const u8,
+        );
         builder.symbol("dlisp_print", dlisp_runtime::dlisp_print as *const u8);
         builder.symbol("dlisp_add", dlisp_runtime::dlisp_add as *const u8);
         builder.symbol("dlisp_sub", dlisp_runtime::dlisp_sub as *const u8);
@@ -212,6 +216,22 @@ impl Default for JIT {
         builder.symbol(
             "dlisp_reduce",
             dlisp_runtime::higher_order::dlisp_reduce as *const u8,
+        );
+        builder.symbol(
+            "dlisp_some",
+            dlisp_runtime::higher_order::dlisp_some as *const u8,
+        );
+        builder.symbol(
+            "dlisp_every",
+            dlisp_runtime::higher_order::dlisp_every as *const u8,
+        );
+        builder.symbol(
+            "dlisp_find",
+            dlisp_runtime::higher_order::dlisp_find as *const u8,
+        );
+        builder.symbol(
+            "dlisp_for_each",
+            dlisp_runtime::higher_order::dlisp_for_each as *const u8,
         );
         builder.symbol(
             "dlisp_file_exists",

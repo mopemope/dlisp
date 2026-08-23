@@ -66,6 +66,10 @@ pub const COMPILED_BUILTINS: &[&str] = &[
     "map",
     "filter",
     "reduce",
+    "some",
+    "every",
+    "find",
+    "for-each",
     // list helpers
     "append",
     "reverse",

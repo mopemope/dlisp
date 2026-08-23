@@ -290,6 +290,9 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 "and" => crate::codegen::forms::control::compile_and(self, list),
                 "or" => crate::codegen::forms::control::compile_or(self, list),
                 "cond" => crate::codegen::forms::control::compile_cond(self, list),
+                "while" => crate::codegen::forms::control::compile_while(self, list),
+                "dotimes" => crate::codegen::forms::control::compile_dotimes(self, list),
+                "dolist" => crate::codegen::forms::control::compile_dolist(self, list),
                 "lambda" => crate::codegen::forms::lambda::compile_lambda(self, list),
                 "spawn" => crate::codegen::forms::spawn::compile_spawn(self, list),
                 "quote" => {

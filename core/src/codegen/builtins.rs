@@ -23,6 +23,11 @@ pub struct BuiltinDefinitions {
     pub dlisp_make_nil: FuncId,
     pub dlisp_car: FuncId,
     pub dlisp_cdr: FuncId,
+    pub dlisp_vector_to_list: FuncId,
+    pub dlisp_some: FuncId,
+    pub dlisp_every: FuncId,
+    pub dlisp_find: FuncId,
+    pub dlisp_for_each: FuncId,
     pub dlisp_print: FuncId,
     pub dlisp_add: FuncId,
     pub dlisp_sub: FuncId,
@@ -282,6 +287,35 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     cdr_sig.returns.push(AbiParam::new(int));
     let cdr_id = module
         .declare_function("dlisp_cdr", Linkage::Import, &cdr_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_vector_to_list(DlispValue*) -> DlispValue*
+    let mut vector_to_list_sig = module.make_signature();
+    vector_to_list_sig.params.push(AbiParam::new(int));
+    vector_to_list_sig.returns.push(AbiParam::new(int));
+    let vector_to_list_id = module
+        .declare_function("dlisp_vector_to_list", Linkage::Import, &vector_to_list_sig)
+        .map_err(|e| e.to_string())?;
+
+    // Higher-order predicates: (DlispValue*, DlispValue*) -> DlispValue*
+    let mut some_sig = module.make_signature();
+    some_sig.params.push(AbiParam::new(int));
+    some_sig.params.push(AbiParam::new(int));
+    some_sig.returns.push(AbiParam::new(int));
+    let some_id = module
+        .declare_function("dlisp_some", Linkage::Import, &some_sig)
+        .map_err(|e| e.to_string())?;
+
+    let every_id = module
+        .declare_function("dlisp_every", Linkage::Import, &some_sig)
+        .map_err(|e| e.to_string())?;
+
+    let find_id = module
+        .declare_function("dlisp_find", Linkage::Import, &some_sig)
+        .map_err(|e| e.to_string())?;
+
+    let for_each_id = module
+        .declare_function("dlisp_for_each", Linkage::Import, &some_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_map_assoc(DlispValue*, DlispValue*, DlispValue*) -> DlispValue*
@@ -652,6 +686,11 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_make_nil: make_nil_id,
         dlisp_car: car_id,
         dlisp_cdr: cdr_id,
+        dlisp_vector_to_list: vector_to_list_id,
+        dlisp_some: some_id,
+        dlisp_every: every_id,
+        dlisp_find: find_id,
+        dlisp_for_each: for_each_id,
         dlisp_print: print_id,
         dlisp_add: add_id,
         dlisp_sub: sub_id,

@@ -238,6 +238,31 @@ unsafe fn flatten_into(val: *mut DlispValue, out: &mut Vec<*mut DlispValue>) {
     }
 }
 
+/// Converts a vector into a list with the same elements. Nil passes through.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `val` points to a valid `DlispValue` struct.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_vector_to_list(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if val.is_null() || (*val).type_ == ValueType::Nil {
+            return dlisp_make_nil();
+        }
+        match (*val).type_ {
+            ValueType::Vector => {
+                let elems = vector_to_vec(val);
+                build_list(&elems)
+            }
+            ValueType::List => val,
+            _ => {
+                eprintln!("Type Error: vector to list requires a vector");
+                std::process::abort();
+            }
+        }
+    }
+}
+
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 #[unsafe(no_mangle)]

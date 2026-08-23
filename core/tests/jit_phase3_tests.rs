@@ -104,6 +104,12 @@ fn create_jit_module() -> JITModule {
         "dlisp_string_contains",
         "dlisp_string_index_of",
         "dlisp_char_at",
+        "dlisp_vector_to_list",
+        "dlisp_some",
+        "dlisp_every",
+        "dlisp_find",
+        "dlisp_for_each",
+        "dlisp_make_closure",
     ];
     for name in binary_symbols {
         builder.symbol(name, dummy_ptr2 as *const u8);
@@ -491,4 +497,80 @@ fn test_codegen_char_at() {
         Value::String("b".to_string()),
     ]);
     compile_expr_in_function(&mut module, &ast, "test_char_at");
+}
+
+// === Compiled loops and higher-order predicates ===
+
+#[test]
+fn test_codegen_while() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("while".to_string()),
+        Value::List(vec![
+            Value::Symbol("<".to_string()),
+            Value::Integer(0),
+            Value::Integer(1),
+        ]),
+        Value::Integer(42),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_while");
+}
+
+#[test]
+fn test_codegen_dotimes() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("dotimes".to_string()),
+        Value::List(vec![Value::Symbol("k".to_string()), Value::Integer(3)]),
+        Value::Symbol("k".to_string()),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_dotimes");
+}
+
+#[test]
+fn test_codegen_dolist() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("dolist".to_string()),
+        Value::List(vec![
+            Value::Symbol("x".to_string()),
+            Value::List(vec![
+                Value::Symbol("list".to_string()),
+                Value::Integer(1),
+                Value::Integer(2),
+            ]),
+        ]),
+        Value::Symbol("x".to_string()),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_dolist");
+}
+
+#[test]
+fn test_codegen_higher_order_predicates() {
+    let lambda = |name: &str| {
+        Value::List(vec![
+            Value::Symbol("lambda".to_string()),
+            Value::List(vec![Value::Symbol("x".to_string())]),
+            Value::Symbol(name.to_string()),
+        ])
+    };
+
+    for (op, func_name) in [
+        ("some", "test_some"),
+        ("every", "test_every"),
+        ("find", "test_find"),
+        ("for-each", "test_for_each"),
+    ] {
+        let mut module = create_jit_module();
+        let ast = Value::List(vec![
+            Value::Symbol(op.to_string()),
+            lambda("x"),
+            Value::List(vec![
+                Value::Symbol("list".to_string()),
+                Value::Integer(1),
+                Value::Integer(2),
+            ]),
+        ]);
+        compile_expr_in_function(&mut module, &ast, func_name);
+    }
 }

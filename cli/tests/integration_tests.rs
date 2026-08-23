@@ -245,6 +245,64 @@ fn test_compile_supports_vector_literals_and_collection_parity() {
 }
 
 #[test]
+fn test_compile_supports_loops_and_higher_order_predicates() {
+    // while/dotimes/dolist and some/every/find/for-each must compile to
+    // native code with interpreter-identical results.
+    let (_dir, script, output) = write_temp_script(
+        "compiled_loops_parity",
+        r#"
+(defun w-sum (n)
+  (let ((acc 0) (i 0))
+    (while (< i n)
+      (setq acc (+ acc i))
+      (setq i (+ i 1)))
+    acc))
+
+(defun d-accum (n)
+  (let ((acc 0))
+    (dotimes (k n)
+      (setq acc (+ acc k)))
+    acc))
+
+(defun dl-sum (xs)
+  (let ((acc 0))
+    (dolist (x xs)
+      (setq acc (+ acc x)))
+    acc))
+
+(defun main ()
+  (print (w-sum 5))
+  (print (d-accum 5))
+  (print (dl-sum '(1 2 3)))
+  (print (dl-sum [4 5]))
+  (print (some (lambda (x) (- x 2)) '(5 6)))
+  (print (every (lambda (x) (> x 0)) '(1 2 3)))
+  (print (find (lambda (x) (> x 2)) '(1 2 3 4)))
+  (print (for-each (lambda (x) x) '(1 2 3))))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("10"))
+        .stdout(predicate::str::contains("6"))
+        .stdout(predicate::str::contains("9"))
+        .stdout(predicate::str::contains("3"))
+        .stdout(predicate::str::contains("true"))
+        .stdout(predicate::str::contains("nil"));
+}
+
+#[test]
 fn test_script_supports_require_core() {
     let (_dir, script, _output) = write_temp_script(
         "require_core_script",

@@ -22,30 +22,30 @@ pub(crate) fn is_codegen_special_form(name: &str) -> bool {
             | "and"
             | "or"
             | "cond"
+            | "while"
+            | "dotimes"
+            | "dolist"
     )
 }
 
 /// Special forms registered in the interpreter that have no codegen
 /// lowering. AOT compilation must reject them with an explicit error
 /// instead of emitting unresolvable symbols.
+///
+/// `some`/`every`/`find`/`for-each`, `map`/`filter`/`reduce`,
+/// `while`/`dotimes`/`dolist` are lowered as compiled builtins instead and
+/// are listed in `crate::codegen::COMPILED_BUILTINS`.
 pub(crate) fn is_interpreter_only_special_form(name: &str) -> bool {
     matches!(
         name,
         "try"
             | "throw"
-            | "while"
-            | "dotimes"
-            | "dolist"
             | "eval"
             | "apply"
             | "macroexpand"
             | "load"
             | "require"
             | "defmacro"
-            | "some"
-            | "every"
-            | "find"
-            | "for-each"
             | "map-indexed"
             | "update"
             | "map-keys"
@@ -70,6 +70,29 @@ pub(crate) fn find_uncompiled_call(
     env: &Environment,
     pending_functions: &HashSet<String>,
 ) -> Option<String> {
+    find_uncompiled_call_inner(expr, current_func, env, pending_functions, &[])
+}
+
+/// Collects the variable names bound by a destructuring pattern.
+fn collect_pattern_names(pattern: &Value, out: &mut Vec<String>) {
+    match pattern {
+        Value::Symbol(s) if s != "&rest" => out.push(s.clone()),
+        Value::List(items) => {
+            for item in items {
+                collect_pattern_names(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn find_uncompiled_call_inner(
+    expr: &Value,
+    current_func: &str,
+    env: &Environment,
+    pending_functions: &HashSet<String>,
+    locals: &[String],
+) -> Option<String> {
     match expr {
         Value::List(items) => {
             if items.is_empty() {
@@ -81,7 +104,64 @@ pub(crate) fn find_uncompiled_call(
                     return None;
                 }
 
-                if op != current_func && !is_codegen_special_form(op) {
+                // `let` / `let*`: binding heads are names, not calls. Init
+                // expressions see the outer scope; the body sees the new
+                // bindings as locals.
+                if op == "let" || op == "let*" {
+                    let mut inner_locals: Vec<String> = locals.to_vec();
+                    if let Some(Value::List(bindings)) = items.get(1) {
+                        for binding in bindings {
+                            if let Value::List(pair) = binding {
+                                if pair.is_empty() {
+                                    return Some("let".to_string());
+                                }
+                                collect_pattern_names(&pair[0], &mut inner_locals);
+                                if pair.len() != 2 {
+                                    continue;
+                                }
+                                find_uncompiled_call_inner(
+                                    &pair[1],
+                                    current_func,
+                                    env,
+                                    pending_functions,
+                                    locals,
+                                )?;
+                            }
+                        }
+                    }
+                    for item in items.iter().skip(2) {
+                        find_uncompiled_call_inner(
+                            item,
+                            current_func,
+                            env,
+                            pending_functions,
+                            &inner_locals,
+                        )?;
+                    }
+                    return None;
+                }
+
+                // `lambda`: parameters are locals of the lambda body.
+                if op == "lambda" {
+                    let mut inner_locals: Vec<String> = locals.to_vec();
+                    if let Some(Value::List(params)) = items.get(1) {
+                        for param in params {
+                            collect_pattern_names(param, &mut inner_locals);
+                        }
+                    }
+                    for item in items.iter().skip(2) {
+                        find_uncompiled_call_inner(
+                            item,
+                            current_func,
+                            env,
+                            pending_functions,
+                            &inner_locals,
+                        )?;
+                    }
+                    return None;
+                }
+
+                if op != current_func && !is_codegen_special_form(op) && !locals.contains(op) {
                     match env.get(op) {
                         Some(Value::UserFunc {
                             jit_code: Some(_), ..
@@ -97,22 +177,30 @@ pub(crate) fn find_uncompiled_call(
                                 return Some(op.clone());
                             }
                         }
-                        None => return Some(op.clone()),
+                        None => {
+                            // Names lowered directly by codegen (e.g. the
+                            // higher-order forms registered only in the
+                            // interpreter registry) need no env binding.
+                            if !crate::codegen::COMPILED_BUILTINS.contains(&op.as_str()) {
+                                return Some(op.clone());
+                            }
+                        }
                         Some(_) => {}
                     }
                 }
             }
 
-            items
-                .iter()
-                .find_map(|item| find_uncompiled_call(item, current_func, env, pending_functions))
+            items.iter().find_map(|item| {
+                find_uncompiled_call_inner(item, current_func, env, pending_functions, locals)
+            })
         }
-        Value::Vector(items) => items
-            .iter()
-            .find_map(|item| find_uncompiled_call(item, current_func, env, pending_functions)),
+        Value::Vector(items) => items.iter().find_map(|item| {
+            find_uncompiled_call_inner(item, current_func, env, pending_functions, locals)
+        }),
         Value::Map(map) => map.iter().find_map(|(k, v)| {
-            find_uncompiled_call(k, current_func, env, pending_functions)
-                .or_else(|| find_uncompiled_call(v, current_func, env, pending_functions))
+            find_uncompiled_call_inner(k, current_func, env, pending_functions, locals).or_else(
+                || find_uncompiled_call_inner(v, current_func, env, pending_functions, locals),
+            )
         }),
         _ => None,
     }

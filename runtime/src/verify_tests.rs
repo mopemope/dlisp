@@ -170,6 +170,76 @@ mod tests {
     }
 
     #[test]
+    fn test_vector_to_list() {
+        dlisp_gc_init();
+
+        unsafe {
+            let v = dlisp_make_vector(2);
+            dlisp_vector_push(v, dlisp_make_int(1));
+            dlisp_vector_push(v, dlisp_make_int(2));
+
+            let list = crate::dlisp_vector_to_list(v);
+            assert_eq!((*list).type_, ValueType::List);
+            assert_eq!(unbox_int(crate::dlisp_car(list)), 1);
+            let rest = crate::dlisp_cdr(list);
+            assert_eq!(unbox_int(crate::dlisp_car(rest)), 2);
+            assert_eq!((*crate::dlisp_cdr(rest)).type_, ValueType::Nil);
+
+            // Lists pass through and nil stays nil
+            assert_eq!(crate::dlisp_vector_to_list(list), list);
+            assert_eq!(
+                (*crate::dlisp_vector_to_list(dlisp_make_nil())).type_,
+                ValueType::Nil
+            );
+        }
+    }
+
+    #[test]
+    fn test_some_every_find_for_each() {
+        dlisp_gc_init();
+
+        unsafe {
+            let make_vec = |elems: &[i64]| {
+                let v = dlisp_make_vector(elems.len());
+                for e in elems {
+                    dlisp_vector_push(v, dlisp_make_int(*e));
+                }
+                v
+            };
+            let passthru = crate::dlisp_make_closure(std::ptr::null_mut(), passthrough as *const _);
+
+            // some: first truthy element (passthrough returns the element)
+            let some_val = crate::dlisp_some(passthru, make_vec(&[0, 1, 2]));
+            assert_eq!(unbox_int(some_val), 1);
+
+            // all falsy -> nil
+            assert_eq!(
+                (*crate::dlisp_some(passthru, make_vec(&[0]))).type_,
+                ValueType::Nil
+            );
+
+            // every: vacuously true, false on any falsy element
+            assert!(unbox_bool(crate::dlisp_every(passthru, make_vec(&[1, 2]))));
+            assert!(!unbox_bool(crate::dlisp_every(passthru, make_vec(&[1, 0]))));
+            assert!(unbox_bool(crate::dlisp_every(passthru, make_vec(&[]))));
+
+            // find: first truthy element itself
+            let found = crate::dlisp_find(passthru, make_vec(&[0, 3, 4]));
+            assert_eq!(unbox_int(found), 3);
+            assert_eq!(
+                (*crate::dlisp_find(passthru, make_vec(&[0]))).type_,
+                ValueType::Nil
+            );
+
+            // for-each returns nil
+            assert_eq!(
+                (*crate::dlisp_for_each(passthru, make_vec(&[1]))).type_,
+                ValueType::Nil
+            );
+        }
+    }
+
+    #[test]
     fn test_cons_to_non_list_makes_proper_list() {
         dlisp_gc_init();
         let val1 = dlisp_make_int(1);

@@ -31,6 +31,10 @@ pub fn compile_builtin<M: Module>(
         "map" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_map),
         "filter" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_filter),
         "reduce" => compile_ternary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_reduce),
+        "some" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_some),
+        "every" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_every),
+        "find" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_find),
+        "for-each" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_for_each),
         // Vector operations
         "vector" => compile_vector_literal(ctx, list),
         "count" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_count, false),

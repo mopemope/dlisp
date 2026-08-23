@@ -155,3 +155,142 @@ pub unsafe extern "C" fn dlisp_reduce(
         acc
     }
 }
+
+/// Returns the first truthy result of applying `func` to each element,
+/// or nil when every result is falsy (matching the interpreter `some`).
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_some(
+    func: *mut DlispValue,
+    coll: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if func.is_null() || (*func).type_ != ValueType::Closure {
+            return dlisp_make_nil();
+        }
+
+        let closure = (*func).payload.closure_val;
+        let func_ptr: ClosureFunc1 = std::mem::transmute((*closure).func_ptr);
+        let env_ptr = (*closure).env;
+
+        let elems = match collection_to_elems(coll) {
+            Some(elems) => elems,
+            None => return dlisp_make_nil(),
+        };
+
+        for item in elems {
+            let val = func_ptr(env_ptr, item);
+            if !val.is_null() && dlisp_is_truthy(val) != 0 {
+                return val;
+            }
+        }
+
+        dlisp_make_nil()
+    }
+}
+
+/// Returns true when `func` yields a truthy result for every element
+/// (vacuously true for empty collections), matching the interpreter `every`.
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_every(
+    func: *mut DlispValue,
+    coll: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        use crate::constructors::dlisp_make_bool;
+
+        if func.is_null() || (*func).type_ != ValueType::Closure {
+            return dlisp_make_bool(true);
+        }
+
+        let closure = (*func).payload.closure_val;
+        let func_ptr: ClosureFunc1 = std::mem::transmute((*closure).func_ptr);
+        let env_ptr = (*closure).env;
+
+        let elems = match collection_to_elems(coll) {
+            Some(elems) => elems,
+            None => return dlisp_make_bool(true),
+        };
+
+        for item in elems {
+            let val = func_ptr(env_ptr, item);
+            if val.is_null() || dlisp_is_truthy(val) == 0 {
+                return dlisp_make_bool(false);
+            }
+        }
+
+        dlisp_make_bool(true)
+    }
+}
+
+/// Returns the first element for which `func` produces a truthy result,
+/// or nil (matching the interpreter `find`).
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_find(
+    func: *mut DlispValue,
+    coll: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if func.is_null() || (*func).type_ != ValueType::Closure {
+            return dlisp_make_nil();
+        }
+
+        let closure = (*func).payload.closure_val;
+        let func_ptr: ClosureFunc1 = std::mem::transmute((*closure).func_ptr);
+        let env_ptr = (*closure).env;
+
+        let elems = match collection_to_elems(coll) {
+            Some(elems) => elems,
+            None => return dlisp_make_nil(),
+        };
+
+        for item in elems {
+            let val = func_ptr(env_ptr, item);
+            if !val.is_null() && dlisp_is_truthy(val) != 0 {
+                return item;
+            }
+        }
+
+        dlisp_make_nil()
+    }
+}
+
+/// Applies `func` to every element for side effects and returns nil
+/// (matching the interpreter `for-each`).
+///
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_for_each(
+    func: *mut DlispValue,
+    coll: *mut DlispValue,
+) -> *mut DlispValue {
+    unsafe {
+        if func.is_null() || (*func).type_ != ValueType::Closure {
+            return dlisp_make_nil();
+        }
+
+        let closure = (*func).payload.closure_val;
+        let func_ptr: ClosureFunc1 = std::mem::transmute((*closure).func_ptr);
+        let env_ptr = (*closure).env;
+
+        let elems = match collection_to_elems(coll) {
+            Some(elems) => elems,
+            None => return dlisp_make_nil(),
+        };
+
+        for item in elems {
+            func_ptr(env_ptr, item);
+        }
+
+        dlisp_make_nil()
+    }
+}
