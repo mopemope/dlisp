@@ -5,9 +5,43 @@ mod tests {
         dlisp_cons, dlisp_eq, dlisp_gc_init, dlisp_keyword_p, dlisp_make_cons, dlisp_make_int,
         dlisp_make_keyword, dlisp_make_map, dlisp_make_nil, dlisp_make_string, dlisp_make_vector,
         dlisp_map_assoc, dlisp_map_get, dlisp_map_p, dlisp_type_of, dlisp_vector_count,
-        dlisp_vector_push,
+        dlisp_vector_get, dlisp_vector_push,
     };
     use std::ffi::CString;
+
+    unsafe extern "C" fn inc1(_env: *mut DlispValue, x: *mut DlispValue) -> *mut DlispValue {
+        unsafe { crate::dlisp_add(x, crate::dlisp_make_int(1)) }
+    }
+
+    unsafe extern "C" fn passthrough(_env: *mut DlispValue, x: *mut DlispValue) -> *mut DlispValue {
+        x
+    }
+
+    unsafe extern "C" fn add2(
+        _env: *mut DlispValue,
+        a: *mut DlispValue,
+        b: *mut DlispValue,
+    ) -> *mut DlispValue {
+        unsafe { crate::dlisp_add(a, b) }
+    }
+
+    fn unbox_bool(p: *mut DlispValue) -> bool {
+        unsafe {
+            assert!(!p.is_null());
+            let val = *p;
+            assert_eq!(val.type_, ValueType::Bool);
+            val.payload.bool_val
+        }
+    }
+
+    fn unbox_int(p: *mut DlispValue) -> i64 {
+        unsafe {
+            assert!(!p.is_null());
+            let val = *p;
+            assert_eq!(val.type_, ValueType::Int);
+            val.payload.int_val
+        }
+    }
 
     #[test]
     fn test_value_layout() {
@@ -97,6 +131,41 @@ mod tests {
             let count = *dlisp_vector_count(dlisp_make_nil());
             assert_eq!(count.type_, ValueType::Int);
             assert_eq!(count.payload.int_val, 0);
+        }
+    }
+
+    #[test]
+    fn test_higher_order_supports_vectors() {
+        dlisp_gc_init();
+
+        unsafe {
+            let v = dlisp_make_vector(3);
+            dlisp_vector_push(v, dlisp_make_int(1));
+            dlisp_vector_push(v, dlisp_make_int(2));
+            dlisp_vector_push(v, dlisp_make_int(3));
+
+            // map over a vector returns a vector
+            let inc = crate::dlisp_make_closure(std::ptr::null_mut(), inc1 as *const _);
+            let mapped = crate::dlisp_map(inc, v);
+            assert_eq!((*mapped).type_, ValueType::Vector);
+            assert_eq!(unbox_int(dlisp_vector_get(mapped, dlisp_make_int(0))), 2);
+            assert_eq!(unbox_int(dlisp_vector_get(mapped, dlisp_make_int(2))), 4);
+
+            // filter over a vector keeps truthy elements (Int 0 is falsy)
+            let vf = dlisp_make_vector(3);
+            dlisp_vector_push(vf, dlisp_make_int(0));
+            dlisp_vector_push(vf, dlisp_make_int(1));
+            dlisp_vector_push(vf, dlisp_make_int(2));
+            let passthru = crate::dlisp_make_closure(std::ptr::null_mut(), passthrough as *const _);
+            let filtered = crate::dlisp_filter(passthru, vf);
+            assert_eq!((*filtered).type_, ValueType::Vector);
+            let first = dlisp_vector_get(filtered, dlisp_make_int(0));
+            assert_eq!(unbox_int(first), 1);
+
+            // reduce over a vector folds with the closure
+            let sum = crate::dlisp_make_closure(std::ptr::null_mut(), add2 as *const _);
+            let total = crate::dlisp_reduce(sum, dlisp_make_int(0), v);
+            assert_eq!(unbox_int(total), 6);
         }
     }
 
@@ -362,6 +431,79 @@ mod tests {
             assert_eq!((*v2).payload.int_val, 2);
             let v3 = dlisp_map_get(m, kw3);
             assert_eq!((*v3).payload.int_val, 3);
+        }
+    }
+
+    #[test]
+    fn test_dlisp_eq_deep_collections() {
+        dlisp_gc_init();
+
+        unsafe {
+            let make_pair_list = |a: *mut DlispValue, b: *mut DlispValue| {
+                dlisp_make_cons(a, dlisp_make_cons(b, dlisp_make_nil()))
+            };
+
+            // Equal lists
+            let l1 = make_pair_list(dlisp_make_int(1), dlisp_make_int(2));
+            let l2 = make_pair_list(dlisp_make_int(1), dlisp_make_int(2));
+            assert!(unbox_bool(dlisp_eq(l1, l2)));
+
+            // Unequal lists (different element)
+            let l3 = make_pair_list(dlisp_make_int(1), dlisp_make_int(3));
+            assert!(!unbox_bool(dlisp_eq(l1, l3)));
+
+            // Unequal lists (different length)
+            let shorter = dlisp_make_cons(dlisp_make_int(1), dlisp_make_nil());
+            assert!(!unbox_bool(dlisp_eq(l1, shorter)));
+
+            // Nested list equality
+            let n1 = dlisp_make_cons(
+                make_pair_list(dlisp_make_int(2), dlisp_make_int(3)),
+                dlisp_make_nil(),
+            );
+            let n2 = dlisp_make_cons(
+                make_pair_list(dlisp_make_int(2), dlisp_make_int(3)),
+                dlisp_make_nil(),
+            );
+            assert!(unbox_bool(dlisp_eq(n1, n2)));
+
+            // Equal vectors
+            let v1 = dlisp_make_vector(2);
+            dlisp_vector_push(v1, dlisp_make_int(1));
+            dlisp_vector_push(v1, dlisp_make_int(2));
+            let v2 = dlisp_make_vector(2);
+            dlisp_vector_push(v2, dlisp_make_int(1));
+            dlisp_vector_push(v2, dlisp_make_int(2));
+            assert!(unbox_bool(dlisp_eq(v1, v2)));
+
+            // Unequal vectors
+            let v3 = dlisp_make_vector(2);
+            dlisp_vector_push(v3, dlisp_make_int(9));
+            dlisp_vector_push(v3, dlisp_make_int(2));
+            assert!(!unbox_bool(dlisp_eq(v1, v3)));
+
+            // Mixed container types are not equal (interpreter parity)
+            assert!(!unbox_bool(dlisp_eq(l1, v1)));
+        }
+    }
+
+    #[test]
+    fn test_dlisp_vector_get_on_list() {
+        dlisp_gc_init();
+
+        unsafe {
+            let l3 = dlisp_make_cons(dlisp_make_int(30), dlisp_make_nil());
+            let l2 = dlisp_make_cons(dlisp_make_int(20), l3);
+            let l1 = dlisp_make_cons(dlisp_make_int(10), l2);
+
+            assert_eq!(unbox_int(dlisp_vector_get(l1, dlisp_make_int(0))), 10);
+            assert_eq!(unbox_int(dlisp_vector_get(l1, dlisp_make_int(2))), 30);
+
+            // Out of range and negative indices yield nil
+            let oob = *dlisp_vector_get(l1, dlisp_make_int(5));
+            assert_eq!(oob.type_, ValueType::Nil);
+            let neg = *dlisp_vector_get(l1, dlisp_make_int(-1));
+            assert_eq!(neg.type_, ValueType::Nil);
         }
     }
 }

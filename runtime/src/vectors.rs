@@ -62,7 +62,10 @@ pub unsafe extern "C" fn dlisp_vector_push(vec: *mut DlispValue, val: *mut Dlisp
     }
 }
 
-/// Gets an element from a vector at the specified index.
+/// Gets an element from a vector or list at the specified index.
+///
+/// Matches the interpreter `nth` builtin: lists are supported alongside
+/// vectors, and out-of-range indices yield nil.
 ///
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
@@ -73,7 +76,7 @@ pub unsafe extern "C" fn dlisp_vector_get(
     index_val: *mut DlispValue,
 ) -> *mut DlispValue {
     unsafe {
-        if vec.is_null() || (*vec).type_ != ValueType::Vector {
+        if vec.is_null() || ((*vec).type_ != ValueType::Vector && (*vec).type_ != ValueType::List) {
             eprintln!("Type Error: vector get requires vector");
             std::process::abort();
         }
@@ -88,17 +91,45 @@ pub unsafe extern "C" fn dlisp_vector_get(
         }
         let index = index as usize;
 
-        let vec_data = (*vec).payload.vector_val;
-        if vec_data.is_null() {
-            return dlisp_make_nil();
-        }
+        match (*vec).type_ {
+            ValueType::Vector => {
+                let vec_data = (*vec).payload.vector_val;
+                if vec_data.is_null() {
+                    return dlisp_make_nil();
+                }
 
-        if index >= (*vec_data).len {
-            return dlisp_make_nil(); // Or error? Clojure returns nil.
-        }
+                if index >= (*vec_data).len {
+                    return dlisp_make_nil(); // Or error? Clojure returns nil.
+                }
 
-        let data = (*vec_data).data;
-        *data.add(index)
+                let data = (*vec_data).data;
+                *data.add(index)
+            }
+            ValueType::List => {
+                let mut current = vec;
+                let mut pos = index;
+                while !current.is_null() && (*current).type_ == ValueType::List {
+                    if pos == 0 {
+                        let list_data = (*current).payload.list_val;
+                        if list_data.is_null() {
+                            return dlisp_make_nil();
+                        }
+                        return (*list_data).car;
+                    }
+                    pos -= 1;
+                    let list_data = (*current).payload.list_val;
+                    if list_data.is_null() {
+                        return dlisp_make_nil();
+                    }
+                    current = (*list_data).cdr;
+                }
+                dlisp_make_nil()
+            }
+            _ => {
+                eprintln!("Type Error: vector get requires vector");
+                std::process::abort();
+            }
+        }
     }
 }
 

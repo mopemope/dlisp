@@ -33,6 +33,7 @@ pub use constructors::{
 };
 pub use gc::{GC_allow_register_threads, GC_call_with_stack_base, GC_init, GC_malloc};
 pub use gc::{dlisp_gc_init, dlisp_gc_malloc};
+pub use higher_order::{dlisp_filter, dlisp_map, dlisp_reduce};
 pub use io::dlisp_read_file;
 pub use lists::{
     dlisp_append, dlisp_butlast, dlisp_car, dlisp_cdr, dlisp_drop, dlisp_flatten, dlisp_last,

@@ -25,6 +25,34 @@ pub(crate) fn is_codegen_special_form(name: &str) -> bool {
     )
 }
 
+/// Special forms registered in the interpreter that have no codegen
+/// lowering. AOT compilation must reject them with an explicit error
+/// instead of emitting unresolvable symbols.
+pub(crate) fn is_interpreter_only_special_form(name: &str) -> bool {
+    matches!(
+        name,
+        "try"
+            | "throw"
+            | "while"
+            | "dotimes"
+            | "dolist"
+            | "eval"
+            | "apply"
+            | "macroexpand"
+            | "load"
+            | "require"
+            | "defmacro"
+            | "some"
+            | "every"
+            | "find"
+            | "for-each"
+            | "map-indexed"
+            | "update"
+            | "map-keys"
+            | "map-vals"
+    )
+}
+
 fn can_jit_compile_expr(
     expr: &Value,
     current_func: &str,

@@ -204,6 +204,47 @@ fn test_compile_supports_rest_let_star_destructure_and_collection_parity() {
 }
 
 #[test]
+fn test_compile_supports_vector_literals_and_collection_parity() {
+    // Regression: AOT used to panic while lowering `(vector ...)`, and
+    // map/filter/reduce/nth/= diverged from the interpreter for vectors/lists.
+    let (_dir, script, output) = write_temp_script(
+        "compiled_vector_parity",
+        r#"
+(defun map-inc (xs)
+  (map (lambda (x) (+ x 1)) xs))
+
+(defun sum (xs)
+  (reduce (lambda (a b) (+ a b)) 0 xs))
+
+(defun main ()
+  (print (vector 1 2 3))
+  (print (map-inc (vector 1 2 3)))
+  (print (sum (vector 1 2 3)))
+  (print (= (list 1 2) (list 1 2)))
+  (print (nth (list 7 8 9) 1)))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[1 2 3]"))
+        .stdout(predicate::str::contains("[2 3 4]"))
+        .stdout(predicate::str::contains("6"))
+        .stdout(predicate::str::contains("true"))
+        .stdout(predicate::str::contains("8"));
+}
+
+#[test]
 fn test_script_supports_require_core() {
     let (_dir, script, _output) = write_temp_script(
         "require_core_script",

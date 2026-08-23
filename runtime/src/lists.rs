@@ -58,7 +58,7 @@ pub(crate) unsafe fn build_list(elems: &[*mut DlispValue]) -> *mut DlispValue {
     }
 }
 
-unsafe fn list_to_vec(val: *mut DlispValue) -> Option<Vec<*mut DlispValue>> {
+pub(crate) unsafe fn list_to_vec(val: *mut DlispValue) -> Option<Vec<*mut DlispValue>> {
     unsafe {
         let mut out = Vec::new();
         let mut cur = val;
@@ -80,7 +80,7 @@ unsafe fn list_to_vec(val: *mut DlispValue) -> Option<Vec<*mut DlispValue>> {
     }
 }
 
-unsafe fn vector_to_vec(val: *mut DlispValue) -> Vec<*mut DlispValue> {
+pub(crate) unsafe fn vector_to_vec(val: *mut DlispValue) -> Vec<*mut DlispValue> {
     unsafe {
         let mut out = Vec::new();
         let vec_data = (*val).payload.vector_val;

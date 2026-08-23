@@ -1,8 +1,21 @@
 use std::ffi::CStr;
 
 use crate::constructors::dlisp_make_bool;
+use crate::lists::{list_to_vec, vector_to_vec};
 use crate::maps::dlisp_map_get;
 use crate::value::{DlispValue, ValueType};
+
+/// Returns true when the boxed values `x` and `y` compare equal
+/// according to [`dlisp_eq`].
+///
+/// # Safety
+/// Dereferences raw pointers; caller must pass valid `DlispValue` pointers.
+unsafe fn values_eq(x: *mut DlispValue, y: *mut DlispValue) -> bool {
+    unsafe {
+        let eq_val = dlisp_eq(x, y);
+        !eq_val.is_null() && (*eq_val).type_ == ValueType::Bool && (*eq_val).payload.bool_val
+    }
+}
 
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
@@ -124,6 +137,18 @@ pub unsafe extern "C" fn dlisp_eq(a: *mut DlispValue, b: *mut DlispValue) -> *mu
                 s1 == s2
             }
             (ValueType::Nil, ValueType::Nil) => true,
+            // Deep structural equality on collections, matching the
+            // interpreter `=` builtin. Mixed container types are not equal.
+            (ValueType::List, ValueType::List) => {
+                let e1 = list_to_vec(a).unwrap_or_default();
+                let e2 = list_to_vec(b).unwrap_or_default();
+                e1.len() == e2.len() && e1.iter().zip(e2.iter()).all(|(x, y)| values_eq(*x, *y))
+            }
+            (ValueType::Vector, ValueType::Vector) => {
+                let e1 = vector_to_vec(a);
+                let e2 = vector_to_vec(b);
+                e1.len() == e2.len() && e1.iter().zip(e2.iter()).all(|(x, y)| values_eq(*x, *y))
+            }
             _ => false,
         };
 

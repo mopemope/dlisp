@@ -153,7 +153,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     .module
                     .declare_func_in_func(self.builtins.funcs.dlisp_make_vector, self.builder.func);
                 let call = self.builder.ins().call(func, &[cap_val]);
-                let mut vec_ptr = self.builder.inst_results(call)[0];
+                let vec_ptr = self.builder.inst_results(call)[0];
 
                 for arg in vec {
                     let arg_val = self.compile_expr(arg)?;
@@ -161,8 +161,8 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                         self.builtins.funcs.dlisp_vector_push,
                         self.builder.func,
                     );
-                    let push_call = self.builder.ins().call(push_func, &[vec_ptr, arg_val]);
-                    vec_ptr = self.builder.inst_results(push_call)[0];
+                    // dlisp_vector_push returns nothing; it mutates the vector in place.
+                    self.builder.ins().call(push_func, &[vec_ptr, arg_val]);
                 }
                 Ok(vec_ptr)
             }

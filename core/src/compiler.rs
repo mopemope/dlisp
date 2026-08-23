@@ -235,7 +235,7 @@ impl AOTCompiler {
                         &self.env.borrow(),
                     ) {
                         return Err(format!(
-                            "AOT compilation requires compiled builtins: function '{}' uses '{}', which has no codegen lowering",
+                            "AOT compilation requires codegen support: function '{}' uses '{}', which has no codegen lowering",
                             name, offender
                         ));
                     }
@@ -434,6 +434,11 @@ fn find_uncompiled_builtin(
                     && matches!(env.get(op), Some(Value::NativeFunc(_)))
                     && !crate::codegen::COMPILED_BUILTINS.contains(&op.as_str())
                 {
+                    return Some(op.clone());
+                }
+                // Interpreter-only special forms have no codegen lowering;
+                // rejecting them up front avoids confusing link failures.
+                if !callable && crate::forms::defun::is_interpreter_only_special_form(op) {
                     return Some(op.clone());
                 }
             }

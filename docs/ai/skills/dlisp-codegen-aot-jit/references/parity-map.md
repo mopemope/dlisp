@@ -41,6 +41,34 @@ Still interpreter-only examples include `sort`, `zip`, `range`, `format`,
 `gensym`, `write-file`, `exec`, `select-keys`, `dissoc`, `merge`, `keys`,
 `vals`, and the numeric helpers `abs`, `min`, `max`, `pow`.
 
+Interpreter-only special forms (`try`, `throw`, `while`, `dotimes`, `dolist`,
+`eval`, `apply`, `macroexpand`, `load`, `require`, `defmacro`, and the
+higher-order forms beyond `map`/`filter`/`reduce`) are rejected by the AOT
+precheck via `is_interpreter_only_special_form` with an explicit error.
+
+## Known minor divergences: error reporting
+Compiled code cannot raise catchable errors, so a few builtins differ from
+the interpreter in their failure mode (value-level results match):
+- `(nth coll -1)` / out-of-range: interpreter errors on negative index;
+  compiled code returns nil.
+- `(car x)` / `(cdr x)` on non-lists: interpreter errors; compiled code
+  returns nil.
+
+Avoid relying on these errors inside functions that get JIT/AOT compiled.
+
+## Parity fixes (verified)
+These previously diverged and now match the interpreter; regression tests
+live in `core/tests/jit_parity_tests.rs`,
+`cli/tests/integration_tests.rs` (vector/collection parity), and
+`runtime/src/verify_tests.rs`:
+- `dlisp_vector_count`: walks lists and treats nil as 0
+- `dlisp_map` / `dlisp_filter` / `dlisp_reduce`: support vectors (shape
+  preserved) and canonical truthiness (Int 0 falsy)
+- `dlisp_eq`: deep equality on lists and vectors
+- `dlisp_vector_get`: supports list indices
+- Vector literal lowering no longer reads a result from the void-returning
+  `dlisp_vector_push`
+
 ## Known limitation: builtin name shadowing
 In compiled code (JIT/AOT), names in `COMPILED_BUILTINS` always lower to the
 runtime FFI and ignore user redefinitions (`(defun last ...)` etc.). Pure
