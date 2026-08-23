@@ -3,8 +3,9 @@ mod tests {
     use crate::value::{DlispValue, ValueType};
     use crate::{
         dlisp_cons, dlisp_eq, dlisp_gc_init, dlisp_keyword_p, dlisp_make_cons, dlisp_make_int,
-        dlisp_make_keyword, dlisp_make_map, dlisp_make_string, dlisp_map_assoc, dlisp_map_get,
-        dlisp_map_p, dlisp_type_of,
+        dlisp_make_keyword, dlisp_make_map, dlisp_make_nil, dlisp_make_string, dlisp_make_vector,
+        dlisp_map_assoc, dlisp_map_get, dlisp_map_p, dlisp_type_of, dlisp_vector_count,
+        dlisp_vector_push,
     };
     use std::ffi::CString;
 
@@ -64,6 +65,38 @@ mod tests {
 
             assert_eq!(car.payload.int_val, 1);
             assert_eq!(cdr.payload.int_val, 2);
+        }
+    }
+
+    #[test]
+    fn test_vector_count() {
+        dlisp_gc_init();
+
+        // Vector: length from stored len
+        let vec = dlisp_make_vector(2);
+        unsafe {
+            dlisp_vector_push(vec, dlisp_make_int(1));
+            dlisp_vector_push(vec, dlisp_make_int(2));
+            let count = *dlisp_vector_count(vec);
+            assert_eq!(count.type_, ValueType::Int);
+            assert_eq!(count.payload.int_val, 2);
+        }
+
+        // List: walk cons cells (1 2 3)
+        unsafe {
+            let l3 = dlisp_make_cons(dlisp_make_int(3), dlisp_make_nil());
+            let l2 = dlisp_make_cons(dlisp_make_int(2), l3);
+            let l1 = dlisp_make_cons(dlisp_make_int(1), l2);
+            let count = *dlisp_vector_count(l1);
+            assert_eq!(count.type_, ValueType::Int);
+            assert_eq!(count.payload.int_val, 3);
+        }
+
+        // Nil counts as 0
+        unsafe {
+            let count = *dlisp_vector_count(dlisp_make_nil());
+            assert_eq!(count.type_, ValueType::Int);
+            assert_eq!(count.payload.int_val, 0);
         }
     }
 

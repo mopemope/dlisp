@@ -52,3 +52,6 @@ pub use strings::{
     dlisp_substring,
 };
 pub use task::{Closure, dlisp_main, dlisp_sleep, dlisp_spawn};
+pub use vectors::{
+    dlisp_make_vector, dlisp_vector_copy, dlisp_vector_count, dlisp_vector_get, dlisp_vector_push,
+};

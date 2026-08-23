@@ -102,7 +102,10 @@ pub unsafe extern "C" fn dlisp_vector_get(
     }
 }
 
-/// Returns the number of elements in a vector.
+/// Returns the number of elements in a collection.
+///
+/// Matches the interpreter `count` builtin: lists are walked cell by cell,
+/// vectors use their stored length, and nil counts as 0.
 ///
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
@@ -113,15 +116,29 @@ pub unsafe extern "C" fn dlisp_vector_count(vec: *mut DlispValue) -> *mut DlispV
         if vec.is_null() {
             return dlisp_make_int(0);
         }
-        if (*vec).type_ != ValueType::Vector {
-            return dlisp_make_int(0);
+        match (*vec).type_ {
+            ValueType::Vector => {
+                let vec_data = (*vec).payload.vector_val;
+                if vec_data.is_null() {
+                    return dlisp_make_int(0);
+                }
+                dlisp_make_int((*vec_data).len as i64)
+            }
+            ValueType::List => {
+                let mut len: i64 = 0;
+                let mut current = (*vec).payload.list_val;
+                while !current.is_null() {
+                    len += 1;
+                    let cdr = (*current).cdr;
+                    if cdr.is_null() || (*cdr).type_ != ValueType::List {
+                        break;
+                    }
+                    current = (*cdr).payload.list_val;
+                }
+                dlisp_make_int(len)
+            }
+            _ => dlisp_make_int(0),
         }
-        let vec_data = (*vec).payload.vector_val;
-        if vec_data.is_null() {
-            return dlisp_make_int(0);
-        }
-
-        dlisp_make_int((*vec_data).len as i64)
     }
 }
 

@@ -75,3 +75,5 @@ Type / error:
 - `inc`, `dec`, `identity`, `constantly`, `second`, `third`
 - `zero?`, `positive?`, `negative?`, `empty-list?`
 - `when-let`
+- `thread-first-step`, `thread-last-step`
+- Threading macros: `->`, `->>`, `as->`, `some->`

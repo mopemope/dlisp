@@ -270,3 +270,67 @@ async fn test_require_missing_file_error_contains_resolved_path() {
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn test_require_core_threading_macros() {
+    let (mut interp, mut env) = setup();
+    let res = eval_str(
+        r#"
+        (require "core")
+        (list
+          (-> 5 inc)
+          (-> '(1 2 3) (cdr) (car))
+          (-> 5)
+          (->> '(1 2 3) (map inc))
+          (->> '(1 2 3 4) (filter (lambda (x) (> x 2))))
+          (as-> 10 x (+ x 5) (* x 2))
+          (as-> 100 y)
+          (some-> nil inc)
+          (some-> 5 inc)
+          (-> "hello" (string-upper)))
+        "#,
+        &mut interp,
+        &mut env,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        res,
+        Value::List(vec![
+            Value::Integer(6),
+            Value::Integer(2),
+            Value::Integer(5),
+            Value::List(vec![
+                Value::Integer(2),
+                Value::Integer(3),
+                Value::Integer(4)
+            ]),
+            Value::List(vec![Value::Integer(3), Value::Integer(4)]),
+            Value::Integer(30),
+            Value::Integer(100),
+            Value::Nil,
+            Value::Integer(6),
+            Value::String("HELLO".to_string()),
+        ])
+    );
+}
+
+#[tokio::test]
+async fn test_require_core_threading_macros_in_defun() {
+    let (mut interp, mut env) = setup();
+    let res = eval_str(
+        r#"
+        (require "core")
+        (defun process (xs)
+          (->> xs (map inc) (filter (lambda (x) (= x 0)))))
+        (process '(-1 0 1))
+        "#,
+        &mut interp,
+        &mut env,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(res, Value::List(vec![Value::Integer(0)]));
+}
