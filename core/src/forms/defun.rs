@@ -76,13 +76,7 @@ fn can_jit_compile_expr(
 }
 
 fn retry_pending_jit_functions(jit: &mut JIT, env: &mut Rc<RefCell<Environment>>) {
-    let candidates: Vec<(
-        String,
-        Vec<String>,
-        Option<String>,
-        Vec<Value>,
-        Option<Rc<RefCell<Environment>>>,
-    )> = {
+    let candidates: Vec<(crate::ast::FuncDef, Option<Rc<RefCell<Environment>>>)> = {
         let borrowed = env.borrow();
         borrowed
             .values
@@ -95,10 +89,7 @@ fn retry_pending_jit_functions(jit: &mut JIT, env: &mut Rc<RefCell<Environment>>
                     jit_code: None,
                     env,
                 } => Some((
-                    name.clone(),
-                    args.clone(),
-                    rest_param.clone(),
-                    body.clone(),
+                    (name.clone(), args.clone(), rest_param.clone(), body.clone()),
                     env.clone(),
                 )),
                 _ => None,
@@ -108,34 +99,29 @@ fn retry_pending_jit_functions(jit: &mut JIT, env: &mut Rc<RefCell<Environment>>
 
     let pending_names: HashSet<String> = candidates
         .iter()
-        .map(|(name, _, _, _, _)| name.clone())
+        .map(|((name, _, _, _), _)| name.clone())
         .collect();
 
-    for (name, args, rest_param, _, _) in &candidates {
+    for ((name, args, rest_param, _), _) in &candidates {
         jit.register_signature(name, args, rest_param.clone());
     }
 
     let compilable: Vec<_> = candidates
         .into_iter()
-        .filter(|(name, _, _, body, _)| {
+        .filter(|((name, _, _, body), _)| {
             let borrowed = env.borrow();
             body.iter()
                 .all(|expr| can_jit_compile_expr(expr, name, &borrowed, &pending_names))
         })
         .collect();
 
-    let defs: Vec<_> = compilable
-        .iter()
-        .map(|(name, args, rest_param, body, _)| {
-            (name.clone(), args.clone(), rest_param.clone(), body.clone())
-        })
-        .collect();
+    let defs: Vec<_> = compilable.iter().map(|(def, _)| def.clone()).collect();
 
     if let Ok(compiled) = jit.compile_batch_with_rest(&defs) {
         for (name, code_ptr) in compiled {
-            if let Some((_, args, rest_param, body, captured_env)) = compilable
+            if let Some(((name, args, rest_param, body), captured_env)) = compilable
                 .iter()
-                .find(|(candidate_name, _, _, _, _)| *candidate_name == name)
+                .find(|((candidate_name, _, _, _), _)| *candidate_name == *name)
             {
                 env.borrow_mut().set(
                     name.clone(),

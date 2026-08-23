@@ -21,7 +21,7 @@
 - evaluator / special forms: `core/src/interpreter.rs`, `core/src/forms/registry.rs`, `core/src/forms/` -> 対象 form の `core/tests/*`。必要なら `docs/ai/skills/dlisp-evaluator-forms/`。
 - builtins / language surface: `core/src/builtins/mod.rs`, 対象 `core/src/builtins/*.rs` -> 対象 builtin の単体/統合テスト。必要なら `docs/ai/skills/dlisp-builtins-surface/`。
 - JIT / AOT / codegen: `core/src/codegen/`, `core/src/jit.rs`, `core/src/compiler.rs`, `cli/src/compile.rs` -> JIT/codegen/CLI compile テスト。必要なら `docs/ai/skills/dlisp-codegen-aot-jit/`。
-- runtime / FFI / GC: `runtime/src/value.rs`, `runtime/src/lib.rs`, `runtime/src/{io,sys,os,vectors,higher_order}.rs` -> `cargo test -p dlisp_runtime --quiet` と必要な compile 経路。必要なら `docs/ai/skills/dlisp-runtime-ffi/`。
+- runtime / FFI / GC: `runtime/src/value.rs`, `runtime/src/lib.rs`, `runtime/src/{gc,constructors,lists,maps,collections,arith,cmp,strings,predicates,print,task,io,sys,os,vectors,higher_order}.rs` -> `cargo test -p dlisp_runtime --quiet` と必要な compile 経路。必要なら `docs/ai/skills/dlisp-runtime-ffi/`。
 - docs / public surface: 先に code と test を確認し、`FUNCTIONS.md` / `spec.md` / `README.md` の責務に合わせて編集する。必要なら `docs/ai/skills/dlisp-language-surface/`。
 
 ## 主要クレート
@@ -36,7 +36,13 @@
 - 組み込み関数の登録: `core/src/builtins/mod.rs`
 - AOT compile: `core/src/compiler.rs`, `cli/src/compile.rs`
 - REPL: `cli/src/repl.rs`
-- runtime / GC / FFI: `runtime/src/lib.rs`, `runtime/build.rs`
+- runtime / GC / FFI: `runtime/src/lib.rs`(re-export hub), `runtime/build.rs`
+
+## 実装ルール
+- 二重経路の原則: interpreter の特殊 form・評価挙動を変えたら、JIT/AOT codegen 側(`core/src/codegen/`, `core/src/compiler.rs`)の対応有無を必ず確認する。意図しない interpreter fallback を残さない。
+- 言語 surface の変更は `registry.rs` / `builtins/mod.rs` が source of truth。`FUNCTIONS.md` / `spec.md` を更新するときは登録名と突き合わせて drift がないか確認する。
+- runtime の FFI 関数は機能別モジュール(`runtime/src/{gc,constructors,arith,cmp,...}.rs`)に追加し、`lib.rs` の re-export で crate-root パスを維持する。シンボル名は変更しない。
+- 挙動確認は `cargo run -- example-lisp/<対象>.lisp` など最小例で先に行い、その後にテストを書く。
 
 ## 検証の最小単位
 - インタプリタ評価系: `cargo test -p dlisp-core --test interpreter_tests --quiet`

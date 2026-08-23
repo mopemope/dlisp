@@ -24,6 +24,10 @@ pub mod sys;
 pub mod type_ops;
 pub mod vector;
 
+/// Registers every builtin function into `env` under its source-level name.
+///
+/// The set of names bound here is the authoritative language surface for
+/// builtins; language docs must stay in sync with it.
 pub fn install(env: &mut Environment) {
     // Arithmetic
     env.set("+".to_string(), Value::NativeFunc(add::add));

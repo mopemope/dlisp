@@ -15,14 +15,15 @@
 - builtins registry: `core/src/builtins/mod.rs`
 - parser: `core/src/parser.rs`
 - JIT 実装: `core/src/jit.rs`, `core/src/jit_runner.rs`
-- runtime export: `runtime/src/lib.rs`
+- runtime export: `runtime/src/lib.rs`(crate-root `dlisp_*` は各モジュールからの re-export)
 
 ## Task routing
-- parser / syntax: `core/src/parser.rs`, `core/src/ast.rs`, `core/src/parser_comments_test.rs`
+- parser / syntax: `core/src/parser.rs`, `core/src/ast.rs`, `core/tests/parser_comments_tests.rs`
 - evaluator / forms: `core/src/interpreter.rs`, `core/src/interpreter/apply.rs`, `core/src/forms/`
 - builtins: `core/src/builtins/mod.rs`, `core/src/builtins/*.rs`
 - JIT / AOT: `core/src/codegen/`, `core/src/jit.rs`, `core/src/jit_runner.rs`, `core/src/compiler.rs`, `cli/src/compile.rs`
-- runtime / FFI: `runtime/src/value.rs`, `runtime/src/lib.rs`, `runtime/src/{io,sys,os,vectors,higher_order}.rs`
+- runtime / FFI: `runtime/src/lib.rs`(re-export hub), `value.rs`, `gc.rs`, `constructors.rs`,
+  `{lists,maps,collections,arith,cmp,strings,predicates,print,task}.rs`, `{io,sys,os,vectors,higher_order}.rs`
 - CLI / REPL: `cli/src/main.rs`, `cli/src/repl.rs`, `cli/src/config.rs`
 
 ## Search hints

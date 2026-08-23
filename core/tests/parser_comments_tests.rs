@@ -1,3 +1,6 @@
+use dlisp_core::ast::Value;
+use dlisp_core::parser::parse;
+
 #[test]
 fn test_parse_comments() {
     // Comment on its own line

@@ -223,7 +223,7 @@ impl JIT {
 
     pub fn compile_batch_with_rest(
         &mut self,
-        defs: &[(String, Vec<String>, Option<String>, Vec<Value>)],
+        defs: &[crate::ast::FuncDef],
     ) -> Result<Vec<(String, *const u8)>, String> {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut ids = Vec::with_capacity(defs.len());

@@ -5,6 +5,9 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
+/// A user function definition: `(name, params, rest_param, body)`.
+pub type FuncDef = (String, Vec<String>, Option<String>, Vec<Value>);
+
 #[derive(Debug, Clone)]
 #[allow(clippy::mutable_key_type)]
 #[allow(unpredictable_function_pointer_comparisons)]

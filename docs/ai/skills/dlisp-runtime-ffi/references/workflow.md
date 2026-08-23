@@ -2,7 +2,10 @@
 
 ## Source of truth
 - Runtime value ABI: `runtime/src/value.rs`
-- Core exports and GC helpers: `runtime/src/lib.rs`
+- GC bindings and allocation: `runtime/src/gc.rs`
+- Value constructors / cons: `runtime/src/constructors.rs`
+- Feature exports: `runtime/src/{lists,maps,collections,arith,cmp,strings,predicates,print,task}.rs`
+- Crate-root re-exports: `runtime/src/lib.rs`(外部・テストは `crate::dlisp_*` パスを維持)
 - Runtime modules: `runtime/src/io.rs`, `sys.rs`, `os.rs`, `vectors.rs`, `higher_order.rs`
 - Codegen declarations: `core/src/codegen/builtins.rs`
 - JIT conversion: `core/src/jit_runner.rs`

@@ -134,3 +134,36 @@ pub unsafe extern "C" fn dlisp_delete_file(val: *mut DlispValue) -> *mut DlispVa
         }
     }
 }
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+/// The caller must ensure that `val` points to a valid `DlispValue` struct.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_read_file(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if (*val).type_ != ValueType::String {
+            eprintln!("Type Error: read-file requires string");
+            std::process::abort();
+        }
+        let c_str = CStr::from_ptr((*val).payload.str_val);
+        let path = c_str.to_string_lossy().to_string();
+
+        let result = tokio::runtime::Handle::current()
+            .block_on(async move { tokio::fs::read_to_string(path).await });
+
+        match result {
+            Ok(content) => {
+                let bytes = content.as_bytes();
+                let len = bytes.len();
+                let ptr = crate::gc::dlisp_gc_malloc(len + 1) as *mut u8;
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, len);
+                *ptr.add(len) = 0;
+                dlisp_make_string(ptr as *mut i8)
+            }
+            Err(_) => {
+                // Return nil on error for now
+                dlisp_make_nil()
+            }
+        }
+    }
+}

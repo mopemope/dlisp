@@ -10,6 +10,10 @@ pub mod apply;
 
 use crate::forms::registry::{FormRegistry, standard_registry};
 
+/// Tree-walking evaluator with a special form registry and JIT handle.
+///
+/// `forms` decides which symbols are special forms; everything else is
+/// applied as a function (builtin `NativeFunc` or closure).
 pub struct Interpreter {
     pub jit: JIT,
     pub forms: FormRegistry,
@@ -423,12 +427,14 @@ impl Interpreter {
     }
 }
 
+/// Fresh global environment with all builtins from `builtins::install`.
 pub fn default_env() -> Rc<RefCell<Environment>> {
     let mut env = Environment::new(None);
     crate::builtins::install(&mut env);
     Rc::new(RefCell::new(env))
 }
 
+/// Fresh interpreter with the standard special form registry.
 pub fn default_interpreter() -> Interpreter {
     Interpreter::new()
 }

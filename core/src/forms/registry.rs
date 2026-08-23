@@ -6,15 +6,26 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// Result of evaluating a special form: `Some(value)` or `None` (no value).
+pub type FormResult = Result<Option<Value>, String>;
+
+/// Boxed future returned by [`SpecialForm::call`].
+pub type FormFuture<'a> = LocalBoxFuture<'a, FormResult>;
+
+/// A special form: syntax evaluated with delayed/unevaluated arguments.
+///
+/// Implementations receive the raw `args` and decide which subexpressions to
+/// evaluate, so they can implement binding, control flow, and quoting.
 pub trait SpecialForm {
     fn call<'a>(
         &self,
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>>;
+    ) -> FormFuture<'a>;
 }
 
+/// Name-to-form table consulted by the evaluator before function application.
 #[derive(Clone)]
 pub struct FormRegistry {
     map: HashMap<String, Rc<dyn SpecialForm>>,
@@ -27,6 +38,7 @@ impl FormRegistry {
         }
     }
 
+    /// Registers `form` under `name` (the symbol used in source code).
     pub fn register<F>(&mut self, name: &str, form: F)
     where
         F: SpecialForm + 'static,
@@ -34,6 +46,7 @@ impl FormRegistry {
         self.map.insert(name.to_string(), Rc::new(form));
     }
 
+    /// Looks up the special form bound to `name`, if any.
     pub fn get(&self, name: &str) -> Option<Rc<dyn SpecialForm>> {
         self.map.get(name).cloned()
     }
@@ -47,6 +60,7 @@ impl Default for FormRegistry {
 
 // --- Standard Forms ---
 
+/// Special form: `(defun name (params...) body...)` defines a named function.
 pub struct DefunForm;
 impl SpecialForm for DefunForm {
     fn call<'a>(
@@ -61,6 +75,7 @@ impl SpecialForm for DefunForm {
     }
 }
 
+/// Special form: `(if cond then else?)` evaluates only the taken branch.
 pub struct IfForm;
 impl SpecialForm for IfForm {
     fn call<'a>(
@@ -73,6 +88,7 @@ impl SpecialForm for IfForm {
     }
 }
 
+/// Special form: `(let ((x v)...) body...)` with parallel bindings.
 pub struct LetForm;
 impl SpecialForm for LetForm {
     fn call<'a>(
@@ -85,6 +101,7 @@ impl SpecialForm for LetForm {
     }
 }
 
+/// Special form: `(let* ((x v)...) body...)` with sequential bindings.
 pub struct LetStarForm;
 impl SpecialForm for LetStarForm {
     fn call<'a>(
@@ -101,6 +118,7 @@ impl SpecialForm for LetStarForm {
     }
 }
 
+/// Special form: `(throw value)` raises `value` as an error.
 pub struct ThrowForm;
 impl SpecialForm for ThrowForm {
     fn call<'a>(
@@ -113,6 +131,7 @@ impl SpecialForm for ThrowForm {
     }
 }
 
+/// Special form: `(spawn closure)` runs a closure on a background task.
 pub struct SpawnForm;
 impl SpecialForm for SpawnForm {
     fn call<'a>(
@@ -125,6 +144,7 @@ impl SpecialForm for SpawnForm {
     }
 }
 
+/// Special form: `(lambda (params...) body...)` creates a closure.
 pub struct LambdaForm;
 impl SpecialForm for LambdaForm {
     fn call<'a>(
@@ -138,6 +158,7 @@ impl SpecialForm for LambdaForm {
     }
 }
 
+/// Special form: `(defvar name value)` defines a global variable.
 pub struct DefVarForm;
 impl SpecialForm for DefVarForm {
     fn call<'a>(
@@ -150,6 +171,7 @@ impl SpecialForm for DefVarForm {
     }
 }
 
+/// Special form: `(quote x)` returns `x` without evaluating it.
 pub struct QuoteForm;
 impl SpecialForm for QuoteForm {
     fn call<'a>(
@@ -162,6 +184,7 @@ impl SpecialForm for QuoteForm {
     }
 }
 
+/// Special form: `(setq name value)` assigns to an existing binding.
 pub struct SetQForm;
 impl SpecialForm for SetQForm {
     fn call<'a>(
@@ -174,6 +197,7 @@ impl SpecialForm for SetQForm {
     }
 }
 
+/// Special form: `(progn body...)` / `(do body...)` evaluates sequentially and returns the last value.
 pub struct PrognForm;
 impl SpecialForm for PrognForm {
     fn call<'a>(
@@ -186,6 +210,7 @@ impl SpecialForm for PrognForm {
     }
 }
 
+/// Special form: `(cond (test expr)...)` evaluates the first true branch.
 pub struct CondForm;
 impl SpecialForm for CondForm {
     fn call<'a>(
@@ -198,6 +223,7 @@ impl SpecialForm for CondForm {
     }
 }
 
+/// Special form: `(and x...)` short-circuiting conjunction.
 pub struct AndForm;
 impl SpecialForm for AndForm {
     fn call<'a>(
@@ -210,6 +236,7 @@ impl SpecialForm for AndForm {
     }
 }
 
+/// Special form: `(or x...)` short-circuiting disjunction.
 pub struct OrForm;
 impl SpecialForm for OrForm {
     fn call<'a>(
@@ -222,6 +249,7 @@ impl SpecialForm for OrForm {
     }
 }
 
+/// Special form: `(map f coll)` applies `f` to each element.
 pub struct MapForm;
 impl SpecialForm for MapForm {
     fn call<'a>(
@@ -234,6 +262,7 @@ impl SpecialForm for MapForm {
     }
 }
 
+/// Special form: `(filter pred coll)` keeps truthy results.
 pub struct FilterForm;
 impl SpecialForm for FilterForm {
     fn call<'a>(
@@ -250,6 +279,7 @@ impl SpecialForm for FilterForm {
     }
 }
 
+/// Special form: `(reduce f init coll)` folds left with accumulator.
 pub struct ReduceForm;
 impl SpecialForm for ReduceForm {
     fn call<'a>(
@@ -266,6 +296,7 @@ impl SpecialForm for ReduceForm {
     }
 }
 
+/// Special form: `(some f coll)` returns the first truthy result of `f`.
 pub struct SomeForm;
 impl SpecialForm for SomeForm {
     fn call<'a>(
@@ -282,6 +313,7 @@ impl SpecialForm for SomeForm {
     }
 }
 
+/// Special form: `(every f coll)` true if `f` is truthy for all elements.
 pub struct EveryForm;
 impl SpecialForm for EveryForm {
     fn call<'a>(
@@ -298,6 +330,7 @@ impl SpecialForm for EveryForm {
     }
 }
 
+/// Special form: `(find f coll)` first element for which `f` is truthy.
 pub struct FindForm;
 impl SpecialForm for FindForm {
     fn call<'a>(
@@ -314,6 +347,7 @@ impl SpecialForm for FindForm {
     }
 }
 
+/// Special form: `(for-each f coll)` applies `f` for side effects; returns nil.
 pub struct ForEachForm;
 impl SpecialForm for ForEachForm {
     fn call<'a>(
@@ -330,6 +364,7 @@ impl SpecialForm for ForEachForm {
     }
 }
 
+/// Special form: `(map-indexed f coll)` applies `f` to `(index elem)` pairs.
 pub struct MapIndexedForm;
 impl SpecialForm for MapIndexedForm {
     fn call<'a>(
@@ -346,6 +381,7 @@ impl SpecialForm for MapIndexedForm {
     }
 }
 
+/// Special form: `(eval expr)` parses and evaluates at runtime.
 pub struct EvalForm;
 impl SpecialForm for EvalForm {
     fn call<'a>(
@@ -358,6 +394,7 @@ impl SpecialForm for EvalForm {
     }
 }
 
+/// Special form: `(apply f arg... arglist)` calls `f` with args plus the spread final list/vector.
 pub struct ApplyForm;
 impl SpecialForm for ApplyForm {
     fn call<'a>(
@@ -370,6 +407,7 @@ impl SpecialForm for ApplyForm {
     }
 }
 
+/// Special form: `(while test body...)` loops until `test` is false.
 pub struct WhileForm;
 impl SpecialForm for WhileForm {
     fn call<'a>(
@@ -382,6 +420,7 @@ impl SpecialForm for WhileForm {
     }
 }
 
+/// Special form: `(when test body...)` evaluates `body` only if `test` is truthy.
 pub struct WhenForm;
 impl SpecialForm for WhenForm {
     fn call<'a>(
@@ -394,6 +433,7 @@ impl SpecialForm for WhenForm {
     }
 }
 
+/// Special form: `(unless test body...)` evaluates `body` only if `test` is nil/false.
 pub struct UnlessForm;
 impl SpecialForm for UnlessForm {
     fn call<'a>(
@@ -410,6 +450,7 @@ impl SpecialForm for UnlessForm {
     }
 }
 
+/// Special form: `(dotimes (i n) body...)` iterates `i` from 0 to n-1.
 pub struct DotimesForm;
 impl SpecialForm for DotimesForm {
     fn call<'a>(
@@ -422,6 +463,7 @@ impl SpecialForm for DotimesForm {
     }
 }
 
+/// Special form: `(dolist (x coll) body...)` iterates over collection elements.
 pub struct DolistForm;
 impl SpecialForm for DolistForm {
     fn call<'a>(
@@ -434,6 +476,7 @@ impl SpecialForm for DolistForm {
     }
 }
 
+/// Special form: `(macroexpand expr)` expands macros one level.
 pub struct MacroExpandForm;
 impl SpecialForm for MacroExpandForm {
     fn call<'a>(
@@ -450,6 +493,7 @@ impl SpecialForm for MacroExpandForm {
     }
 }
 
+/// Special form: `(load path)` loads and evaluates a source file.
 pub struct LoadForm;
 impl SpecialForm for LoadForm {
     fn call<'a>(
@@ -462,6 +506,7 @@ impl SpecialForm for LoadForm {
     }
 }
 
+/// Special form: `(require module)` loads a module or bundled stdlib once.
 pub struct RequireForm;
 impl SpecialForm for RequireForm {
     fn call<'a>(
@@ -474,6 +519,7 @@ impl SpecialForm for RequireForm {
     }
 }
 
+/// Special form: `(update map key f extra...)` updates the value at `key` with `(f old-value extra...)`.
 pub struct UpdateForm;
 impl SpecialForm for UpdateForm {
     fn call<'a>(
@@ -490,6 +536,7 @@ impl SpecialForm for UpdateForm {
     }
 }
 
+/// Special form: `(map-keys f map)` transforms every key.
 pub struct MapKeysForm;
 impl SpecialForm for MapKeysForm {
     fn call<'a>(
@@ -506,6 +553,7 @@ impl SpecialForm for MapKeysForm {
     }
 }
 
+/// Special form: `(map-vals f map)` transforms every value.
 pub struct MapValsForm;
 impl SpecialForm for MapValsForm {
     fn call<'a>(
@@ -524,6 +572,10 @@ impl SpecialForm for MapValsForm {
 
 use crate::forms::try_catch::TryCatchForm;
 
+/// Builds the default special form registry used by `Interpreter::new`.
+///
+/// The set of names registered here is the authoritative language surface for
+/// special forms; language docs must stay in sync with it.
 pub fn standard_registry() -> FormRegistry {
     let mut reg = FormRegistry::new();
     reg.register("defun", DefunForm);
