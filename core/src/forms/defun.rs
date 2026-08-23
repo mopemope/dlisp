@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-fn is_codegen_special_form(name: &str) -> bool {
+pub(crate) fn is_codegen_special_form(name: &str) -> bool {
     matches!(
         name,
         "if" | "let"
@@ -31,15 +31,26 @@ fn can_jit_compile_expr(
     env: &Environment,
     pending_functions: &HashSet<String>,
 ) -> bool {
+    find_uncompiled_call(expr, current_func, env, pending_functions).is_none()
+}
+
+/// Returns the offending call target if `expr` contains a call that codegen
+/// cannot lower (an interpreter-only builtin or an unresolved name).
+pub(crate) fn find_uncompiled_call(
+    expr: &Value,
+    current_func: &str,
+    env: &Environment,
+    pending_functions: &HashSet<String>,
+) -> Option<String> {
     match expr {
         Value::List(items) => {
             if items.is_empty() {
-                return true;
+                return None;
             }
 
             if let Value::Symbol(op) = &items[0] {
                 if op == "quote" {
-                    return true;
+                    return None;
                 }
 
                 if op != current_func && !is_codegen_special_form(op) {
@@ -47,14 +58,18 @@ fn can_jit_compile_expr(
                         Some(Value::UserFunc {
                             jit_code: Some(_), ..
                         })
-                        | Some(Value::NativeFunc(_))
                         | Some(Value::Macro { .. }) => {}
-                        Some(Value::UserFunc { jit_code: None, .. }) => {
-                            if !pending_functions.contains(op) {
-                                return false;
+                        Some(Value::NativeFunc(_)) => {
+                            if !crate::codegen::COMPILED_BUILTINS.contains(&op.as_str()) {
+                                return Some(op.clone());
                             }
                         }
-                        None => return false,
+                        Some(Value::UserFunc { jit_code: None, .. }) => {
+                            if !pending_functions.contains(op) {
+                                return Some(op.clone());
+                            }
+                        }
+                        None => return Some(op.clone()),
                         Some(_) => {}
                     }
                 }
@@ -62,16 +77,16 @@ fn can_jit_compile_expr(
 
             items
                 .iter()
-                .all(|item| can_jit_compile_expr(item, current_func, env, pending_functions))
+                .find_map(|item| find_uncompiled_call(item, current_func, env, pending_functions))
         }
         Value::Vector(items) => items
             .iter()
-            .all(|item| can_jit_compile_expr(item, current_func, env, pending_functions)),
-        Value::Map(map) => map.iter().all(|(k, v)| {
-            can_jit_compile_expr(k, current_func, env, pending_functions)
-                && can_jit_compile_expr(v, current_func, env, pending_functions)
+            .find_map(|item| find_uncompiled_call(item, current_func, env, pending_functions)),
+        Value::Map(map) => map.iter().find_map(|(k, v)| {
+            find_uncompiled_call(k, current_func, env, pending_functions)
+                .or_else(|| find_uncompiled_call(v, current_func, env, pending_functions))
         }),
-        _ => true,
+        _ => None,
     }
 }
 

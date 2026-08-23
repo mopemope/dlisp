@@ -148,6 +148,25 @@ impl AOTCompiler {
         }
 
         let mut init_exprs = Vec::new();
+        // Names of every function being compiled, so body scans can accept
+        // calls between them.
+        let fn_names: std::collections::HashSet<String> = expanded_ast
+            .iter()
+            .filter_map(|f| match f {
+                Value::List(fl) => match fl.first() {
+                    Some(Value::Symbol(s)) if s == "defun" && fl.len() >= 2 => match &fl[1] {
+                        Value::Symbol(n) => Some(if n == "main" {
+                            "dlisp_user_main".to_string()
+                        } else {
+                            n.clone()
+                        }),
+                        _ => None,
+                    },
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect();
         for expr in expanded_ast {
             if let Value::List(ref l) = expr
                 && let Some(Value::Symbol(s)) = l.first()
@@ -199,6 +218,27 @@ impl AOTCompiler {
                 if name == "main" {
                     name = "dlisp_user_main".to_string();
                     has_main = true;
+                }
+
+                // AOT output has no embedded interpreter: calls to
+                // interpreter-only builtins would emit unresolvable imports.
+                // Unlike the JIT gate, unknown symbols are allowed here (they
+                // may be parameters or locals invoked indirectly); only
+                // builtin names with no codegen lowering are rejected.
+                for def_expr in body {
+                    if let Some(offender) = find_uncompiled_builtin(
+                        def_expr,
+                        &name,
+                        &arg_names,
+                        rest_param.as_ref(),
+                        &fn_names,
+                        &self.env.borrow(),
+                    ) {
+                        return Err(format!(
+                            "AOT compilation requires compiled builtins: function '{}' uses '{}', which has no codegen lowering",
+                            name, offender
+                        ));
+                    }
                 }
 
                 self.codegen.compile_with_rest(
@@ -357,5 +397,59 @@ impl AOTCompiler {
 impl Default for AOTCompiler {
     fn default() -> Self {
         Self::with_options(CompilerOptions::default())
+    }
+}
+
+/// Finds a call to an interpreter-only builtin inside an AOT function body.
+///
+/// Unlike the JIT gate (`forms::defun::can_jit_compile_expr`), unknown
+/// symbols are not rejected: they may be parameters or `let` bindings
+/// invoked indirectly. Only symbols that resolve to a `NativeFunc` outside
+/// [`crate::codegen::COMPILED_BUILTINS`] are reported.
+fn find_uncompiled_builtin(
+    expr: &Value,
+    current_func: &str,
+    params: &[String],
+    rest_param: Option<&String>,
+    fn_names: &std::collections::HashSet<String>,
+    env: &Environment,
+) -> Option<String> {
+    match expr {
+        Value::List(items) => {
+            if items.is_empty() {
+                return None;
+            }
+
+            if let Value::Symbol(op) = &items[0] {
+                // Quoted data is never called; skip it entirely like the JIT gate.
+                if op == "quote" {
+                    return None;
+                }
+                let callable = op == current_func
+                    || fn_names.contains(op)
+                    || params.iter().any(|p| p == op)
+                    || rest_param == Some(op)
+                    || crate::forms::defun::is_codegen_special_form(op);
+                if !callable
+                    && matches!(env.get(op), Some(Value::NativeFunc(_)))
+                    && !crate::codegen::COMPILED_BUILTINS.contains(&op.as_str())
+                {
+                    return Some(op.clone());
+                }
+            }
+
+            items.iter().find_map(|item| {
+                find_uncompiled_builtin(item, current_func, params, rest_param, fn_names, env)
+            })
+        }
+        Value::Vector(items) => items.iter().find_map(|item| {
+            find_uncompiled_builtin(item, current_func, params, rest_param, fn_names, env)
+        }),
+        Value::Map(map) => map.iter().find_map(|(k, v)| {
+            find_uncompiled_builtin(k, current_func, params, rest_param, fn_names, env).or_else(
+                || find_uncompiled_builtin(v, current_func, params, rest_param, fn_names, env),
+            )
+        }),
+        _ => None,
     }
 }

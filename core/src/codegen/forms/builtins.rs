@@ -80,6 +80,70 @@ pub fn compile_builtin<M: Module>(
         "args" => compile_nullary(ctx, op, list, ctx.builtins.funcs.dlisp_args),
         "exit" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_exit, false),
         "sh" => compile_variadic_list_call(ctx, op, list, ctx.builtins.funcs.dlisp_sh),
+        // Compiled list helpers
+        "reverse" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_reverse, false),
+        "last" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_last, false),
+        "butlast" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_butlast, false),
+        "flatten" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_flatten, false),
+        "empty?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_is_empty, false),
+        "take" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_take),
+        "drop" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_drop),
+        "append" => compile_append_variadic(ctx, list),
+        // Compiled string helpers
+        "string-split" => {
+            compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_string_split)
+        }
+        "string-replace" => {
+            compile_ternary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_string_replace)
+        }
+        "string-upper" => {
+            compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_upper, false)
+        }
+        "string-lower" => {
+            compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_lower, false)
+        }
+        "string-trim" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_string_trim, false),
+        "string-trim-left" => compile_unary(
+            ctx,
+            op,
+            list,
+            ctx.builtins.funcs.dlisp_string_trim_left,
+            false,
+        ),
+        "string-trim-right" => compile_unary(
+            ctx,
+            op,
+            list,
+            ctx.builtins.funcs.dlisp_string_trim_right,
+            false,
+        ),
+        "string-starts-with?" => {
+            compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_string_starts_with)
+        }
+        "string-ends-with?" => {
+            compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_string_ends_with)
+        }
+        "string-contains?" => {
+            compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_string_contains)
+        }
+        "string-index-of" => {
+            compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_string_index_of)
+        }
+        "string->number" => compile_unary(
+            ctx,
+            op,
+            list,
+            ctx.builtins.funcs.dlisp_string_to_number,
+            false,
+        ),
+        "number->string" => compile_unary(
+            ctx,
+            op,
+            list,
+            ctx.builtins.funcs.dlisp_number_to_string,
+            false,
+        ),
+        "char-at" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_char_at),
         _ => unreachable!("Unknown builtin: {}", op),
     }
 }
@@ -254,6 +318,28 @@ fn compile_variadic_arithmetic<M: Module>(
         }
         Ok(acc)
     }
+}
+
+/// `(append arg...)` concatenates every argument (list/vector/nil) into one
+/// list by folding the binary `dlisp_append` runtime helper.
+fn compile_append_variadic<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if list.len() < 2 {
+        return Err("append requires at least 1 argument".to_string());
+    }
+
+    let mut acc = ctx.compile_expr(&list[1])?;
+    for arg in &list[2..] {
+        let next_val = ctx.compile_expr(arg)?;
+        let local_func = ctx
+            .module
+            .declare_func_in_func(ctx.builtins.funcs.dlisp_append, ctx.builder.func);
+        let call = ctx.builder.ins().call(local_func, &[acc, next_val]);
+        acc = ctx.builder.inst_results(call)[0];
+    }
+    Ok(acc)
 }
 
 fn compile_binary_builtin<M: Module>(

@@ -34,12 +34,21 @@ pub use constructors::{
 pub use gc::{GC_allow_register_threads, GC_call_with_stack_base, GC_init, GC_malloc};
 pub use gc::{dlisp_gc_init, dlisp_gc_malloc};
 pub use io::dlisp_read_file;
-pub use lists::{dlisp_car, dlisp_cdr};
+pub use lists::{
+    dlisp_append, dlisp_butlast, dlisp_car, dlisp_cdr, dlisp_drop, dlisp_flatten, dlisp_last,
+    dlisp_reverse, dlisp_take,
+};
 pub use maps::{dlisp_make_map, dlisp_map_assoc, dlisp_map_get};
 pub use predicates::{
-    dlisp_keyword_p, dlisp_list_p, dlisp_map_p, dlisp_nil_p, dlisp_number_p, dlisp_string_p,
-    dlisp_symbol_p, dlisp_type_of, dlisp_vector_p,
+    dlisp_is_empty, dlisp_keyword_p, dlisp_list_p, dlisp_map_p, dlisp_nil_p, dlisp_number_p,
+    dlisp_string_p, dlisp_symbol_p, dlisp_type_of, dlisp_vector_p,
 };
 pub use print::dlisp_print;
-pub use strings::{dlisp_str, dlisp_string_append, dlisp_string_length, dlisp_substring};
+pub use strings::{
+    dlisp_char_at, dlisp_number_to_string, dlisp_str, dlisp_string_append, dlisp_string_contains,
+    dlisp_string_ends_with, dlisp_string_index_of, dlisp_string_length, dlisp_string_lower,
+    dlisp_string_replace, dlisp_string_split, dlisp_string_starts_with, dlisp_string_to_number,
+    dlisp_string_trim, dlisp_string_trim_left, dlisp_string_trim_right, dlisp_string_upper,
+    dlisp_substring,
+};
 pub use task::{Closure, dlisp_main, dlisp_sleep, dlisp_spawn};

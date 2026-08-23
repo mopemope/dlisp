@@ -100,6 +100,85 @@ impl Default for JIT {
         );
         builder.symbol("dlisp_map_p", dlisp_runtime::dlisp_map_p as *const u8);
         builder.symbol("dlisp_vector_p", dlisp_runtime::dlisp_vector_p as *const u8);
+        builder.symbol(
+            "dlisp_append",
+            dlisp_runtime::lists::dlisp_append as *const u8,
+        );
+        builder.symbol(
+            "dlisp_reverse",
+            dlisp_runtime::lists::dlisp_reverse as *const u8,
+        );
+        builder.symbol("dlisp_last", dlisp_runtime::lists::dlisp_last as *const u8);
+        builder.symbol(
+            "dlisp_butlast",
+            dlisp_runtime::lists::dlisp_butlast as *const u8,
+        );
+        builder.symbol(
+            "dlisp_flatten",
+            dlisp_runtime::lists::dlisp_flatten as *const u8,
+        );
+        builder.symbol("dlisp_take", dlisp_runtime::lists::dlisp_take as *const u8);
+        builder.symbol("dlisp_drop", dlisp_runtime::lists::dlisp_drop as *const u8);
+        builder.symbol(
+            "dlisp_is_empty",
+            dlisp_runtime::predicates::dlisp_is_empty as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_split",
+            dlisp_runtime::strings::dlisp_string_split as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_replace",
+            dlisp_runtime::strings::dlisp_string_replace as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_upper",
+            dlisp_runtime::strings::dlisp_string_upper as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_lower",
+            dlisp_runtime::strings::dlisp_string_lower as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_trim",
+            dlisp_runtime::strings::dlisp_string_trim as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_trim_left",
+            dlisp_runtime::strings::dlisp_string_trim_left as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_trim_right",
+            dlisp_runtime::strings::dlisp_string_trim_right as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_starts_with",
+            dlisp_runtime::strings::dlisp_string_starts_with as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_ends_with",
+            dlisp_runtime::strings::dlisp_string_ends_with as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_contains",
+            dlisp_runtime::strings::dlisp_string_contains as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_index_of",
+            dlisp_runtime::strings::dlisp_string_index_of as *const u8,
+        );
+        builder.symbol(
+            "dlisp_string_to_number",
+            dlisp_runtime::strings::dlisp_string_to_number as *const u8,
+        );
+        builder.symbol(
+            "dlisp_number_to_string",
+            dlisp_runtime::strings::dlisp_number_to_string as *const u8,
+        );
+        builder.symbol(
+            "dlisp_char_at",
+            dlisp_runtime::strings::dlisp_char_at as *const u8,
+        );
         builder.symbol("dlisp_type_of", dlisp_runtime::dlisp_type_of as *const u8);
         builder.symbol(
             "dlisp_make_vector",

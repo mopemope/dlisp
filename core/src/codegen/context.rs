@@ -298,14 +298,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                     }
                     self.compile_quoted_value(&list[1])
                 }
-                "print" | "+" | "-" | "*" | "sleep" | ">" | "<" | "=" | "not" | "car" | "first"
-                | "cdr" | "rest" | "cons" | "list" | "read-file" | "vector" | "nth" | "count" | "conj"
-                | "/" | "%" | "mod" | ">=" | "<=" | "/=" | "str" | "string-length" | "substring"
-                | "string-append" | "hash-map" | "assoc" | "get" | "map?" | "nil?" | "list?" | "number?" | "string?" | "symbol?"
-                | "keyword?" | "vector?" | "type-of" | "map" | "filter" | "reduce"
-                // Phase 3 Additions
-                | "file-exists?" | "is-dir?" | "is-file?" | "list-dir" | "delete-file"
-                | "getenv" | "setenv" | "cwd" | "set-cwd" | "args" | "exit" | "sh" => {
+                op if crate::codegen::COMPILED_BUILTINS.contains(&op) => {
                     crate::codegen::forms::builtins::compile_builtin(self, op, list)
                 }
                 _ => {

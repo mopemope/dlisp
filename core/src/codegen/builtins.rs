@@ -73,6 +73,30 @@ pub struct BuiltinDefinitions {
     pub dlisp_args: FuncId,
     pub dlisp_exit: FuncId,
     pub dlisp_sh: FuncId,
+    // Compiled list helpers
+    pub dlisp_append: FuncId,
+    pub dlisp_reverse: FuncId,
+    pub dlisp_last: FuncId,
+    pub dlisp_butlast: FuncId,
+    pub dlisp_flatten: FuncId,
+    pub dlisp_take: FuncId,
+    pub dlisp_drop: FuncId,
+    pub dlisp_is_empty: FuncId,
+    // Compiled string helpers
+    pub dlisp_string_split: FuncId,
+    pub dlisp_string_replace: FuncId,
+    pub dlisp_string_upper: FuncId,
+    pub dlisp_string_lower: FuncId,
+    pub dlisp_string_trim: FuncId,
+    pub dlisp_string_trim_left: FuncId,
+    pub dlisp_string_trim_right: FuncId,
+    pub dlisp_string_starts_with: FuncId,
+    pub dlisp_string_ends_with: FuncId,
+    pub dlisp_string_contains: FuncId,
+    pub dlisp_string_index_of: FuncId,
+    pub dlisp_string_to_number: FuncId,
+    pub dlisp_number_to_string: FuncId,
+    pub dlisp_char_at: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -435,6 +459,83 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_string_append", Linkage::Import, &mul_sig) // Reuse binary sig
         .map_err(|e| e.to_string())?;
 
+    // Compiled list helpers
+    let append_id = module
+        .declare_function("dlisp_append", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+
+    let reverse_id = module
+        .declare_function("dlisp_reverse", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    let last_id = module
+        .declare_function("dlisp_last", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    let butlast_id = module
+        .declare_function("dlisp_butlast", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    let flatten_id = module
+        .declare_function("dlisp_flatten", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    let take_id = module
+        .declare_function("dlisp_take", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+
+    let drop_id = module
+        .declare_function("dlisp_drop", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+
+    let is_empty_id = module
+        .declare_function("dlisp_is_empty", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
+    // Compiled string helpers
+    let string_split_id = module
+        .declare_function("dlisp_string_split", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    let string_replace_id = module
+        .declare_function("dlisp_string_replace", Linkage::Import, &substring_sig)
+        .map_err(|e| e.to_string())?;
+    let string_upper_id = module
+        .declare_function("dlisp_string_upper", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let string_lower_id = module
+        .declare_function("dlisp_string_lower", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let string_trim_id = module
+        .declare_function("dlisp_string_trim", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let string_trim_left_id = module
+        .declare_function("dlisp_string_trim_left", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let string_trim_right_id = module
+        .declare_function("dlisp_string_trim_right", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let string_starts_with_id = module
+        .declare_function("dlisp_string_starts_with", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    let string_ends_with_id = module
+        .declare_function("dlisp_string_ends_with", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    let string_contains_id = module
+        .declare_function("dlisp_string_contains", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    let string_index_of_id = module
+        .declare_function("dlisp_string_index_of", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    let string_to_number_id = module
+        .declare_function("dlisp_string_to_number", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let number_to_string_id = module
+        .declare_function("dlisp_number_to_string", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let char_at_id = module
+        .declare_function("dlisp_char_at", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+
     // Predicates (unary)
     let nil_p_id = module
         .declare_function("dlisp_nil_p", Linkage::Import, &car_sig)
@@ -599,5 +700,30 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_map: map_id,
         dlisp_filter: filter_id,
         dlisp_reduce: reduce_id,
+        // Compiled list helpers (unary reuse car_sig, binary reuse mul_sig)
+        dlisp_append: append_id,
+        dlisp_reverse: reverse_id,
+        dlisp_last: last_id,
+        dlisp_butlast: butlast_id,
+        dlisp_flatten: flatten_id,
+        dlisp_take: take_id,
+        dlisp_drop: drop_id,
+        dlisp_is_empty: is_empty_id,
+        // Compiled string helpers (unary reuse car_sig, binary reuse mul_sig,
+        // ternary reuses substring_sig)
+        dlisp_string_split: string_split_id,
+        dlisp_string_replace: string_replace_id,
+        dlisp_string_upper: string_upper_id,
+        dlisp_string_lower: string_lower_id,
+        dlisp_string_trim: string_trim_id,
+        dlisp_string_trim_left: string_trim_left_id,
+        dlisp_string_trim_right: string_trim_right_id,
+        dlisp_string_starts_with: string_starts_with_id,
+        dlisp_string_ends_with: string_ends_with_id,
+        dlisp_string_contains: string_contains_id,
+        dlisp_string_index_of: string_index_of_id,
+        dlisp_string_to_number: string_to_number_id,
+        dlisp_number_to_string: number_to_string_id,
+        dlisp_char_at: char_at_id,
     })
 }

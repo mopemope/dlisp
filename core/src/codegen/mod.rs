@@ -11,6 +11,102 @@ use std::sync::atomic::AtomicUsize;
 
 pub static LAMBDA_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+/// Builtin function names lowered directly by codegen (see
+/// `forms::builtins::compile_builtin`).
+///
+/// This is the single source of truth for what codegen supports. Any builtin
+/// outside this list is interpreter-only: JIT gating rejects functions that
+/// call it (they keep running on the interpreter), and AOT compilation
+/// reports an explicit error instead of emitting an unresolvable import.
+pub const COMPILED_BUILTINS: &[&str] = &[
+    // arithmetic / comparison
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "mod",
+    ">",
+    "<",
+    "=",
+    ">=",
+    "<=",
+    "/=",
+    // values / collections
+    "print",
+    "not",
+    "list",
+    "cons",
+    "car",
+    "first",
+    "cdr",
+    "rest",
+    "vector",
+    "nth",
+    "count",
+    "conj",
+    "hash-map",
+    "assoc",
+    "get",
+    // strings / types
+    "str",
+    "string-length",
+    "substring",
+    "string-append",
+    "nil?",
+    "list?",
+    "number?",
+    "string?",
+    "symbol?",
+    "keyword?",
+    "vector?",
+    "map?",
+    "type-of",
+    // higher-order
+    "map",
+    "filter",
+    "reduce",
+    // list helpers
+    "append",
+    "reverse",
+    "last",
+    "butlast",
+    "flatten",
+    "take",
+    "drop",
+    "empty?",
+    // string helpers
+    "string-split",
+    "string-replace",
+    "string-upper",
+    "string-lower",
+    "string-trim",
+    "string-trim-left",
+    "string-trim-right",
+    "string-starts-with?",
+    "string-ends-with?",
+    "string-contains?",
+    "string-index-of",
+    "string->number",
+    "number->string",
+    "char-at",
+    // io / sys / os
+    "read-file",
+    "file-exists?",
+    "is-dir?",
+    "is-file?",
+    "list-dir",
+    "delete-file",
+    "getenv",
+    "setenv",
+    "cwd",
+    "set-cwd",
+    "args",
+    "exit",
+    "sh",
+    "sleep",
+];
+
 #[derive(Clone)]
 pub struct FunctionMetadata {
     pub fixed_args: Vec<String>,

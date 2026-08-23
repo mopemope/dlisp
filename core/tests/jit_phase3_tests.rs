@@ -60,6 +60,18 @@ fn create_jit_module() -> JITModule {
         "dlisp_vector_count",
         "dlisp_vector_copy",
         "dlisp_gc_malloc",
+        "dlisp_reverse",
+        "dlisp_last",
+        "dlisp_butlast",
+        "dlisp_flatten",
+        "dlisp_is_empty",
+        "dlisp_string_upper",
+        "dlisp_string_lower",
+        "dlisp_string_trim",
+        "dlisp_string_trim_left",
+        "dlisp_string_trim_right",
+        "dlisp_string_to_number",
+        "dlisp_number_to_string",
     ];
     for name in unary_symbols {
         builder.symbol(name, dummy_ptr as *const u8);
@@ -83,6 +95,15 @@ fn create_jit_module() -> JITModule {
         "dlisp_string_append",
         "dlisp_vector_get",
         "dlisp_vector_push",
+        "dlisp_append",
+        "dlisp_take",
+        "dlisp_drop",
+        "dlisp_string_split",
+        "dlisp_string_starts_with",
+        "dlisp_string_ends_with",
+        "dlisp_string_contains",
+        "dlisp_string_index_of",
+        "dlisp_char_at",
     ];
     for name in binary_symbols {
         builder.symbol(name, dummy_ptr2 as *const u8);
@@ -104,6 +125,7 @@ fn create_jit_module() -> JITModule {
     builder.symbol("dlisp_spawn", dummy_ptr as *const u8);
     builder.symbol("dlisp_sleep", dummy_ptr as *const u8);
     builder.symbol("dlisp_substring", dummy_ptr as *const u8);
+    builder.symbol("dlisp_string_replace", dummy_ptr as *const u8);
     builder.symbol("printf", dummy_ptr as *const u8);
 
     JITModule::new(builder)
@@ -282,4 +304,191 @@ fn test_codegen_sh_multi_arg() {
         Value::String("world".to_string()),
     ]);
     compile_expr_in_function(&mut module, &ast, "test_sh_multi");
+}
+
+// === Compiled List Helpers ===
+
+#[test]
+fn test_codegen_append_variadic() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("append".to_string()),
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+        ]),
+        Value::List(vec![Value::Symbol("list".to_string()), Value::Integer(3)]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_append");
+}
+
+#[test]
+fn test_codegen_reverse() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("reverse".to_string()),
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_reverse");
+}
+
+#[test]
+fn test_codegen_last() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("last".to_string()),
+        Value::List(vec![Value::Symbol("list".to_string()), Value::Integer(1)]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_last");
+}
+
+#[test]
+fn test_codegen_butlast() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("butlast".to_string()),
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_butlast");
+}
+
+#[test]
+fn test_codegen_flatten() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("flatten".to_string()),
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::Integer(1),
+            Value::List(vec![Value::Symbol("list".to_string()), Value::Integer(2)]),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_flatten");
+}
+
+#[test]
+fn test_codegen_take_drop() {
+    let mut module = create_jit_module();
+    let take_ast = Value::List(vec![
+        Value::Symbol("take".to_string()),
+        Value::Integer(2),
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &take_ast, "test_take");
+
+    let drop_ast = Value::List(vec![
+        Value::Symbol("drop".to_string()),
+        Value::Integer(1),
+        Value::List(vec![
+            Value::Symbol("list".to_string()),
+            Value::Integer(1),
+            Value::Integer(2),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &drop_ast, "test_drop");
+}
+
+#[test]
+fn test_codegen_empty_p() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![Value::Symbol("empty?".to_string()), Value::Nil]);
+    compile_expr_in_function(&mut module, &ast, "test_empty_p");
+}
+
+// === Compiled String Helpers ===
+
+#[test]
+fn test_codegen_string_split() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("string-split".to_string()),
+        Value::String("a,b".to_string()),
+        Value::String(",".to_string()),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_string_split");
+}
+
+#[test]
+fn test_codegen_string_replace() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("string-replace".to_string()),
+        Value::String("foo".to_string()),
+        Value::String("o".to_string()),
+        Value::String("0".to_string()),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_string_replace");
+}
+
+#[test]
+fn test_codegen_string_case_and_trim() {
+    let ops = [
+        ("string-upper", "string-upper"),
+        ("string-lower", "string-lower"),
+        ("string-trim", "string-trim"),
+        ("string-trim-left", "string-trim-left"),
+        ("string-trim-right", "string-trim-right"),
+        ("string->number", "string-to-number"),
+        ("number->string", "number-to-string"),
+    ];
+    for (op, name) in ops {
+        let mut module = create_jit_module();
+        let ast = Value::List(vec![
+            Value::Symbol(op.to_string()),
+            Value::String("x".to_string()),
+        ]);
+        compile_expr_in_function(
+            &mut module,
+            &ast,
+            &format!("test_{}", name.replace('-', "_")),
+        );
+    }
+}
+
+#[test]
+fn test_codegen_string_preds() {
+    let ops = [
+        "string-starts-with?",
+        "string-ends-with?",
+        "string-contains?",
+        "string-index-of",
+    ];
+    for op in ops {
+        let mut module = create_jit_module();
+        let ast = Value::List(vec![
+            Value::Symbol(op.to_string()),
+            Value::String("abc".to_string()),
+            Value::String("b".to_string()),
+        ]);
+        compile_expr_in_function(
+            &mut module,
+            &ast,
+            &format!("test_{}", op.replace(['-', '?'], "_")),
+        );
+    }
+}
+
+#[test]
+fn test_codegen_char_at() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("char-at".to_string()),
+        Value::String("abc".to_string()),
+        Value::String("b".to_string()),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_char_at");
 }

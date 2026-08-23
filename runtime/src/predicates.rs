@@ -70,6 +70,36 @@ pub unsafe extern "C" fn dlisp_map_p(val: *mut DlispValue) -> *mut DlispValue {
 /// # Safety
 /// This function is unsafe because it dereferences raw pointers.
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_is_empty(val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if val.is_null() || (*val).type_ == ValueType::Nil {
+            return dlisp_make_bool(true);
+        }
+        let is_empty = match (*val).type_ {
+            // A cons cell always holds at least one element; the empty list
+            // is represented as Nil (handled above).
+            ValueType::List => false,
+            ValueType::Vector => {
+                let vec_data = (*val).payload.vector_val;
+                vec_data.is_null() || (*vec_data).len == 0
+            }
+            ValueType::Map => {
+                let map_data = (*val).payload.map_val;
+                map_data.is_null() || (*map_data).len == 0
+            }
+            ValueType::String => *(*val).payload.str_val == 0,
+            _ => {
+                eprintln!("Type Error: empty? requires a collection or string");
+                std::process::abort();
+            }
+        };
+        dlisp_make_bool(is_empty)
+    }
+}
+
+/// # Safety
+/// This function is unsafe because it dereferences raw pointers.
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_type_of(val: *mut DlispValue) -> *mut DlispValue {
     unsafe {
         let name = if val.is_null() {
