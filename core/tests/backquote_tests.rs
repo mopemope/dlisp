@@ -2,7 +2,7 @@ use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{Interpreter, default_env};
 use dlisp_core::parser::parse;
 
-async fn run_code(code: &str) -> Result<Value, String> {
+async fn run_code(code: &str) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let mut env = default_env();
     let mut interpreter = Interpreter::new();
     let parsed = parse(code).map_err(|e| format!("{:?}", e))?;

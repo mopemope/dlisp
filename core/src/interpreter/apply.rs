@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,9 +10,9 @@ pub async fn apply(
     func: Value,
     args: Vec<Value>,
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Value, String> {
+) -> Result<Value, EvalFailure> {
     match func {
-        Value::NativeFunc(f) => f(&args).await,
+        Value::NativeFunc(f) => f(&args).await.map_err(EvalFailure::from),
         Value::UserFunc {
             args: param_names,
             rest_param,
@@ -27,7 +28,8 @@ pub async fn apply(
                         "Function expects at least {} arguments, got {}",
                         param_names.len(),
                         args.len()
-                    ));
+                    )
+                    .into());
                 }
             } else {
                 // Without &rest: exact count required
@@ -36,7 +38,8 @@ pub async fn apply(
                         "Function expects {} arguments, got {}",
                         param_names.len(),
                         args.len()
-                    ));
+                    )
+                    .into());
                 }
             }
 
@@ -85,6 +88,6 @@ pub async fn apply(
             }
             Ok(result)
         }
-        _ => Err("Value is not a function".to_string()),
+        _ => Err("Value is not a function".to_string().into()),
     }
 }

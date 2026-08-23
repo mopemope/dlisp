@@ -32,7 +32,11 @@ async fn eval_err(
     env: &mut Rc<RefCell<dlisp_core::environment::Environment>>,
 ) -> String {
     let exprs = parse(src).unwrap();
-    interpreter.eval(exprs[0].clone(), env).await.unwrap_err()
+    interpreter
+        .eval(exprs[0].clone(), env)
+        .await
+        .unwrap_err()
+        .to_string()
 }
 
 // --- Division ---

@@ -17,7 +17,7 @@ async fn eval_str(
     src: &str,
     interpreter: &mut dlisp_core::interpreter::Interpreter,
     env: &mut Rc<RefCell<dlisp_core::environment::Environment>>,
-) -> Result<Value, String> {
+) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let exprs = parse(src).map_err(|e| format!("{:?}", e))?;
     let mut result = Value::Nil;
     for expr in exprs {
@@ -81,6 +81,7 @@ async fn test_let_destructure_non_list_error() {
     assert!(res.is_err());
     assert!(
         res.unwrap_err()
+            .to_string()
             .contains("destructuring bind expects a list")
     );
 }
@@ -190,7 +191,11 @@ async fn test_setq_empty_args_error() {
     let exprs = parse("(setq)").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("pairs of (symbol value)"));
+    assert!(
+        res.unwrap_err()
+            .to_string()
+            .contains("pairs of (symbol value)")
+    );
 }
 
 #[tokio::test]
@@ -199,7 +204,7 @@ async fn test_setq_non_symbol_error() {
     let exprs = parse("(setq 42 10)").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("must be symbols"));
+    assert!(res.unwrap_err().to_string().contains("must be symbols"));
 }
 
 #[tokio::test]

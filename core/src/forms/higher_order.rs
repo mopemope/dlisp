@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use futures::future::LocalBoxFuture;
 use std::cell::RefCell;
@@ -9,10 +10,12 @@ pub fn map_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("map requires exactly 2 arguments: (map func list)".to_string());
+            return Err("map requires exactly 2 arguments: (map func list)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -39,7 +42,8 @@ pub fn map_form<'a>(
             val => Err(format!(
                 "map expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -48,10 +52,12 @@ pub fn filter_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("filter requires exactly 2 arguments: (filter func list)".to_string());
+            return Err("filter requires exactly 2 arguments: (filter func list)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -86,7 +92,8 @@ pub fn filter_form<'a>(
             val => Err(format!(
                 "filter expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -95,10 +102,14 @@ pub fn reduce_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 3 {
-            return Err("reduce requires exactly 3 arguments: (reduce func init list)".to_string());
+            return Err(
+                "reduce requires exactly 3 arguments: (reduce func init list)"
+                    .to_string()
+                    .into(),
+            );
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -118,7 +129,8 @@ pub fn reduce_form<'a>(
             val => Err(format!(
                 "reduce expects a list or vector as the third argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -127,10 +139,12 @@ pub fn some_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("some requires exactly 2 arguments: (some func list)".to_string());
+            return Err("some requires exactly 2 arguments: (some func list)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -150,7 +164,8 @@ pub fn some_form<'a>(
             val => Err(format!(
                 "some expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -159,10 +174,12 @@ pub fn every_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("every requires exactly 2 arguments: (every func list)".to_string());
+            return Err("every requires exactly 2 arguments: (every func list)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -182,7 +199,8 @@ pub fn every_form<'a>(
             val => Err(format!(
                 "every expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -191,10 +209,12 @@ pub fn find_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("find requires exactly 2 arguments: (find func list)".to_string());
+            return Err("find requires exactly 2 arguments: (find func list)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -216,7 +236,8 @@ pub fn find_form<'a>(
             val => Err(format!(
                 "find expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -225,10 +246,14 @@ pub fn for_each_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("for-each requires exactly 2 arguments: (for-each func list)".to_string());
+            return Err(
+                "for-each requires exactly 2 arguments: (for-each func list)"
+                    .to_string()
+                    .into(),
+            );
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -245,7 +270,8 @@ pub fn for_each_form<'a>(
             val => Err(format!(
                 "for-each expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -254,12 +280,12 @@ pub fn map_indexed_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err(
-                "map-indexed requires exactly 2 arguments: (map-indexed func list)".to_string(),
-            );
+            return Err(EvalFailure::message(
+                "map-indexed requires exactly 2 arguments: (map-indexed func list)",
+            ));
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -290,7 +316,8 @@ pub fn map_indexed_form<'a>(
             val => Err(format!(
                 "map-indexed expects a list or vector as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -301,12 +328,12 @@ pub fn update_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() < 3 {
-            return Err(
-                "update requires at least 3 arguments: (update map key func arg1 ...)".to_string(),
-            );
+            return Err(EvalFailure::message(
+                "update requires at least 3 arguments: (update map key func arg1 ...)",
+            ));
         }
 
         let map_val = interpreter.eval(args[0].clone(), env).await?;
@@ -317,7 +344,11 @@ pub fn update_form<'a>(
         let old_val = match &map_val {
             Value::Map(m) => m.get(&key).cloned().unwrap_or(Value::Nil),
             Value::Nil => Value::Nil,
-            _ => return Err("update first argument must be a map or nil".to_string()),
+            _ => {
+                return Err("update first argument must be a map or nil"
+                    .to_string()
+                    .into());
+            }
         };
         let mut func_args = vec![old_val];
 
@@ -346,10 +377,12 @@ pub fn map_keys_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("map-keys requires exactly 2 arguments: (map-keys func map)".to_string());
+            return Err("map-keys requires exactly 2 arguments: (map-keys func map)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -368,7 +401,8 @@ pub fn map_keys_form<'a>(
             val => Err(format!(
                 "map-keys expects a map as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }
@@ -377,10 +411,12 @@ pub fn map_vals_form<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.len() != 2 {
-            return Err("map-vals requires exactly 2 arguments: (map-vals func map)".to_string());
+            return Err("map-vals requires exactly 2 arguments: (map-vals func map)"
+                .to_string()
+                .into());
         }
 
         let func = interpreter.eval(args[0].clone(), env).await?;
@@ -399,7 +435,8 @@ pub fn map_vals_form<'a>(
             val => Err(format!(
                 "map-vals expects a map as the second argument, got: {}",
                 val
-            )),
+            )
+            .into()),
         }
     })
 }

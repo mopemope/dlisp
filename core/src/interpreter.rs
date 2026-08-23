@@ -8,6 +8,7 @@ use crate::jit::JIT;
 
 pub mod apply;
 
+use crate::eval_failure::EvalFailure;
 use crate::forms::registry::{FormRegistry, standard_registry};
 
 /// Tree-walking evaluator with a special form registry and JIT handle.
@@ -40,7 +41,7 @@ impl Interpreter {
         &mut self,
         val: Value,
         env: &mut Rc<RefCell<Environment>>,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, EvalFailure> {
         // Expand macros first
         let expanded = self.expand(val, env).await?;
 
@@ -48,7 +49,7 @@ impl Interpreter {
             Value::Symbol(s) => env
                 .borrow()
                 .get(&s)
-                .ok_or_else(|| format!("Undefined symbol: {}", s)),
+                .ok_or_else(|| EvalFailure::message(format!("Undefined symbol: {}", s))),
             Value::Keyword(_) => Ok(expanded),
             Value::List(list) => {
                 if list.is_empty() {
@@ -107,7 +108,7 @@ impl Interpreter {
         &mut self,
         val: Value,
         env: &mut Rc<RefCell<Environment>>,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, EvalFailure> {
         match val {
             Value::List(ref list) => {
                 if list.is_empty() {
@@ -229,7 +230,8 @@ impl Interpreter {
                                 expected_len,
                                 if has_rest { " or more" } else { "" },
                                 macro_args_vals.len()
-                            ));
+                            )
+                            .into());
                         }
 
                         // Execute macro body
@@ -298,7 +300,7 @@ impl Interpreter {
         name: &str,
         args: &[Value],
         env: &mut Rc<RefCell<Environment>>,
-    ) -> Result<Option<Value>, String> {
+    ) -> Result<Option<Value>, EvalFailure> {
         if let Some(form) = self.forms.get(name) {
             form.call(self, args, env).await
         } else {
@@ -312,7 +314,7 @@ impl Interpreter {
         val: Value,
         env: &mut Rc<RefCell<Environment>>,
         depth: usize,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, EvalFailure> {
         match val {
             Value::List(list) => {
                 if list.is_empty() {
@@ -329,16 +331,16 @@ impl Interpreter {
                     if s == "unquote" {
                         if depth == 1 {
                             if list.len() < 2 {
-                                return Err("unquote expects 1 argument".to_string());
+                                return Err("unquote expects 1 argument".to_string().into());
                             }
                             return self.expand(list[1].clone(), env).await;
                         }
                         is_uq = true;
                     } else if s == "unquote-splicing" {
                         if depth == 1 {
-                            return Err(
-                                "unquote-splicing invalid at top-level of backquote".to_string()
-                            );
+                            return Err("unquote-splicing invalid at top-level of backquote"
+                                .to_string()
+                                .into());
                         }
                         is_uq = true;
                     } else if s == "backquote" {
@@ -370,7 +372,7 @@ impl Interpreter {
                             append_args.push(Value::List(list_call));
                         }
                         if inner.len() < 2 {
-                            return Err("unquote-splicing expects 1 argument".to_string());
+                            return Err("unquote-splicing expects 1 argument".to_string().into());
                         }
                         append_args.push(self.expand(inner[1].clone(), env).await?);
                         continue;
@@ -422,7 +424,7 @@ impl Interpreter {
         func: Value,
         args: Vec<Value>,
         env: &mut Rc<RefCell<Environment>>,
-    ) -> Result<Value, String> {
+    ) -> Result<Value, EvalFailure> {
         crate::interpreter::apply::apply(self, func, args, env).await
     }
 }

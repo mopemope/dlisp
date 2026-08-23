@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::forms::registry::SpecialForm;
 use crate::interpreter::Interpreter;
 use futures::future::LocalBoxFuture;
@@ -14,7 +15,7 @@ impl SpecialForm for TryCatchForm {
         interp: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         let args_vec = args.to_vec();
         Box::pin(try_catch_impl(interp, args_vec, env))
     }
@@ -24,7 +25,7 @@ async fn try_catch_impl(
     interp: &mut Interpreter,
     args: Vec<Value>,
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     // (try body... (catch var handler-body...))
     // We look for the `catch` clause at the end.
 
@@ -46,7 +47,7 @@ async fn try_catch_impl(
         && s == "catch"
     {
         if last_list.len() < 2 {
-            return Err("catch requires a variable name".to_string());
+            return Err(EvalFailure::message("catch requires a variable name"));
         }
         if let Value::Symbol(var) = &last_list[1] {
             catch_var = var.clone();
@@ -54,7 +55,7 @@ async fn try_catch_impl(
             has_catch = true;
             body.pop(); // Remove catch from body
         } else {
-            return Err("catch variable must be a symbol".to_string());
+            return Err(EvalFailure::message("catch variable must be a symbol"));
         }
     }
 
@@ -65,7 +66,9 @@ async fn try_catch_impl(
             Ok(val) => {
                 last_val = val;
             }
-            Err(e) => {
+            // Recur must reach its `loop` untouched; never catch it here.
+            Err(err @ EvalFailure::Recur(_)) => return Err(err),
+            Err(EvalFailure::Message(e)) => {
                 // Try to extract DLISP_THROW or wrap error string
                 if has_catch {
                     // Extract thrown value from interpreter state if present.
@@ -89,7 +92,7 @@ async fn try_catch_impl(
                     return Ok(Some(result));
                 } else {
                     // Uncaught, bubble up
-                    return Err(e);
+                    return Err(EvalFailure::Message(e));
                 }
             }
         }

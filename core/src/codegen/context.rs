@@ -15,12 +15,21 @@ pub struct FunctionTranslationContext<'a, 'func, M: Module> {
     pub module: &'a mut M,
     pub builtins: &'a Builtins,
     pub scopes: Vec<HashMap<String, Variable>>,
+    // Stack of enclosing `(loop ...)` frames for `recur` lowering.
+    pub loop_frames: Vec<LoopFrame>,
     // Map captured var name to offset (bytes) in env struct
     pub captured_vars: HashMap<String, u32>,
     pub env_param: Option<IrValue>,
     pub ptr_type: Type,
     pub global_functions: &'a HashMap<String, crate::codegen::FunctionMetadata>,
     pub global_variables: &'a HashMap<String, DataId>,
+}
+
+/// One enclosing `loop` on the compile-time stack: its iteration variables
+/// (in binding order) and the block a `recur` jumps back to.
+pub struct LoopFrame {
+    pub vars: Vec<Variable>,
+    pub header_block: Block,
 }
 
 impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
@@ -293,6 +302,8 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 "while" => crate::codegen::forms::control::compile_while(self, list),
                 "dotimes" => crate::codegen::forms::control::compile_dotimes(self, list),
                 "dolist" => crate::codegen::forms::control::compile_dolist(self, list),
+                "loop" => crate::codegen::forms::control::compile_loop(self, list),
+                "recur" => crate::codegen::forms::control::compile_recur(self, list),
                 "lambda" => crate::codegen::forms::lambda::compile_lambda(self, list),
                 "spawn" => crate::codegen::forms::spawn::compile_spawn(self, list),
                 "quote" => {

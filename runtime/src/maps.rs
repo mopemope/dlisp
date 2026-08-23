@@ -2,7 +2,7 @@ use std::ffi::CStr;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use crate::cmp::dlisp_eq;
-use crate::constructors::dlisp_make_nil;
+use crate::constructors::{dlisp_make_cons, dlisp_make_nil};
 use crate::gc::dlisp_gc_malloc;
 use crate::value::{DlispValue, MapData, ValuePayload, ValueType};
 
@@ -197,5 +197,28 @@ pub unsafe extern "C" fn dlisp_map_get(
                 return dlisp_make_nil();
             }
         }
+    }
+}
+
+/// Returns a fresh list of the map's keys (iteration order).
+///
+/// # Safety
+/// This function is unsafe because it uses raw pointers directly.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn dlisp_keys(map_val: *mut DlispValue) -> *mut DlispValue {
+    unsafe {
+        if map_val.is_null() || (*map_val).type_ != ValueType::Map {
+            eprintln!("Type Error: keys requires a map");
+            std::process::abort();
+        }
+        let data = (*map_val).payload.map_val;
+        let mut acc = dlisp_make_nil();
+        for i in 0..(*data).cap {
+            let slot = (*data).elements.add(i);
+            if let Some((k, _)) = *slot {
+                acc = dlisp_make_cons(k, acc);
+            }
+        }
+        acc
     }
 }

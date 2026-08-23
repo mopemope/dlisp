@@ -15,6 +15,7 @@ pub struct BuiltinDefinitions {
     pub dlisp_make_map: FuncId,
     pub dlisp_map_assoc: FuncId,
     pub dlisp_map_get: FuncId,
+    pub dlisp_keys: FuncId,
     pub dlisp_get: FuncId,
     pub dlisp_make_cons: FuncId,
     pub dlisp_cons: FuncId,
@@ -335,6 +336,14 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     map_get_sig.returns.push(AbiParam::new(int));
     let map_get_id = module
         .declare_function("dlisp_map_get", Linkage::Import, &map_get_sig)
+        .map_err(|e| e.to_string())?;
+
+    // dlisp_keys(DlispValue*) -> DlispValue*
+    let mut keys_sig = module.make_signature();
+    keys_sig.params.push(AbiParam::new(int));
+    keys_sig.returns.push(AbiParam::new(int));
+    let keys_id = module
+        .declare_function("dlisp_keys", Linkage::Import, &keys_sig)
         .map_err(|e| e.to_string())?;
 
     let mut get_sig = module.make_signature();
@@ -678,6 +687,7 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_make_map: make_map_id,
         dlisp_map_assoc: map_assoc_id,
         dlisp_map_get: map_get_id,
+        dlisp_keys: keys_id,
         dlisp_get: get_id,
         dlisp_make_cons: make_cons_id,
         dlisp_cons: cons_id,

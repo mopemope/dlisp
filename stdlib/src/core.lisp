@@ -100,3 +100,97 @@
           ((= argc 2) (range-build (first args) (second args) 1))
           ((= argc 3) (range-build (first args) (second args) (third args)))
           (true nil))))
+
+;; ---------------------------------------------------------------------------
+;; Collection helpers (Clojure-flavoured; compiled on every path)
+;; ---------------------------------------------------------------------------
+
+;; Truthy when x occurs in xs (`=` equality).
+(defun member? (x xs)
+  (some (lambda (y) (= y x)) xs))
+
+;; xs without duplicates, preserving first-seen order.
+(defun distinct (xs)
+  (reverse
+   (reduce (lambda (acc x)
+             (if (member? x acc) acc (cons x acc)))
+           nil
+           xs)))
+
+;; Map of element -> occurrence count.
+(defun frequencies (xs)
+  (reduce (lambda (acc x)
+            (assoc acc x (+ 1 (get acc x 0))))
+          (hash-map)
+          xs))
+
+;; Map of (f x) -> list of x's sharing that key.
+(defun group-by (f xs)
+  (reduce (lambda (acc x)
+            (let ((k (f x)))
+              (assoc acc k (append (get acc k nil) (list x)))))
+          (hash-map)
+          xs))
+
+;; Merge two maps; conflicting keys are combined with (f a-val b-val).
+;; `contains?` has no codegen lowering, so presence is probed with a
+;; sentinel default instead.
+(defun merge-with (f a b)
+  (reduce (lambda (acc k)
+            (let ((cur (get acc k :dlisp-missing)))
+              (if (= cur :dlisp-missing)
+                  (assoc acc k (get b k))
+                  (assoc acc k (f cur (get b k))))))
+          a
+          (keys b)))
+
+;; Internal: walk the path vector positionally instead of slicing it.
+(defun get-in-at (m ks i)
+  (if (= i (count ks))
+      m
+      (let ((v (get m (nth ks i) :dlisp-missing)))
+        (if (= v :dlisp-missing)
+            nil
+            (get-in-at v ks (+ i 1))))))
+
+;; Nested lookup: (get-in user [:address :city]); a missing key yields nil.
+(defun get-in (m ks)
+  (get-in-at m ks 0))
+
+;; Internal: rebuild nested maps along the path, setting leaf to v.
+(defun assoc-in-at (m ks i v)
+  (let ((k (nth ks i)))
+    (if (= (+ i 1) (count ks))
+        (assoc m k v)
+        (assoc m k (assoc-in-at (get m k (hash-map)) ks (+ i 1) v)))))
+
+;; Nested association: (assoc-in cfg [:db :host] "localhost")
+(defun assoc-in (m ks v)
+  (assoc-in-at m ks 0 v))
+
+;; Internal: apply f to the value at the path and store it back.
+(defun update-in-at (m ks i f)
+  (let ((k (nth ks i)))
+    (if (= (+ i 1) (count ks))
+        (assoc m k (f (get m k)))
+        (assoc m k (update-in-at (get m k (hash-map)) ks (+ i 1) f)))))
+
+;; Nested update with a unary function: (update-in cfg [:retries] inc)
+(defun update-in (m ks f)
+  (update-in-at m ks 0 f))
+
+;; Consecutive n-element chunks of coll (last chunk may be shorter).
+(defun partition (n coll)
+  (loop [rest coll acc nil]
+    (if (empty? rest)
+        (reverse acc)
+        (recur (drop n rest) (cons (take n rest) acc)))))
+
+;; Alternating elements of two collections until either runs out.
+(defun interleave (a b)
+  (reverse
+   (loop [ra a rb b acc nil]
+     (if (or (empty? ra) (empty? rb))
+         acc
+         (recur (rest ra) (rest rb)
+                (cons (first rb) (cons (first ra) acc)))))))

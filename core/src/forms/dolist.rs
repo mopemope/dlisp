@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -13,23 +14,29 @@ pub async fn dolist_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
-        return Err("dolist requires at least a binding form (var list-expr)".to_string());
+        return Err("dolist requires at least a binding form (var list-expr)"
+            .to_string()
+            .into());
     }
 
     let binding = match &args[0] {
         Value::List(l) => l,
-        _ => return Err("dolist first argument must be (var list-expr)".to_string()),
+        _ => {
+            return Err("dolist first argument must be (var list-expr)"
+                .to_string()
+                .into());
+        }
     };
 
     if binding.len() != 2 {
-        return Err("dolist binding must be (var list-expr)".to_string());
+        return Err("dolist binding must be (var list-expr)".to_string().into());
     }
 
     let var_name = match &binding[0] {
         Value::Symbol(s) => s.clone(),
-        _ => return Err("dolist variable must be a symbol".to_string()),
+        _ => return Err("dolist variable must be a symbol".to_string().into()),
     };
 
     let list_val = interpreter.eval(binding[1].clone(), env).await?;
@@ -37,7 +44,11 @@ pub async fn dolist_form(
         Value::List(l) => l,
         Value::Vector(v) => v,
         Value::Nil => Vec::new(),
-        _ => return Err("dolist requires a list or vector to iterate over".to_string()),
+        _ => {
+            return Err("dolist requires a list or vector to iterate over"
+                .to_string()
+                .into());
+        }
     };
 
     let body = &args[1..];

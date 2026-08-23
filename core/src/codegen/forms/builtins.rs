@@ -43,6 +43,7 @@ pub fn compile_builtin<M: Module>(
         "hash-map" => compile_hash_map(ctx, list),
         "assoc" => compile_assoc(ctx, list),
         "get" => compile_get(ctx, list),
+        "keys" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_keys, false),
         // Phase 2
         "/" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_div),
         "%" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_mod),

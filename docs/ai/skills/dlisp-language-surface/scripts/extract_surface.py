@@ -77,6 +77,17 @@ def extract_doc_names(root: Path, heading: str) -> set[str]:
     return set(re.findall(r"`([^`\n]+)`", section))
 
 
+def extract_stdlib_names(root: Path) -> set[str]:
+    core_lisp = root / "stdlib/src/core.lisp"
+    try:
+        source = read_text(core_lisp)
+    except SystemExit:
+        return set()
+    return set(
+        re.findall(r"\((?:defun|defmacro)\s+\(?([^\s()\[\]]+)", source)
+    )
+
+
 def print_snapshot(root: Path) -> None:
     print(GENERATED_HEADER)
     print()
@@ -120,7 +131,7 @@ def check_surface(root: Path) -> int:
     builtin_stale = doc_builtins - actual_builtins
 
     spec_refs = extract_spec_references(root)
-    known_surface = actual_forms | actual_builtins
+    known_surface = actual_forms | actual_builtins | extract_stdlib_names(root)
     spec_unknown = {
         token
         for token in spec_refs

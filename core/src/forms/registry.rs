@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use futures::future::LocalBoxFuture;
 use std::cell::RefCell;
@@ -7,7 +8,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// Result of evaluating a special form: `Some(value)` or `None` (no value).
-pub type FormResult = Result<Option<Value>, String>;
+pub type FormResult = Result<Option<Value>, EvalFailure>;
 
 /// Boxed future returned by [`SpecialForm::call`].
 pub type FormFuture<'a> = LocalBoxFuture<'a, FormResult>;
@@ -68,7 +69,7 @@ impl SpecialForm for DefunForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         // defun is synchronous, so we execute it immediately and return the result
         let res = crate::forms::defun::defun(&mut interpreter.jit, args, env);
         Box::pin(async move { res })
@@ -83,7 +84,7 @@ impl SpecialForm for IfForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::if_expr::if_form(interpreter, args, env))
     }
 }
@@ -96,7 +97,7 @@ impl SpecialForm for LetForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::let_expr::let_form(interpreter, args, env))
     }
 }
@@ -109,7 +110,7 @@ impl SpecialForm for LetStarForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::let_star::let_star_form(
             interpreter,
             args,
@@ -126,7 +127,7 @@ impl SpecialForm for ThrowForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::throw::throw_form(interpreter, args, env))
     }
 }
@@ -139,7 +140,7 @@ impl SpecialForm for SpawnForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::spawn::spawn(interpreter, args, env))
     }
 }
@@ -152,7 +153,7 @@ impl SpecialForm for LambdaForm {
         _interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         let res = crate::forms::lambda::lambda(args, env);
         Box::pin(async move { res })
     }
@@ -166,7 +167,7 @@ impl SpecialForm for DefVarForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::defvar::defvar(interpreter, args, env))
     }
 }
@@ -179,7 +180,7 @@ impl SpecialForm for QuoteForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::quote::QuoteForm.call(interpreter, args, env))
     }
 }
@@ -192,7 +193,7 @@ impl SpecialForm for SetQForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::setq::setq(interpreter, args, env))
     }
 }
@@ -205,7 +206,7 @@ impl SpecialForm for PrognForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::progn::progn(interpreter, args, env))
     }
 }
@@ -218,7 +219,7 @@ impl SpecialForm for CondForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::cond::cond(interpreter, args, env))
     }
 }
@@ -231,7 +232,7 @@ impl SpecialForm for AndForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::and_or::and_form(interpreter, args, env))
     }
 }
@@ -244,7 +245,7 @@ impl SpecialForm for OrForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::and_or::or_form(interpreter, args, env))
     }
 }
@@ -257,7 +258,7 @@ impl SpecialForm for MapForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::map_form(interpreter, args, env))
     }
 }
@@ -270,7 +271,7 @@ impl SpecialForm for FilterForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::filter_form(
             interpreter,
             args,
@@ -287,7 +288,7 @@ impl SpecialForm for ReduceForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::reduce_form(
             interpreter,
             args,
@@ -304,7 +305,7 @@ impl SpecialForm for SomeForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::some_form(
             interpreter,
             args,
@@ -321,7 +322,7 @@ impl SpecialForm for EveryForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::every_form(
             interpreter,
             args,
@@ -338,7 +339,7 @@ impl SpecialForm for FindForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::find_form(
             interpreter,
             args,
@@ -355,7 +356,7 @@ impl SpecialForm for ForEachForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::for_each_form(
             interpreter,
             args,
@@ -372,7 +373,7 @@ impl SpecialForm for MapIndexedForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::map_indexed_form(
             interpreter,
             args,
@@ -389,7 +390,7 @@ impl SpecialForm for EvalForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::eval::eval_form(interpreter, args, env))
     }
 }
@@ -402,7 +403,7 @@ impl SpecialForm for ApplyForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::apply::apply_form(interpreter, args, env))
     }
 }
@@ -415,7 +416,7 @@ impl SpecialForm for WhileForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::while_loop::while_form(interpreter, args, env))
     }
 }
@@ -428,7 +429,7 @@ impl SpecialForm for WhenForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::when_unless::when_form(interpreter, args, env))
     }
 }
@@ -441,7 +442,7 @@ impl SpecialForm for UnlessForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::when_unless::unless_form(
             interpreter,
             args,
@@ -458,7 +459,7 @@ impl SpecialForm for DotimesForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::dotimes::dotimes_form(interpreter, args, env))
     }
 }
@@ -471,7 +472,7 @@ impl SpecialForm for DolistForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::dolist::dolist_form(interpreter, args, env))
     }
 }
@@ -484,7 +485,7 @@ impl SpecialForm for MacroExpandForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::macroexpand::macroexpand_form(
             interpreter,
             args,
@@ -501,7 +502,7 @@ impl SpecialForm for LoadForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::load::load_form(interpreter, args, env))
     }
 }
@@ -514,7 +515,7 @@ impl SpecialForm for RequireForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::require::require_form(interpreter, args, env))
     }
 }
@@ -527,7 +528,7 @@ impl SpecialForm for UpdateForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::update_form(
             interpreter,
             args,
@@ -544,7 +545,7 @@ impl SpecialForm for MapKeysForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::map_keys_form(
             interpreter,
             args,
@@ -561,7 +562,7 @@ impl SpecialForm for MapValsForm {
         interpreter: &'a mut Interpreter,
         args: &'a [Value],
         env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         Box::pin(crate::forms::higher_order::map_vals_form(
             interpreter,
             args,
@@ -570,6 +571,7 @@ impl SpecialForm for MapValsForm {
     }
 }
 
+use crate::forms::loop_expr::{LoopForm, RecurForm};
 use crate::forms::try_catch::TryCatchForm;
 
 /// Builds the default special form registry used by `Interpreter::new`.
@@ -606,6 +608,8 @@ pub fn standard_registry() -> FormRegistry {
     reg.register("eval", EvalForm);
     reg.register("apply", ApplyForm);
     reg.register("while", WhileForm);
+    reg.register("loop", LoopForm);
+    reg.register("recur", RecurForm);
     reg.register("when", WhenForm);
     reg.register("unless", UnlessForm);
     reg.register("dotimes", DotimesForm);

@@ -16,7 +16,7 @@
 - `if`, `cond`, `and`, `or`, `progn`, `do`, `when`, `unless`, `while`
 
 反復:
-- `dotimes`, `dolist`
+- `dotimes`, `dolist`, `loop` / `recur`(任意位置の recur で束縛を再束縛して反復)
 
 評価と適用:
 - `eval`, `apply`, `quote`, `macroexpand`, `load`, `require`
@@ -54,7 +54,8 @@ Vector:
 - `vector`, `nth`, `count`, `conj`
 
 Map:
-- `hash-map`, `get`, `assoc`, `dissoc`, `keys`, `vals`, `contains?`, `merge`, `select-keys`
+- `hash-map`, `get`, `assoc`, `keys` — compiled(JIT/AOT)対応
+- `dissoc`, `vals`, `contains?`, `merge`, `select-keys` — interpreter のみ
 
 String:
 - `string-length`, `substring`, `string-append`, `string-split`, `string-replace`, `string-upper`, `string-lower`, `string-trim`, `string-trim-left`, `string-trim-right`, `string-starts-with?`, `string-ends-with?`, `string-contains?`, `string-index-of`, `string->number`, `number->string`, `char-at`
@@ -76,5 +77,6 @@ Type / error:
 - `zero?`, `positive?`, `negative?`, `empty-list?`
 - `when-let`
 - `range` — `(range end)` / `(range start end)` / `(range start end step)`。非整数引数や step 0 は `nil`。内部 helper として `range-build`, `range-iter` も定義される
+- コレクション: `member?`, `distinct`, `frequencies`, `group-by`, `merge-with`(2 map), `get-in`, `assoc-in`, `update-in`(unary f、パスは vector), `partition`, `interleave` — 全経路 compile 対応
 - `thread-first-step`, `thread-last-step`
 - Threading macros: `->`, `->>`, `as->`, `some->`

@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,9 +9,11 @@ pub async fn if_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.len() < 2 {
-        return Err("if requires at least condition and then-branch".to_string());
+        return Err("if requires at least condition and then-branch"
+            .to_string()
+            .into());
     }
 
     let cond = interpreter.eval(args[0].clone(), env).await?;

@@ -1,5 +1,5 @@
 use crate::ast::Value;
-use crate::codegen::context::FunctionTranslationContext;
+use crate::codegen::context::{FunctionTranslationContext, LoopFrame};
 use cranelift::codegen::ir::StackSlot;
 use cranelift::prelude::{Value as IrValue, *};
 use cranelift_module::Module;
@@ -67,6 +67,30 @@ fn result_slot<M: Module>(ctx: &mut FunctionTranslationContext<M>) -> StackSlot 
         .create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 8, 3))
 }
 
+/// True when the current block already ends in a terminator instruction.
+pub(crate) fn block_terminated<M: Module>(ctx: &FunctionTranslationContext<M>) -> bool {
+    let Some(block) = ctx.builder.current_block() else {
+        return false;
+    };
+    let Some(last) = ctx.builder.func.layout.last_inst(block) else {
+        return false;
+    };
+    ctx.builder.func.dfg.insts[last].opcode().is_terminator()
+}
+
+/// After compiling an expression that may have terminated the current block
+/// (e.g. an unconditional `recur`), reopen a fresh block so the caller can
+/// keep emitting instructions. Anything emitted there is dead code, matching
+/// the interpreter's abort-on-recur semantics.
+pub(crate) fn ensure_open_block<M: Module>(ctx: &mut FunctionTranslationContext<M>) {
+    if block_terminated(ctx) {
+        let dead = ctx.builder.create_block();
+        ctx.builder.switch_to_block(dead);
+        // No predecessor will ever be added to this block.
+        ctx.builder.seal_block(dead);
+    }
+}
+
 fn compile_body<M: Module>(
     ctx: &mut FunctionTranslationContext<M>,
     body: &[Value],
@@ -74,6 +98,7 @@ fn compile_body<M: Module>(
     let mut result = ctx.make_nil()?;
     for expr in body {
         result = ctx.compile_expr(expr)?;
+        ensure_open_block(ctx);
     }
     Ok(result)
 }
@@ -99,6 +124,7 @@ pub fn compile_when<M: Module>(
     }
 
     let cond_val = ctx.compile_expr(&list[1])?;
+    ensure_open_block(ctx);
     let truthy = compile_truthy(ctx, cond_val)?;
 
     let body_block = ctx.builder.create_block();
@@ -147,6 +173,7 @@ pub fn compile_and<M: Module>(
 
     for (idx, expr) in args.iter().enumerate() {
         let val = ctx.compile_expr(expr)?;
+        ensure_open_block(ctx);
         ctx.builder.ins().stack_store(val, slot, 0);
 
         if idx + 1 == args.len() {
@@ -182,6 +209,7 @@ pub fn compile_or<M: Module>(
 
     for (idx, expr) in args.iter().enumerate() {
         let val = ctx.compile_expr(expr)?;
+        ensure_open_block(ctx);
         ctx.builder.ins().stack_store(val, slot, 0);
 
         if idx + 1 == args.len() {
@@ -224,6 +252,7 @@ pub fn compile_cond<M: Module>(
         }
 
         let test_val = ctx.compile_expr(&items[0])?;
+        ensure_open_block(ctx);
         let truthy = compile_truthy(ctx, test_val)?;
         let body_block = ctx.builder.create_block();
         let next_block = ctx.builder.create_block();
@@ -275,6 +304,7 @@ pub fn compile_while<M: Module>(
 
     ctx.builder.switch_to_block(header_block);
     let cond_val = ctx.compile_expr(&list[1])?;
+    ensure_open_block(ctx);
     let truthy = compile_truthy(ctx, cond_val)?;
     ctx.builder
         .ins()
@@ -284,6 +314,7 @@ pub fn compile_while<M: Module>(
     ctx.builder.seal_block(body_block);
     for expr in &list[2..] {
         let val = ctx.compile_expr(expr)?;
+        ensure_open_block(ctx);
         ctx.builder.ins().stack_store(val, slot, 0);
     }
     ctx.builder.ins().jump(header_block, &[]);
@@ -342,6 +373,7 @@ pub fn compile_dotimes<M: Module>(
     ctx.builder.seal_block(body_block);
     for expr in &list[2..] {
         ctx.compile_expr(expr)?;
+        ensure_open_block(ctx);
     }
     let cur_val = ctx.builder.use_var(counter);
     let next_val = call_binary(ctx, ctx.builtins.funcs.dlisp_add, cur_val, one_val)?;
@@ -432,6 +464,7 @@ pub fn compile_dolist<M: Module>(
     ctx.builder.def_var(elem, car_val);
     for expr in &list[2..] {
         ctx.compile_expr(expr)?;
+        ensure_open_block(ctx);
     }
     let walked_val = call_unary(ctx, ctx.builtins.funcs.dlisp_cdr, cur_val)?;
     ctx.builder.def_var(current, walked_val);
@@ -443,4 +476,124 @@ pub fn compile_dolist<M: Module>(
 
     ctx.scopes.pop();
     ctx.make_nil()
+}
+
+/// `(loop [name init ...] body...)`: iteration with `recur` support.
+///
+/// Bindings become Cranelift variables in a fresh scope; a `recur` re-defines
+/// them with freshly evaluated values and jumps back to the body header.
+pub fn compile_loop<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    if list.len() < 2 {
+        return Err("loop requires bindings and a body".to_string());
+    }
+    let items: &[Value] = match &list[1] {
+        Value::List(items) => items,
+        Value::Vector(items) => items,
+        _ => return Err("loop bindings must be a list or vector of name/init pairs".to_string()),
+    };
+    if !items.len().is_multiple_of(2) {
+        return Err("loop bindings must contain an even number of name/init forms".to_string());
+    }
+    let mut names = Vec::with_capacity(items.len() / 2);
+    let mut inits = Vec::with_capacity(items.len() / 2);
+    for pair in items.chunks(2) {
+        let Value::Symbol(name) = &pair[0] else {
+            return Err("loop binding name must be a symbol".to_string());
+        };
+        names.push(name.clone());
+        inits.push(&pair[1]);
+    }
+
+    ctx.scopes.push(HashMap::new());
+    let mut vars = Vec::with_capacity(names.len());
+    for (name, init) in names.iter().zip(inits.iter()) {
+        let val = ctx.compile_expr(init)?;
+        let var = ctx.builder.declare_var(ctx.ptr_type);
+        ctx.builder.def_var(var, val);
+        ctx.scopes
+            .last_mut()
+            .expect("loop scope exists")
+            .insert(name.clone(), var);
+        vars.push(var);
+    }
+
+    // The body block doubles as the loop header; `recur` jumps straight to it.
+    let body_block = ctx.builder.create_block();
+    let end_block = ctx.builder.create_block();
+    ctx.builder.ins().jump(body_block, &[]);
+    ctx.builder.switch_to_block(body_block);
+
+    let slot = result_slot(ctx);
+    let nil_val = ctx.make_nil()?;
+    ctx.builder.ins().stack_store(nil_val, slot, 0);
+
+    ctx.loop_frames.push(LoopFrame {
+        vars,
+        header_block: body_block,
+    });
+    for expr in &list[2..] {
+        if block_terminated(ctx) {
+            // A previous expression ended this iteration (unconditional
+            // recur); the rest of the body is unreachable by construction,
+            // matching the interpreter's abort-on-recur semantics.
+            break;
+        }
+        let val = ctx.compile_expr(expr)?;
+        if !block_terminated(ctx) {
+            ctx.builder.ins().stack_store(val, slot, 0);
+        }
+    }
+    ctx.loop_frames.pop();
+    ctx.scopes.pop();
+
+    if !block_terminated(ctx) {
+        ctx.builder.ins().jump(end_block, &[]);
+    }
+
+    ctx.builder.switch_to_block(end_block);
+    ctx.builder.seal_block(body_block);
+    ctx.builder.seal_block(end_block);
+    Ok(ctx.builder.ins().stack_load(ctx.ptr_type, slot, 0))
+}
+
+/// `(recur expr ...)`: rebind the innermost loop's variables and iterate.
+///
+/// All new values are evaluated into temporaries before any binding is
+/// overwritten, so `(recur (- n 1) (* acc n))` sees the old bindings.
+pub fn compile_recur<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    list: &[Value],
+) -> Result<IrValue, String> {
+    let Some(frame) = ctx.loop_frames.last().map(|f| LoopFrame {
+        vars: f.vars.clone(),
+        header_block: f.header_block,
+    }) else {
+        return Err("recur outside loop".to_string());
+    };
+    let args = &list[1..];
+    if args.len() != frame.vars.len() {
+        return Err(format!(
+            "recur expects {} argument(s), got {}",
+            frame.vars.len(),
+            args.len()
+        ));
+    }
+
+    let mut tmps = Vec::with_capacity(args.len());
+    for arg in args {
+        let val = ctx.compile_expr(arg)?;
+        let tmp = ctx.builder.declare_var(ctx.ptr_type);
+        ctx.builder.def_var(tmp, val);
+        tmps.push(tmp);
+    }
+    let nil_val = ctx.make_nil()?;
+    for (var, tmp) in frame.vars.iter().zip(tmps.iter()) {
+        let val = ctx.builder.use_var(*tmp);
+        ctx.builder.def_var(*var, val);
+    }
+    ctx.builder.ins().jump(frame.header_block, &[]);
+    Ok(nil_val)
 }

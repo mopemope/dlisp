@@ -2,7 +2,7 @@ use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{Interpreter, default_env};
 use dlisp_core::parser::parse;
 
-async fn run_code(code: &str) -> Result<Value, String> {
+async fn run_code(code: &str) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let mut env = default_env();
     let mut interpreter = Interpreter::new();
     let parsed = parse(code).map_err(|e| format!("{:?}", e))?;
@@ -52,7 +52,12 @@ async fn test_gensym_too_many_args() {
 async fn test_gensym_invalid_type() {
     let result = run_code("(gensym 42)").await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("must be a string or symbol"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("must be a string or symbol")
+    );
 }
 
 // --- macroexpand tests ---

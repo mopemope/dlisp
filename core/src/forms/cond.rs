@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,12 +9,12 @@ pub async fn cond(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     for clause in args {
         match clause {
             Value::List(pair) => {
                 if pair.is_empty() {
-                    return Err("cond clause must be a non-empty list".to_string());
+                    return Err("cond clause must be a non-empty list".to_string().into());
                 }
                 let test_val = interpreter.eval(pair[0].clone(), env).await?;
                 if test_val.is_truthy() {
@@ -28,7 +29,7 @@ pub async fn cond(
                     return Ok(Some(result));
                 }
             }
-            _ => return Err("cond clause must be a list".to_string()),
+            _ => return Err("cond clause must be a list".to_string().into()),
         }
     }
     Ok(Some(Value::Nil))

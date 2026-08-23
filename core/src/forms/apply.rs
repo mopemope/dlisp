@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,11 +9,11 @@ pub async fn apply_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.len() < 2 {
-        return Err(
-            "apply requires at least 2 arguments (function and a list of arguments)".to_string(),
-        );
+        return Err(EvalFailure::message(
+            "apply requires at least 2 arguments (function and a list of arguments)",
+        ));
     }
 
     // Evaluate the function
@@ -36,7 +37,11 @@ pub async fn apply_form(
             eval_args.extend(v);
         }
         Value::Nil => {}
-        _ => return Err("apply requires the last argument to be a list or vector".to_string()),
+        _ => {
+            return Err("apply requires the last argument to be a list or vector"
+                .to_string()
+                .into());
+        }
     }
 
     let res = interpreter.apply(func_val, eval_args, env).await?;

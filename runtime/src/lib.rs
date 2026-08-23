@@ -31,7 +31,10 @@ pub use constructors::{
     dlisp_cons, dlisp_make_bool, dlisp_make_closure, dlisp_make_cons, dlisp_make_float,
     dlisp_make_int, dlisp_make_keyword, dlisp_make_nil, dlisp_make_string, dlisp_make_symbol,
 };
-pub use gc::{GC_allow_register_threads, GC_call_with_stack_base, GC_init, GC_malloc};
+pub use gc::{
+    GC_allow_register_threads, GC_call_with_stack_base, GC_get_stack_base, GC_init, GC_malloc,
+    GC_register_my_thread, GC_stack_base, GC_unregister_my_thread,
+};
 pub use gc::{dlisp_gc_init, dlisp_gc_malloc};
 pub use higher_order::{
     dlisp_every, dlisp_filter, dlisp_find, dlisp_for_each, dlisp_map, dlisp_reduce, dlisp_some,
@@ -41,7 +44,7 @@ pub use lists::{
     dlisp_append, dlisp_butlast, dlisp_car, dlisp_cdr, dlisp_drop, dlisp_flatten, dlisp_last,
     dlisp_reverse, dlisp_take, dlisp_vector_to_list,
 };
-pub use maps::{dlisp_make_map, dlisp_map_assoc, dlisp_map_get};
+pub use maps::{dlisp_keys, dlisp_make_map, dlisp_map_assoc, dlisp_map_get};
 pub use predicates::{
     dlisp_is_empty, dlisp_keyword_p, dlisp_list_p, dlisp_map_p, dlisp_nil_p, dlisp_number_p,
     dlisp_string_p, dlisp_symbol_p, dlisp_type_of, dlisp_vector_p,

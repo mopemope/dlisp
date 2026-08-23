@@ -31,6 +31,7 @@ fn create_jit_module() -> JITModule {
 
     // Register all required symbols as dummies
     let unary_symbols = [
+        "dlisp_keys",
         "dlisp_make_string",
         "dlisp_make_symbol",
         "dlisp_make_nil",
@@ -163,6 +164,7 @@ fn compile_expr_in_function(module: &mut JITModule, ast: &Value, func_name: &str
         module,
         builtins: &builtins,
         scopes: vec![HashMap::new()],
+        loop_frames: Vec::new(),
         captured_vars: HashMap::new(),
         env_param: None,
         ptr_type: int,

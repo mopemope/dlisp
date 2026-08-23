@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +12,7 @@ pub async fn and_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
         return Ok(Some(Value::Bool(true)));
     }
@@ -32,7 +33,7 @@ pub async fn or_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
         return Ok(Some(Value::Nil));
     }

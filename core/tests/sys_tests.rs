@@ -2,7 +2,7 @@ use dlisp_core::ast::Value;
 use dlisp_core::interpreter::default_env;
 use std::env;
 
-async fn eval_lisp(code: &str) -> Result<Value, String> {
+async fn eval_lisp(code: &str) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let mut env = default_env();
     let mut interpreter = dlisp_core::interpreter::Interpreter::new();
     let vals = dlisp_core::parser::parse(code).map_err(|e| format!("{:?}", e))?;

@@ -97,7 +97,7 @@ async fn try_eval_str(
     src: &str,
     interpreter: &mut dlisp_core::interpreter::Interpreter,
     env: &mut Rc<RefCell<dlisp_core::environment::Environment>>,
-) -> Result<Value, String> {
+) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let exprs = parse(src).map_err(|e| format!("{:?}", e))?;
     interpreter.eval(exprs[0].clone(), env).await
 }

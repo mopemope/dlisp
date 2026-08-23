@@ -11,6 +11,7 @@
 | binding / scope | `defvar_tests`, `setq_tests`, `let_star_tests`, `destructure_tests` | 各 `--test <名前>` |
 | macro / backquote | `macros.rs`, `macro_utils_tests.rs`, `backquote_tests.rs` | 各 `--test <名前>` |
 | 基本 builtin surface | `phase1_tests`, `phase2_tests`, `review_tests` | 各 `--test <名前>` |
+| stdlib (`require "core"`) | `core/tests/stdlib_tests.rs`, `loop_recur_tests.rs` | 各 `--test <名前>` |
 | map / vector / format / io / sys / os builtin | `map_tests`, `vector_tests`, `format_tests`, `io_tests`, `sys_tests`, `os_tests` | 対象の1つ |
 | JIT / codegen surface | `core/tests/jit_phase3_tests.rs`(他に `jit_phase2_tests`) | `cargo test -p dlisp-core --test jit_phase3_tests --quiet` |
 | AOT / compiler | `compiler_tests`, `compiler_integration_tests` | 各 `--test <名前>` |

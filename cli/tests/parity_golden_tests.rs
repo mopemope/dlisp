@@ -23,12 +23,14 @@ const GOLDEN_EXAMPLES: &[&str] = &[
     "hello.lisp",
     "higher_order_aot_test.lisp",
     "keyword_aot_test.lisp",
+    "loop_recur.lisp",
     "macros.lisp",
     "main_entry.lisp",
     "map_aot_test.lisp",
     "mutual_recursion.lisp",
     "no_main.lisp",
     "stdlib_range.lisp",
+    "stdlib_collections.lisp",
     "vector.lisp",
 ];
 

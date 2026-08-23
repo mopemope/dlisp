@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use futures::future::LocalBoxFuture;
 use std::cell::RefCell;
@@ -9,17 +10,17 @@ pub fn defvar<'a>(
     interpreter: &'a mut Interpreter,
     args: &'a [Value],
     env: &'a mut Rc<RefCell<Environment>>,
-) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
     Box::pin(async move {
         if args.is_empty() || args.len() > 3 {
-            return Err(
-                "defvar requires 1 to 3 arguments (symbol, [init-value, [doc-string]])".to_string(),
-            );
+            return Err(EvalFailure::message(
+                "defvar requires 1 to 3 arguments (symbol, [init-value, [doc-string]])",
+            ));
         }
 
         let symbol_name = match &args[0] {
             Value::Symbol(s) => s.clone(),
-            _ => return Err("defvar first argument must be a symbol".to_string()),
+            _ => return Err("defvar first argument must be a symbol".to_string().into()),
         };
 
         // Defvar normally defines globally (or at top level).

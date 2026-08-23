@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,9 +9,11 @@ pub async fn while_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
-        return Err("while requires at least 1 argument (condition)".to_string());
+        return Err("while requires at least 1 argument (condition)"
+            .to_string()
+            .into());
     }
 
     let condition_expr = args[0].clone();

@@ -134,6 +134,7 @@ pub fn compile_lambda<M: Module>(
                 module: ctx.module,
                 builtins: &inner_builtins,
                 scopes: vec![initial_scope],
+                loop_frames: Vec::new(),
                 captured_vars: captured_offsets,
                 env_param: Some(env_param),
                 ptr_type: int,
@@ -199,78 +200,15 @@ fn find_free_vars(
 ) {
     match expr {
         Value::Symbol(s) if !bound.contains(s) => {
-            let builtins = [
-                "+",
-                "-",
-                "*",
-                "/",
-                "%",
-                "mod",
-                ">",
-                "<",
-                "=",
-                ">=",
-                "<=",
-                "/=",
-                "print",
-                "not",
-                "sleep",
-                "spawn",
-                "let",
-                "let*",
-                "lambda",
-                "if",
-                "progn",
-                "do",
-                "when",
-                "unless",
-                "and",
-                "or",
-                "cond",
-                "quote",
-                "list",
-                "cons",
-                "car",
-                "first",
-                "cdr",
-                "rest",
-                "vector",
-                "count",
-                "nth",
-                "conj",
-                "hash-map",
-                "assoc",
-                "get",
-                "nil?",
-                "list?",
-                "number?",
-                "string?",
-                "symbol?",
-                "keyword?",
-                "map?",
-                "vector?",
-                "type-of",
-                "str",
-                "string-length",
-                "substring",
-                "string-append",
-                "map",
-                "filter",
-                "reduce",
-                "file-exists?",
-                "is-dir?",
-                "is-file?",
-                "list-dir",
-                "delete-file",
-                "getenv",
-                "setenv",
-                "cwd",
-                "set-cwd",
-                "args",
-                "exit",
-                "sh",
-            ];
-            if !builtins.contains(&s.as_str()) {
+            // Authoritative non-free sources: compiled builtins lower to FFI
+            // directly, and special forms never resolve through the
+            // environment. Anything else may be a global function/closure
+            // worth capturing.
+            if !crate::codegen::COMPILED_BUILTINS.contains(&s.as_str())
+                && !crate::forms::defun::is_codegen_special_form(s)
+                && !crate::forms::defun::is_interpreter_only_special_form(s)
+                && s != "defmacro"
+            {
                 free.push(s.clone());
             }
         }

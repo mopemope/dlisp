@@ -11,7 +11,7 @@ async fn eval_str(
     src: &str,
     interpreter: &mut dlisp_core::interpreter::Interpreter,
     env: &mut Rc<RefCell<dlisp_core::environment::Environment>>,
-) -> Result<Value, String> {
+) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let exprs = parse(src).unwrap();
     let mut result = Value::Nil;
     for expr in exprs {
@@ -113,8 +113,8 @@ async fn test_require_unknown_module_errors() {
     let exprs = parse(r#"(require "missing")"#).unwrap();
     let err = interp.eval(exprs[0].clone(), &mut env).await.unwrap_err();
 
-    assert!(err.contains("Unknown stdlib module 'missing'"));
-    assert!(err.contains("core"));
+    assert!(err.to_string().contains("Unknown stdlib module 'missing'"));
+    assert!(err.to_string().contains("core"));
 }
 
 #[tokio::test]
@@ -123,7 +123,10 @@ async fn test_require_requires_string_module_name() {
     let exprs = parse("(require 42)").unwrap();
     let err = interp.eval(exprs[0].clone(), &mut env).await.unwrap_err();
 
-    assert!(err.contains("require requires a string module name"));
+    assert!(
+        err.to_string()
+            .contains("require requires a string module name")
+    );
 }
 
 #[tokio::test]
@@ -264,9 +267,9 @@ async fn test_require_missing_file_error_contains_resolved_path() {
     let exprs = parse(r#"(require "./missing.lisp")"#).unwrap();
     let err = interp.eval(exprs[0].clone(), &mut env).await.unwrap_err();
 
-    assert!(err.contains("Failed to resolve required file"));
-    assert!(err.contains(&dir.display().to_string()));
-    assert!(err.contains("missing.lisp"));
+    assert!(err.to_string().contains("Failed to resolve required file"));
+    assert!(err.to_string().contains(&dir.display().to_string()));
+    assert!(err.to_string().contains("missing.lisp"));
 
     let _ = fs::remove_dir_all(&dir);
 }

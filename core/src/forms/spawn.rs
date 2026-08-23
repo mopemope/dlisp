@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,9 +9,11 @@ pub async fn spawn(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
-        return Err("spawn requires a function or function call".to_string());
+        return Err("spawn requires a function or function call"
+            .to_string()
+            .into());
     }
 
     let func_val = interpreter.eval(args[0].clone(), env).await?;
@@ -24,11 +27,11 @@ pub async fn spawn(
     tokio::task::spawn_local(async move {
         let mut interpreter = Interpreter::new();
         // apply expects the arguments and env to be passed seamlessly.
-        if let Err(e) = interpreter
+        if let Err(err) = interpreter
             .apply(func_val, eval_args, &mut env_clone.clone())
             .await
         {
-            eprintln!("Spawned task error: {}", e);
+            eprintln!("Spawned task error: {}", err);
         }
     });
 

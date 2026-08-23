@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::forms::registry::SpecialForm;
 use crate::interpreter::Interpreter;
 use futures::future::LocalBoxFuture;
@@ -14,11 +15,11 @@ impl SpecialForm for QuoteForm {
         _interpreter: &'a mut Interpreter,
         args: &'a [Value],
         _env: &'a mut Rc<RefCell<Environment>>,
-    ) -> LocalBoxFuture<'a, Result<Option<Value>, String>> {
+    ) -> LocalBoxFuture<'a, Result<Option<Value>, EvalFailure>> {
         let args = args.to_vec();
         Box::pin(async move {
             if args.len() != 1 {
-                return Err("quote requires exactly 1 argument".to_string());
+                return Err("quote requires exactly 1 argument".to_string().into());
             }
             Ok(Some(args[0].clone()))
         })

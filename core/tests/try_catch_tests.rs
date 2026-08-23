@@ -1,7 +1,7 @@
 use dlisp_core::ast::Value;
 use dlisp_core::interpreter::{default_env, default_interpreter};
 
-async fn run_code(code: &str) -> Result<Value, String> {
+async fn run_code(code: &str) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let mut interpreter = default_interpreter();
     let env = default_env();
 

@@ -8,7 +8,7 @@ async fn eval_str(
     src: &str,
     interpreter: &mut dlisp_core::interpreter::Interpreter,
     env: &mut Rc<RefCell<dlisp_core::environment::Environment>>,
-) -> Result<Value, String> {
+) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let exprs = parse(src).unwrap();
     let mut result = Value::Nil;
     for expr in exprs {

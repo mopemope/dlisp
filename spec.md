@@ -63,6 +63,7 @@
 - `progn` / `do`: 順次評価して最後の値を返す
 - `when` / `unless`: 条件付きブロック
 - `while`, `dotimes`, `dolist`: 反復
+- `loop` / `recur`: スタック安全な反復。`(loop [name init ...] body...)` は束縛を持ち、body 中の任意位置の `(recur expr ...)` が全束縛を再束縛して次の反復へ進む。recur 引数の個数は束縛数と一致が必要。loop を囲まずに recur が評価器の外層へ到達した場合はエラー。interpreter / JIT / AOT の全経路で同一意味論
 - `try` / `throw`: 例外系
 
 ## 評価補助とメタプログラミング
@@ -79,6 +80,7 @@
 ## コレクションと高階操作
 - List、Vector、Map を扱う builtins がある
 - `map`, `filter`, `reduce`, `some`, `every`, `find`, `for-each`, `map-indexed`, `update`, `map-keys`, `map-vals` は current evaluator の評価規則に乗る special form として登録されている
+- `(require "core")` の stdlib は Clojure 風のヘルパーを提供する: `member?`, `distinct`, `frequencies`, `group-by`, `merge-with`(2 map), `get-in`, `assoc-in`, `update-in`(unary f、パスは vector), `partition`, `interleave`。これらは Lisp 実装で、interpreter / JIT / AOT 全経路で compile される
 
 ## 並行実行
 - `spawn` は別タスクで関数適用を走らせる

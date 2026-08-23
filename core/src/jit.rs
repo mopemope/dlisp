@@ -51,6 +51,7 @@ impl Default for JIT {
             dlisp_runtime::dlisp_map_assoc as *const u8,
         );
         builder.symbol("dlisp_map_get", dlisp_runtime::dlisp_map_get as *const u8);
+        builder.symbol("dlisp_keys", dlisp_runtime::dlisp_keys as *const u8);
         builder.symbol("dlisp_get", dlisp_runtime::dlisp_get as *const u8);
         builder.symbol("dlisp_car", dlisp_runtime::dlisp_car as *const u8);
         builder.symbol("dlisp_cdr", dlisp_runtime::dlisp_cdr as *const u8);

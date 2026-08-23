@@ -142,7 +142,7 @@ async fn test_map_wrong_args() {
     let exprs = parse("(map (lambda (x) x))").unwrap(); // Missing list
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("exactly 2 arguments"));
+    assert!(res.unwrap_err().to_string().contains("exactly 2 arguments"));
 }
 
 #[tokio::test]
@@ -151,7 +151,7 @@ async fn test_map_not_a_list() {
     let exprs = parse("(map (lambda (x) x) 42)").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("expects a list"));
+    assert!(res.unwrap_err().to_string().contains("expects a list"));
 }
 
 #[tokio::test]
@@ -160,7 +160,7 @@ async fn test_map_not_a_func() {
     let exprs = parse("(map 42 '(1 2 3))").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("not a function"));
+    assert!(res.unwrap_err().to_string().contains("not a function"));
 }
 
 #[tokio::test]
@@ -183,7 +183,7 @@ async fn test_reduce_error_in_func() {
     let exprs = parse("(reduce (lambda (acc x) (/ acc 0)) 10 '(1 2 3))").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("zero"));
+    assert!(res.unwrap_err().to_string().contains("zero"));
 }
 
 #[tokio::test]
@@ -192,7 +192,7 @@ async fn test_filter_wrong_args() {
     let exprs = parse("(filter (lambda (x) x))").unwrap(); // Missing list
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("exactly 2 arguments"));
+    assert!(res.unwrap_err().to_string().contains("exactly 2 arguments"));
 }
 
 #[tokio::test]
@@ -201,7 +201,7 @@ async fn test_filter_not_a_list() {
     let exprs = parse("(filter (lambda (x) x) 42)").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("expects a list"));
+    assert!(res.unwrap_err().to_string().contains("expects a list"));
 }
 
 #[tokio::test]
@@ -210,7 +210,7 @@ async fn test_filter_not_a_func() {
     let exprs = parse("(filter 42 '(1 2 3))").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("not a function"));
+    assert!(res.unwrap_err().to_string().contains("not a function"));
 }
 
 #[tokio::test]
@@ -219,7 +219,7 @@ async fn test_reduce_wrong_args() {
     let exprs = parse("(reduce + 0)").unwrap(); // Missing list
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("exactly 3 arguments"));
+    assert!(res.unwrap_err().to_string().contains("exactly 3 arguments"));
 }
 
 #[tokio::test]
@@ -228,7 +228,7 @@ async fn test_reduce_not_a_list() {
     let exprs = parse("(reduce + 0 42)").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("expects a list"));
+    assert!(res.unwrap_err().to_string().contains("expects a list"));
 }
 
 #[tokio::test]
@@ -237,7 +237,7 @@ async fn test_reduce_not_a_func() {
     let exprs = parse("(reduce 42 0 '(1 2 3))").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("not a function"));
+    assert!(res.unwrap_err().to_string().contains("not a function"));
 }
 
 #[tokio::test]
@@ -401,7 +401,7 @@ async fn test_some_wrong_args() {
     let exprs = parse("(some (lambda (x) x))").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("exactly 2 arguments"));
+    assert!(res.unwrap_err().to_string().contains("exactly 2 arguments"));
 }
 
 #[tokio::test]
@@ -410,7 +410,7 @@ async fn test_some_not_a_list() {
     let exprs = parse("(some (lambda (x) x) 42)").unwrap();
     let res = i.eval(exprs[0].clone(), &mut e).await;
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("expects a list"));
+    assert!(res.unwrap_err().to_string().contains("expects a list"));
 }
 
 #[tokio::test]

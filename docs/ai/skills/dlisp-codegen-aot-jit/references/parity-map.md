@@ -16,7 +16,7 @@ Compiled builtin names are listed in `COMPILED_BUILTINS` (`core/src/codegen/mod.
 
 Currently represented compiled builtins include:
 - Arithmetic/comparison: `+`, `-`, `*`, `/`, `%`, `mod`, `>`, `<`, `=`, `>=`, `<=`, `/=`
-- Core values/collections: `print`, `not`, `list`, `cons`, `car`, `first`, `cdr`, `rest`, `vector`, `nth`, `count`, `conj`, `hash-map`, `assoc`, `get`
+- Core values/collections: `print`, `not`, `list`, `cons`, `car`, `first`, `cdr`, `rest`, `vector`, `nth`, `count`, `conj`, `hash-map`, `assoc`, `get`, `keys`
 - List helpers: `append`, `reverse`, `last`, `butlast`, `flatten`, `take`, `drop`, `empty?`
 - Strings/types: `str`, `string-length`, `substring`, `string-append`,
   `string-split`, `string-replace`, `string-upper`, `string-lower`,
@@ -30,7 +30,9 @@ Currently represented compiled builtins include:
 Compiled special forms include:
 - Binding/functions: `let`, `let*`, `setq`, `defvar`, `lambda`
 - Control: `if`, `progn`, `do`, `when`, `unless`, `and`, `or`, `cond`,
-  `while`, `dotimes`, `dolist`
+  `while`, `dotimes`, `dolist`, `loop` / `recur`(recur は最内 loop の
+  束縛を一時変数経由で再定義し body 先頭へ jump; interpreter の
+  abort-on-recur 段階的実行に対応するため後続式は dead block へ)
 - Quoting/concurrency: `quote`, `spawn`
 
 ## Interpreter-only by default
@@ -146,3 +148,11 @@ the `range` migration:
 - Runtime exported symbols: `rg -n "extern \"C\" fn dlisp_" runtime/src`
 - Codegen declarations: `rg -n "declare_function\\(\"dlisp_" core/src/codegen`
 - Lowering dispatch: match arms in `core/src/codegen/forms/builtins.rs`
+
+## Known limitation: cross-function recur
+Interpreter `recur` escapes dynamically, so a helper called from inside a
+`loop` can recur the caller's loop. Compiled code resolves `recur` against
+the compile-time loop stack; a `recur` inside a lambda/defun with no
+lexically enclosing `loop` fails codegen ("recur outside loop"), which makes
+the JIT gate keep such functions on the interpreter and makes AOT reject the
+function. Keep `recur` lexically inside its `loop` for compiled paths.

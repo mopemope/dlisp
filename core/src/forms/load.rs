@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::forms::require::{normalize_source_dir, resolve_source_path};
 use crate::interpreter::Interpreter;
 use crate::parser::parse;
@@ -11,16 +12,18 @@ pub async fn load_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
-        return Err("load requires a string argument representing the file path".to_string());
+        return Err("load requires a string argument representing the file path"
+            .to_string()
+            .into());
     }
 
     let path_val = interpreter.eval(args[0].clone(), env).await?;
 
     let path = match path_val {
         Value::String(s) => s,
-        _ => return Err("load requires a string file path".to_string()),
+        _ => return Err("load requires a string file path".to_string().into()),
     };
 
     let resolved = {
@@ -31,11 +34,11 @@ pub async fn load_form(
     let content = match fs::read_to_string(&resolved) {
         Ok(c) => c,
         Err(e) => {
-            return Err(format!(
+            return Err(EvalFailure::message(format!(
                 "Failed to read file '{}': {}",
                 resolved.display(),
                 e
-            ));
+            )));
         }
     };
     let canonical = fs::canonicalize(&resolved).unwrap_or_else(|_| resolved.clone());
@@ -65,6 +68,10 @@ pub async fn load_form(
             }
             Ok(Some(result))
         }
-        Err(e) => Err(format!("Parse error in '{}': {:?}", resolved.display(), e)),
+        Err(e) => Err(EvalFailure::message(format!(
+            "Parse error in '{}': {:?}",
+            resolved.display(),
+            e
+        ))),
     }
 }

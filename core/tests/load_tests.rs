@@ -60,7 +60,12 @@ async fn test_load_nonexistent_file() {
     let parsed = dlisp_core::parser::parse(code).unwrap();
     let result = interpreter.eval(parsed[0].clone(), &mut env).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Failed to read file"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to read file")
+    );
 }
 
 #[tokio::test]
@@ -76,7 +81,7 @@ async fn test_load_invalid_lisp() {
     let parsed = dlisp_core::parser::parse(&code).unwrap();
     let result = interpreter.eval(parsed[0].clone(), &mut env).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("Parse error"));
+    assert!(result.unwrap_err().to_string().contains("Parse error"));
 
     let _ = fs::remove_file(&test_file);
     let _ = fs::remove_dir(&dir);
@@ -91,7 +96,7 @@ async fn test_load_requires_string_arg() {
     let parsed = dlisp_core::parser::parse(code).unwrap();
     let result = interpreter.eval(parsed[0].clone(), &mut env).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().contains("string file path"));
+    assert!(result.unwrap_err().to_string().contains("string file path"));
 }
 
 #[tokio::test]

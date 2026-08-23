@@ -22,6 +22,7 @@
 - `let`
 - `let*`
 - `load`
+- `loop`
 - `macroexpand`
 - `map`
 - `map-indexed`
@@ -30,6 +31,7 @@
 - `or`
 - `progn`
 - `quote`
+- `recur`
 - `reduce`
 - `require`
 - `setq`

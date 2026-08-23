@@ -13,6 +13,7 @@ pub mod lambda;
 pub mod let_expr;
 pub mod let_star;
 pub mod load;
+pub mod loop_expr;
 pub mod macroexpand;
 pub mod progn;
 pub mod quote;

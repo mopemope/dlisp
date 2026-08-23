@@ -3,8 +3,35 @@ use std::ffi::c_void;
 use tokio::runtime::Runtime;
 
 use crate::constructors::dlisp_make_int;
-use crate::gc::{GC_call_with_stack_base, dlisp_gc_init};
+use crate::gc::{
+    GC_call_with_stack_base, GC_get_stack_base, GC_register_my_thread, GC_stack_base,
+    GC_unregister_my_thread, dlisp_gc_init,
+};
 use crate::value::{DlispValue, ValueType};
+
+const GC_SUCCESS: i32 = 0;
+
+/// Runs `f` on a GC-registered thread.
+///
+/// Compiled programs allocate from worker threads (tokio blocking pool);
+/// Boehm aborts with "Collecting from unknown thread" if such a thread
+/// triggers a collection without being registered. Registration is
+/// per-thread and must be undone before the pooled thread exits.
+pub fn with_gc_registered<T>(f: impl FnOnce() -> T) -> T {
+    dlisp_gc_init();
+    unsafe {
+        let mut stack_base = GC_stack_base {
+            mem_base: std::ptr::null_mut(),
+        };
+        let registered = GC_get_stack_base(&mut stack_base) == GC_SUCCESS
+            && GC_register_my_thread(&stack_base) == GC_SUCCESS;
+        let out = f();
+        if registered {
+            GC_unregister_my_thread();
+        }
+        out
+    }
+}
 
 // Wrapper callbacks for GC_call_with_stack_base
 
@@ -39,8 +66,10 @@ pub unsafe extern "C" fn dlisp_main(user_main_ptr: extern "C" fn(*mut c_void) ->
     rt.block_on(async {
         // Run the user's main function
         // Pass NULL as env
-        let handle = tokio::task::spawn_blocking(move || unsafe {
-            GC_call_with_stack_base(run_user_main_wrapper, user_main_ptr as *mut c_void);
+        let handle = tokio::task::spawn_blocking(move || {
+            with_gc_registered(|| unsafe {
+                GC_call_with_stack_base(run_user_main_wrapper, user_main_ptr as *mut c_void);
+            });
         });
 
         handle.await.unwrap();
@@ -89,9 +118,9 @@ pub unsafe extern "C" fn dlisp_spawn(closure_ptr: *mut DlispValue) {
         let local_closure = Closure { func, env };
         let local_closure_ptr = &local_closure as *const _ as *mut c_void;
 
-        unsafe {
+        with_gc_registered(|| unsafe {
             let _res = GC_call_with_stack_base(run_closure_wrapper, local_closure_ptr);
-        }
+        });
     });
 }
 

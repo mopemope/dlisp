@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::interpreter::Interpreter;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -8,16 +9,18 @@ pub async fn let_form(
     interpreter: &mut Interpreter,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.is_empty() {
-        return Err("let requires at least a list of bindings".to_string());
+        return Err("let requires at least a list of bindings"
+            .to_string()
+            .into());
     }
 
     let empty_vec = Vec::new();
     let bindings = match &args[0] {
         Value::List(l) => l,
         Value::Nil => &empty_vec,
-        _ => return Err("let bindings must be a list".to_string()),
+        _ => return Err("let bindings must be a list".to_string().into()),
     };
 
     let body = args[1..].to_vec();
@@ -28,9 +31,9 @@ pub async fn let_form(
         match binding {
             Value::List(bind_pair) => {
                 if bind_pair.len() != 2 {
-                    return Err(
-                        "let binding must be a list of two elements: (pattern value)".to_string(),
-                    );
+                    return Err(EvalFailure::message(
+                        "let binding must be a list of two elements: (pattern value)",
+                    ));
                 }
                 let pattern = &bind_pair[0];
                 let val_expr = &bind_pair[1];
@@ -42,7 +45,7 @@ pub async fn let_form(
                     &mut evaluated_bindings,
                 )?;
             }
-            _ => return Err("let binding must be a list".to_string()),
+            _ => return Err("let binding must be a list".to_string().into()),
         }
     }
 

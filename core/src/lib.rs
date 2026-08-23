@@ -6,6 +6,7 @@ pub mod builtins;
 pub mod codegen;
 pub mod compiler;
 pub mod environment;
+pub mod eval_failure;
 pub mod forms;
 pub mod interpreter;
 pub mod jit;

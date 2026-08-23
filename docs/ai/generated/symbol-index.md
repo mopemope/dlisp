@@ -9,44 +9,46 @@ Lookup table for AI agents: jump straight to the definition instead of grepping.
 
 Registered in the evaluator registry.
 
-- `and` — core/src/forms/registry.rs:593
-- `apply` — core/src/forms/registry.rs:607
-- `cond` — core/src/forms/registry.rs:592
-- `defmacro` — core/src/interpreter.rs:61
-- `defun` — core/src/forms/registry.rs:581
-- `defvar` — core/src/forms/registry.rs:587
-- `do` — core/src/forms/registry.rs:591
-- `dolist` — core/src/forms/registry.rs:612
-- `dotimes` — core/src/forms/registry.rs:611
-- `eval` — core/src/forms/registry.rs:606
-- `every` — core/src/forms/registry.rs:599
-- `filter` — core/src/forms/registry.rs:596
-- `find` — core/src/forms/registry.rs:600
-- `for-each` — core/src/forms/registry.rs:601
-- `if` — core/src/forms/registry.rs:582
-- `lambda` — core/src/forms/registry.rs:586
-- `let` — core/src/forms/registry.rs:583
-- `let*` — core/src/forms/registry.rs:584
-- `load` — core/src/forms/registry.rs:614
-- `macroexpand` — core/src/forms/registry.rs:613
-- `map` — core/src/forms/registry.rs:595
-- `map-indexed` — core/src/forms/registry.rs:602
-- `map-keys` — core/src/forms/registry.rs:604
-- `map-vals` — core/src/forms/registry.rs:605
-- `or` — core/src/forms/registry.rs:594
-- `progn` — core/src/forms/registry.rs:590
-- `quote` — core/src/forms/registry.rs:588
-- `reduce` — core/src/forms/registry.rs:597
-- `require` — core/src/forms/registry.rs:615
-- `setq` — core/src/forms/registry.rs:589
-- `some` — core/src/forms/registry.rs:598
-- `spawn` — core/src/forms/registry.rs:585
-- `throw` — core/src/forms/registry.rs:617
-- `try` — core/src/forms/registry.rs:616
-- `unless` — core/src/forms/registry.rs:610
-- `update` — core/src/forms/registry.rs:603
-- `when` — core/src/forms/registry.rs:609
-- `while` — core/src/forms/registry.rs:608
+- `and` — core/src/forms/registry.rs:595
+- `apply` — core/src/forms/registry.rs:609
+- `cond` — core/src/forms/registry.rs:594
+- `defmacro` — core/src/interpreter.rs:62
+- `defun` — core/src/forms/registry.rs:583
+- `defvar` — core/src/forms/registry.rs:589
+- `do` — core/src/forms/registry.rs:593
+- `dolist` — core/src/forms/registry.rs:616
+- `dotimes` — core/src/forms/registry.rs:615
+- `eval` — core/src/forms/registry.rs:608
+- `every` — core/src/forms/registry.rs:601
+- `filter` — core/src/forms/registry.rs:598
+- `find` — core/src/forms/registry.rs:602
+- `for-each` — core/src/forms/registry.rs:603
+- `if` — core/src/forms/registry.rs:584
+- `lambda` — core/src/forms/registry.rs:588
+- `let` — core/src/forms/registry.rs:585
+- `let*` — core/src/forms/registry.rs:586
+- `load` — core/src/forms/registry.rs:618
+- `loop` — core/src/forms/registry.rs:611
+- `macroexpand` — core/src/forms/registry.rs:617
+- `map` — core/src/forms/registry.rs:597
+- `map-indexed` — core/src/forms/registry.rs:604
+- `map-keys` — core/src/forms/registry.rs:606
+- `map-vals` — core/src/forms/registry.rs:607
+- `or` — core/src/forms/registry.rs:596
+- `progn` — core/src/forms/registry.rs:592
+- `quote` — core/src/forms/registry.rs:590
+- `recur` — core/src/forms/registry.rs:612
+- `reduce` — core/src/forms/registry.rs:599
+- `require` — core/src/forms/registry.rs:619
+- `setq` — core/src/forms/registry.rs:591
+- `some` — core/src/forms/registry.rs:600
+- `spawn` — core/src/forms/registry.rs:587
+- `throw` — core/src/forms/registry.rs:621
+- `try` — core/src/forms/registry.rs:620
+- `unless` — core/src/forms/registry.rs:614
+- `update` — core/src/forms/registry.rs:605
+- `when` — core/src/forms/registry.rs:613
+- `while` — core/src/forms/registry.rs:610
 
 ## Builtins
 
@@ -90,7 +92,7 @@ Registered into the default environment.
 - `hash-map [compiled]` — core/src/builtins/mod.rs:116
 - `is-dir? [compiled]` — core/src/builtins/mod.rs:71
 - `is-file? [compiled]` — core/src/builtins/mod.rs:72
-- `keys` — core/src/builtins/mod.rs:120
+- `keys [compiled]` — core/src/builtins/mod.rs:120
 - `last [compiled]` — core/src/builtins/mod.rs:102
 - `list [compiled]` — core/src/builtins/mod.rs:92
 - `list-dir [compiled]` — core/src/builtins/mod.rs:77
@@ -147,8 +149,8 @@ Registered into the default environment.
 - `dlisp_find` — runtime/src/higher_order.rs:237
 - `dlisp_flatten` — runtime/src/lists.rs:269
 - `dlisp_for_each` — runtime/src/higher_order.rs:272
-- `dlisp_gc_init` — runtime/src/gc.rs:20
-- `dlisp_gc_malloc` — runtime/src/gc.rs:30
+- `dlisp_gc_init` — runtime/src/gc.rs:30
+- `dlisp_gc_malloc` — runtime/src/gc.rs:40
 - `dlisp_get` — runtime/src/collections.rs:10
 - `dlisp_getenv` — runtime/src/sys.rs:8
 - `dlisp_gt` — runtime/src/cmp.rs:24
@@ -157,13 +159,14 @@ Registered into the default environment.
 - `dlisp_is_empty` — runtime/src/predicates.rs:73
 - `dlisp_is_file` — runtime/src/io.rs:52
 - `dlisp_is_truthy` — runtime/src/cmp.rs:241
+- `dlisp_keys` — runtime/src/maps.rs:208
 - `dlisp_keyword_p` — runtime/src/predicates.rs:52
 - `dlisp_last` — runtime/src/lists.rs:161
 - `dlisp_list_dir` — runtime/src/io.rs:74
 - `dlisp_list_p` — runtime/src/predicates.rs:16
 - `dlisp_lt` — runtime/src/cmp.rs:53
 - `dlisp_lte` — runtime/src/cmp.rs:198
-- `dlisp_main` — runtime/src/task.rs:34
+- `dlisp_main` — runtime/src/task.rs:61
 - `dlisp_make_bool` — runtime/src/constructors.rs:119
 - `dlisp_make_closure` — runtime/src/constructors.rs:54
 - `dlisp_make_cons` — runtime/src/constructors.rs:74
@@ -192,9 +195,9 @@ Registered into the default environment.
 - `dlisp_set_cwd` — runtime/src/sys.rs:74
 - `dlisp_setenv` — runtime/src/sys.rs:30
 - `dlisp_sh` — runtime/src/os.rs:8
-- `dlisp_sleep` — runtime/src/task.rs:102
+- `dlisp_sleep` — runtime/src/task.rs:131
 - `dlisp_some` — runtime/src/higher_order.rs:165
-- `dlisp_spawn` — runtime/src/task.rs:60
+- `dlisp_spawn` — runtime/src/task.rs:89
 - `dlisp_str` — runtime/src/strings.rs:9
 - `dlisp_string_append` — runtime/src/strings.rs:98
 - `dlisp_string_contains` — runtime/src/strings.rs:280
@@ -230,12 +233,23 @@ Lisp-level definitions loaded by `(require "core")`.
 - `->` — stdlib/src/core.lisp:47 (defmacro)
 - `->>` — stdlib/src/core.lisp:53 (defmacro)
 - `as->` — stdlib/src/core.lisp:59 (defmacro)
+- `assoc-in` — stdlib/src/core.lisp:168 (defun)
+- `assoc-in-at` — stdlib/src/core.lisp:161 (defun)
 - `constantly` — stdlib/src/core.lisp:10 (defun)
 - `dec` — stdlib/src/core.lisp:4 (defun)
+- `distinct` — stdlib/src/core.lisp:113 (defun)
 - `empty-list?` — stdlib/src/core.lisp:28 (defun)
+- `frequencies` — stdlib/src/core.lisp:121 (defun)
+- `get-in` — stdlib/src/core.lisp:157 (defun)
+- `get-in-at` — stdlib/src/core.lisp:148 (defun)
+- `group-by` — stdlib/src/core.lisp:128 (defun)
 - `identity` — stdlib/src/core.lisp:7 (defun)
 - `inc` — stdlib/src/core.lisp:1 (defun)
+- `interleave` — stdlib/src/core.lisp:190 (defun)
+- `member?` — stdlib/src/core.lisp:109 (defun)
+- `merge-with` — stdlib/src/core.lisp:138 (defun)
 - `negative?` — stdlib/src/core.lisp:25 (defun)
+- `partition` — stdlib/src/core.lisp:183 (defun)
 - `positive?` — stdlib/src/core.lisp:22 (defun)
 - `range` — stdlib/src/core.lisp:97 (defun)
 - `range-build` — stdlib/src/core.lisp:85 (defun)
@@ -245,5 +259,7 @@ Lisp-level definitions loaded by `(require "core")`.
 - `third` — stdlib/src/core.lisp:16 (defun)
 - `thread-first-step` — stdlib/src/core.lisp:37 (defun)
 - `thread-last-step` — stdlib/src/core.lisp:42 (defun)
+- `update-in` — stdlib/src/core.lisp:179 (defun)
+- `update-in-at` — stdlib/src/core.lisp:172 (defun)
 - `when-let` — stdlib/src/core.lisp:31 (defmacro)
 - `zero?` — stdlib/src/core.lisp:19 (defun)

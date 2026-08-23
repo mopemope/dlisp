@@ -4,7 +4,7 @@ use dlisp_core::parser::parse;
 use std::fs;
 use std::path::PathBuf;
 
-async fn run_file(name: &str) -> Result<Value, String> {
+async fn run_file(name: &str) -> Result<Value, dlisp_core::eval_failure::EvalFailure> {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.pop(); // root
     path.push("example-lisp");

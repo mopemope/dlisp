@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::codegen::context::FunctionTranslationContext;
+use crate::codegen::forms::control::{block_terminated, ensure_open_block};
 use cranelift::prelude::{Value as IrValue, *};
 use cranelift_module::Module;
 
@@ -12,6 +13,7 @@ pub fn compile_if<M: Module>(
     }
 
     let cond_val = ctx.compile_expr(&list[1])?;
+    ensure_open_block(ctx);
 
     // Check truthiness
     let local_truthy = ctx
@@ -38,8 +40,10 @@ pub fn compile_if<M: Module>(
     ctx.builder.switch_to_block(then_block);
     ctx.builder.seal_block(then_block);
     let then_val = ctx.compile_expr(&list[2])?;
-    ctx.builder.ins().stack_store(then_val, slot, 0);
-    ctx.builder.ins().jump(merge_block, &[]);
+    if !block_terminated(ctx) {
+        ctx.builder.ins().stack_store(then_val, slot, 0);
+        ctx.builder.ins().jump(merge_block, &[]);
+    }
 
     // Else Block
     ctx.builder.switch_to_block(else_block);
@@ -49,8 +53,10 @@ pub fn compile_if<M: Module>(
     } else {
         ctx.builder.ins().iconst(ctx.ptr_type, 0)
     };
-    ctx.builder.ins().stack_store(else_val, slot, 0);
-    ctx.builder.ins().jump(merge_block, &[]);
+    if !block_terminated(ctx) {
+        ctx.builder.ins().stack_store(else_val, slot, 0);
+        ctx.builder.ins().jump(merge_block, &[]);
+    }
 
     // Merge Block
     ctx.builder.switch_to_block(merge_block);

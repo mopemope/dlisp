@@ -1,5 +1,6 @@
 use crate::ast::Value;
 use crate::environment::Environment;
+use crate::eval_failure::EvalFailure;
 use crate::jit::JIT;
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -25,6 +26,8 @@ pub(crate) fn is_codegen_special_form(name: &str) -> bool {
             | "while"
             | "dotimes"
             | "dolist"
+            | "loop"
+            | "recur"
     )
 }
 
@@ -128,6 +131,32 @@ fn find_uncompiled_call_inner(
                                 )?;
                             }
                         }
+                    }
+                    for item in items.iter().skip(2) {
+                        find_uncompiled_call_inner(
+                            item,
+                            current_func,
+                            env,
+                            pending_functions,
+                            &inner_locals,
+                        )?;
+                    }
+                    return None;
+                }
+
+                // `loop`: flat name/init bindings introduce locals for the body.
+                if op == "loop" {
+                    let mut inner_locals: Vec<String> = locals.to_vec();
+                    match items.get(1) {
+                        Some(Value::List(bs)) | Some(Value::Vector(bs)) => {
+                            if bs.len() % 2 != 0 {
+                                return Some("loop".to_string());
+                            }
+                            for name in bs.iter().step_by(2) {
+                                collect_pattern_names(name, &mut inner_locals);
+                            }
+                        }
+                        _ => return Some("loop".to_string()),
                     }
                     for item in items.iter().skip(2) {
                         find_uncompiled_call_inner(
@@ -273,17 +302,17 @@ pub fn defun(
     jit: &mut JIT,
     args: &[Value],
     env: &mut Rc<RefCell<Environment>>,
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, EvalFailure> {
     if args.len() < 3 {
-        return Err("defun requires at least 3 arguments".to_string());
+        return Err("defun requires at least 3 arguments".to_string().into());
     }
     let func_name = match &args[0] {
         Value::Symbol(n) => n.clone(),
-        _ => return Err("defun name must be a symbol".to_string()),
+        _ => return Err("defun name must be a symbol".to_string().into()),
     };
     let params = match &args[1] {
         Value::List(l) => l,
-        _ => return Err("defun args must be a list".to_string()),
+        _ => return Err("defun args must be a list".to_string().into()),
     };
     let mut arg_names = Vec::new();
     let mut rest_param = None;
@@ -292,21 +321,23 @@ pub fn defun(
         match &params[i] {
             Value::Symbol(n) if n == "&rest" => {
                 if i + 1 >= params.len() {
-                    return Err("&rest requires a parameter name".to_string());
+                    return Err("&rest requires a parameter name".to_string().into());
                 }
                 match &params[i + 1] {
                     Value::Symbol(rest_name) => {
                         rest_param = Some(rest_name.clone());
                     }
-                    _ => return Err("&rest parameter must be a symbol".to_string()),
+                    _ => return Err("&rest parameter must be a symbol".to_string().into()),
                 }
                 if i + 2 < params.len() {
-                    return Err("&rest parameter must be last in the parameter list".to_string());
+                    return Err("&rest parameter must be last in the parameter list"
+                        .to_string()
+                        .into());
                 }
                 break;
             }
             Value::Symbol(n) => arg_names.push(n.clone()),
-            _ => return Err("defun arg must be a symbol".to_string()),
+            _ => return Err("defun arg must be a symbol".to_string().into()),
         }
         i += 1;
     }

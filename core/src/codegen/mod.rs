@@ -47,6 +47,7 @@ pub const COMPILED_BUILTINS: &[&str] = &[
     "conj",
     "hash-map",
     "assoc",
+    "keys",
     "get",
     // strings / types
     "str",
@@ -317,6 +318,7 @@ impl CodeGen {
                 module,
                 builtins: &builtins,
                 scopes: vec![initial_scope],
+                loop_frames: Vec::new(),
                 captured_vars: HashMap::new(),
                 env_param: Some(env_param),
                 ptr_type: int,
@@ -404,6 +406,7 @@ impl CodeGen {
             module,
             builtins: &builtins,
             scopes: vec![HashMap::new()],
+            loop_frames: Vec::new(),
             captured_vars: HashMap::new(),
             env_param: Some(env_param),
             ptr_type: int,
