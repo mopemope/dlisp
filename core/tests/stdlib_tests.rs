@@ -169,3 +169,130 @@ async fn test_interleave() {
         Value::List(vec![Value::Integer(1), Value::Symbol("x".to_string())])
     );
 }
+
+#[tokio::test]
+async fn test_match_literals_and_bindings() {
+    let (mut i, mut e) = setup();
+    // Literal patterns use structural `=` equality.
+    assert_eq!(
+        eval_str("(match 42 (42 :answer) (_ :other))", &mut i, &mut e).await,
+        Value::Keyword("answer".to_string())
+    );
+    assert_eq!(
+        eval_str(
+            r#"(match "hi" ("hi" :greeting) (_ :other))"#,
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::Keyword("greeting".to_string())
+    );
+    assert_eq!(
+        eval_str("(match :ok (:ok :fine) (_ :other))", &mut i, &mut e).await,
+        Value::Keyword("fine".to_string())
+    );
+    // A plain symbol pattern binds the scrutinee; `_` matches without binding.
+    assert_eq!(
+        eval_str("(match 7 (n (* n n)) (_ nil))", &mut i, &mut e).await,
+        Value::Integer(49)
+    );
+    // No matching clause yields nil.
+    assert_eq!(
+        eval_str("(match :nope (1 :one) ([a b] :pair))", &mut i, &mut e).await,
+        Value::Nil
+    );
+}
+
+#[tokio::test]
+async fn test_match_guards_fall_through() {
+    let (mut i, mut e) = setup();
+    // A failed guard must fall through to later clauses.
+    assert_eq!(
+        eval_str(
+            "(match 8 ((x :when (> x 10)) :big) ((x :when (> x 5)) :medium) (x :small))",
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::Keyword("medium".to_string())
+    );
+    assert_eq!(
+        eval_str(
+            "(match 2 ((x :when (> x 10)) :big) ((x :when (> x 5)) :medium) (x :small))",
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::Keyword("small".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_match_sequence_patterns() {
+    let (mut i, mut e) = setup();
+    // Fixed-length sequence over lists and vectors.
+    assert_eq!(
+        eval_str("(match [1 2] ([a b] (+ a b)))", &mut i, &mut e).await,
+        Value::Integer(3)
+    );
+    assert_eq!(
+        eval_str("(match '(1 2) ([a b] (+ a b)))", &mut i, &mut e).await,
+        Value::Integer(3)
+    );
+    // Wrong length must not match.
+    assert_eq!(
+        eval_str(
+            "(match '(1 2 3) ([a b] :two) ([a b c] :three))",
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::Keyword("three".to_string())
+    );
+    // `&rest` captures the tail.
+    assert_eq!(
+        eval_str("(match [1 2 3 4] ([a b &rest r] r))", &mut i, &mut e).await,
+        Value::Vector(vec![Value::Integer(3), Value::Integer(4)])
+    );
+}
+
+#[tokio::test]
+async fn test_match_map_and_nested_patterns() {
+    let (mut i, mut e) = setup();
+    // Every key in the map pattern must be present.
+    assert_eq!(
+        eval_str("(match {:x 2 :y 3} ({:x x :y y} (+ x y)))", &mut i, &mut e).await,
+        Value::Integer(5)
+    );
+    // A missing key means no match.
+    assert_eq!(
+        eval_str(
+            "(match {:x 1} ({:x x :y y} :both) (_ :fallback))",
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::Keyword("fallback".to_string())
+    );
+    // Nested composition: sequence of map and guard patterns.
+    assert_eq!(
+        eval_str(
+            "(match [{:kind :add} 5] ([{:kind k} v] (list k v)))",
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::List(vec![Value::Keyword("add".to_string()), Value::Integer(5),])
+    );
+    // The scrutinee is evaluated exactly once (side effects happen once).
+    assert_eq!(
+        eval_str(
+            "(defvar calls 0) (defvar once (lambda () (setq calls (+ calls 1)) 9)) \
+             (match (once) (9 :nine)) calls",
+            &mut i,
+            &mut e
+        )
+        .await,
+        Value::Integer(1)
+    );
+}

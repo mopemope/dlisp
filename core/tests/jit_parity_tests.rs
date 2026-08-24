@@ -328,3 +328,68 @@ async fn test_jit_gate_accepts_let_loops_and_higher_order_forms() {
         }
     }
 }
+
+#[tokio::test]
+async fn test_match_expansion_stays_jit_eligible() {
+    // `match` lowers to if/let plus compiled builtins, so a defun whose body
+    // uses it must still be eagerly JIT-compiled instead of silently falling
+    // back to the interpreter.
+    let code = r#"(require "core")
+                   (defun f (v)
+                     (match v
+                       (42 :answer)
+                       ([a b] (+ a b))
+                       ((n :when (> n 0)) :pos)
+                       (_ :other)))"#;
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+    for val in parse(code).unwrap() {
+        interpreter.eval(val, &mut env).await.unwrap();
+    }
+    match env.borrow().get("f") {
+        Some(Value::UserFunc {
+            jit_code: Some(_), ..
+        }) => {}
+        _ => panic!("match-using defun should be JIT-compiled"),
+    }
+}
+
+#[tokio::test]
+async fn test_jit_match_semantics() {
+    // Same function as above, exercised through the compiled call path.
+    // Guards are not type-checked, so numeric guards pair with `number?`.
+    assert_eq!(
+        eval_code(
+            r#"(require "core")
+                (defun f (v)
+                  (match v
+                    (42 :answer)
+                    ([a b] (+ a b))
+                    ((n :when (and (number? n) (> n 0))) :pos)
+                    (_ :other)))
+                (list (f 42) (f [3 4]) (f 5) (f :zz))"#
+        )
+        .await,
+        Value::List(vec![
+            Value::Keyword("answer".to_string()),
+            Value::Integer(7),
+            Value::Keyword("pos".to_string()),
+            Value::Keyword("other".to_string()),
+        ])
+    );
+
+    // Sequence patterns with `&rest` and map patterns on the compiled path.
+    assert_eq!(
+        eval_code(
+            r#"(require "core")
+                (defun tail-of (xs) (match xs ([a &rest r] r)))
+                (defun point-y (m) (match m ({:y y} y)))
+                (list (tail-of [1 2 3]) (point-y {:x 9 :y 4}))"#
+        )
+        .await,
+        Value::List(vec![
+            Value::Vector(vec![Value::Integer(2), Value::Integer(3)]),
+            Value::Integer(4),
+        ])
+    );
+}

@@ -64,6 +64,7 @@
 - `when` / `unless`: 条件付きブロック
 - `while`, `dotimes`, `dolist`: 反復
 - `loop` / `recur`: スタック安全な反復。`(loop [name init ...] body...)` は束縛を持ち、body 中の任意位置の `(recur expr ...)` が全束縛を再束縛して次の反復へ進む。recur 引数の個数は束縛数と一致が必要。loop を囲まずに recur が評価器の外層へ到達した場合はエラー。interpreter / JIT / AOT の全経路で同一意味論
+- `match`: パターンマッチング(stdlib マクロ)。`(match expr (pattern body...)+)` の形で、expr は一度だけ評価される。pattern はリテラル(`=` の構造的等値)、シンボル束縛、`_` ワイルドカード、list/vector 分解 `[p0 p1]` / `[p0 p1 &rest r]`、map 分解 `{:k p}`(全キー存在必須)、ガード付き `(pat :when guard)`。ネストしたパターンも合成できる。guard 失敗は後続の節へ fall-through し、どの節もマッチしなければ `nil` を返す。guard は型検査しないため必要に応じ `number?` 等と併用する。macro 展開結果は lower 可能な式のみで構成され、interpreter / JIT / AOT の全経路で同一意味論
 - `try` / `throw`: 例外系
 
 ## 評価補助とメタプログラミング

@@ -27,6 +27,7 @@ const GOLDEN_EXAMPLES: &[&str] = &[
     "macros.lisp",
     "main_entry.lisp",
     "map_aot_test.lisp",
+    "match.lisp",
     "mutual_recursion.lisp",
     "no_main.lisp",
     "stdlib_range.lisp",

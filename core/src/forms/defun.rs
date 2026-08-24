@@ -257,23 +257,44 @@ fn retry_pending_jit_functions(jit: &mut JIT, env: &mut Rc<RefCell<Environment>>
             .collect()
     };
 
-    let pending_names: HashSet<String> = candidates
+    // Iteratively shrink the candidate set until it reaches a fixed point:
+    // a candidate stays compilable only while every call target it
+    // references is itself compilable in the same batch. Without this loop
+    // a candidate could pass the gate while calling another that was
+    // rejected (e.g. one containing an unlowerable form), and codegen would
+    // emit an import for the rejected function that no module defines,
+    // panicking at finalize time.
+    let mut selected: HashSet<String> = candidates
         .iter()
         .map(|((name, _, _, _), _)| name.clone())
         .collect();
-
-    for ((name, args, rest_param, _), _) in &candidates {
-        jit.register_signature(name, args, rest_param.clone());
+    loop {
+        let borrowed = env.borrow();
+        let next: HashSet<String> = candidates
+            .iter()
+            .filter(|((name, _, _, body), _)| {
+                selected.contains(name)
+                    && body
+                        .iter()
+                        .all(|expr| can_jit_compile_expr(expr, name, &borrowed, &selected))
+            })
+            .map(|((name, _, _, _), _)| name.clone())
+            .collect();
+        drop(borrowed);
+        if next == selected {
+            break;
+        }
+        selected = next;
     }
 
     let compilable: Vec<_> = candidates
         .into_iter()
-        .filter(|((name, _, _, body), _)| {
-            let borrowed = env.borrow();
-            body.iter()
-                .all(|expr| can_jit_compile_expr(expr, name, &borrowed, &pending_names))
-        })
+        .filter(|((name, _, _, _), _)| selected.contains(name))
         .collect();
+
+    for ((name, args, rest_param, _), _) in &compilable {
+        jit.register_signature(name, args, rest_param.clone());
+    }
 
     let defs: Vec<_> = compilable.iter().map(|(def, _)| def.clone()).collect();
 

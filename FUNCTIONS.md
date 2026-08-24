@@ -76,6 +76,7 @@ Type / error:
 - `inc`, `dec`, `identity`, `constantly`, `second`, `third`
 - `zero?`, `positive?`, `negative?`, `empty-list?`
 - `when-let`
+- `match` — パターンマッチングマクロ。`(match expr (pattern body...)+)`。リテラル / 束縛 / `_` / `[p...]`(+ `&rest`)/ `{:k p}` / `(pat :when guard)` をサポートし、no-match は `nil`。詳細は `spec.md` 制御セクション
 - `range` — `(range end)` / `(range start end)` / `(range start end step)`。非整数引数や step 0 は `nil`。内部 helper として `range-build`, `range-iter` も定義される
 - コレクション: `member?`, `distinct`, `frequencies`, `group-by`, `merge-with`(2 map), `get-in`, `assoc-in`, `update-in`(unary f、パスは vector), `partition`, `interleave` — 全経路 compile 対応
 - `thread-first-step`, `thread-last-step`

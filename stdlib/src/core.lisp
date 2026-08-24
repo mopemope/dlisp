@@ -194,3 +194,147 @@
          acc
          (recur (rest ra) (rest rb)
                 (cons (first rb) (cons (first ra) acc)))))))
+
+;; Truthy when pat can serve as a literal pattern.
+(defun match-literal-pattern? (pat)
+  (or (number? pat)
+      (string? pat)
+      (keyword? pat)
+      (= (type-of pat) "bool")
+      (nil? pat)))
+
+;; Index of the `&rest` marker in sequence pattern ps from i onward, or nil.
+(defun match-rest-index (ps i)
+  (cond ((>= i (count ps)) nil)
+        ((= (nth ps i) '&rest) i)
+        (true (match-rest-index ps (+ i 1)))))
+
+;; (pat :when guard) -> (core guard); otherwise nil.
+(defun match-guard-split (pat)
+  (if (and (list? pat)
+           (= (count pat) 3)
+           (= (second pat) :when))
+      (list (car pat) (third pat))
+      nil))
+
+;; ---------------------------------------------------------------------------
+;; Pattern matching (`match`)
+;;
+;; Syntax: (match expr (pattern body...)+)
+;;
+;; Patterns:
+;;   _                   wildcard, matches anything without binding
+;;   name                binds the matched value to name
+;;   42 "s" :kw t nil    literal patterns (structural equality via `=`)
+;;   [p0 p1]             sequence pattern over lists/vectors
+;;   [p0 p1 &rest r]     fixed elements plus the remaining tail
+;;   {:k p}              map pattern; every key must be present
+;;   (pat :when guard)   matches pat only while guard is truthy
+;;
+;; Nested patterns compose freely, e.g. [{:name n} (x :when (> x 0))].
+;; The scrutinee is evaluated exactly once; a failed guard falls through
+;; to later clauses. When no clause matches, the form yields nil.
+;; Guards are only recognised at the head of a clause; quoted list
+;; literals compare structurally instead of acting as patterns.
+;; ---------------------------------------------------------------------------
+
+(defmacro match (expr &rest clauses)
+  ;; The expansion helpers below are local lambdas on purpose: they build
+  ;; quasiquoted ASTs, which no codegen path lowers. Keeping them inside
+  ;; the macro body means they are never registered in the global
+  ;; environment, so the eager JIT compilation set stays free of them and
+  ;; every execution path sees identical behaviour.
+  (let ((build nil)
+        (expand-clause nil)
+        (expand-all nil))
+    ;; Build the predicate expression (want t) or binding pairs
+    ;; ((name expr)...) (want nil) that matches pat against var.
+    (setq build
+          (lambda (pat var want)
+            (cond
+              ;; wildcard / plain binding
+              ((symbol? pat)
+               (cond ((= pat '_) (if want true nil))
+                     (want true)
+                     (true (list (list pat var)))))
+              ;; literals and anything else compared structurally
+              ((or (match-literal-pattern? pat)
+                   (not (or (vector? pat) (map? pat) (list? pat))))
+               (if want `(= ,var ,pat) nil))
+              ;; sequence pattern, optionally with &rest
+              ((vector? pat)
+               (let ((ri (match-rest-index pat 0)))
+                 (let ((fixed-end (if ri ri (count pat))))
+                   (if want
+                       (let ((count-test (if ri `(>= (count ,var) ,fixed-end)
+                                             `(= (count ,var) ,(count pat))))
+                             (preds true)
+                             (i fixed-end))
+                         (while (> i 0)
+                           (setq i (- i 1))
+                           (setq preds `(and ,(build (nth pat i) `(nth ,var ,i) true)
+                                             ,preds)))
+                         `(and (or (list? ,var) (vector? ,var)) ,count-test ,preds))
+                       (let ((bs nil)
+                             (i fixed-end))
+                         (while (> i 0)
+                           (setq i (- i 1))
+                           (setq bs (cons (build (nth pat i) `(nth ,var ,i) nil) bs)))
+                         (if ri
+                             (append (apply append bs)
+                                     (build (nth pat (+ ri 1)) `(drop ,fixed-end ,var) nil))
+                             (apply append bs)))))))
+              ;; map pattern: keys must be present, subpatterns see
+              ;; (get var key). Presence uses a sentinel default because
+              ;; `contains?` has no lowering.
+              ((map? pat)
+               (let ((ks (keys pat)))
+                 (let ((n (count ks)))
+                   (if want
+                       (let ((checks nil)
+                             (i n))
+                         (while (> i 0)
+                           (setq i (- i 1))
+                           (setq checks (cons `(not (= (get ,var ,(nth ks i)
+                                                       :dlisp-match-missing)
+                                                       :dlisp-match-missing))
+                                              checks)))
+                         (cons 'and (cons `(map? ,var) checks)))
+                       (let ((bs nil)
+                             (i n))
+                         (while (> i 0)
+                           (setq i (- i 1))
+                           (setq bs (cons (build (get pat (nth ks i))
+                                                 `(get ,var ,(nth ks i))
+                                                 nil)
+                                          bs)))
+                         (apply append bs))))))
+              ;; anything else compares structurally
+              (true
+               (if want `(= ,var ,pat) nil)))))
+    ;; Expand one clause into an if chain step; `next` runs when this
+    ;; clause's pattern test or guard fails.
+    (setq expand-clause
+          (lambda (g clause next)
+            (let ((split (match-guard-split (car clause)))
+                  (core (car clause))
+                  (body (cdr clause)))
+              (let ((inner-core (if split (car split) core))
+                    (guard (if split (second split) true)))
+                (let ((pred (build inner-core g true))
+                      (bs (build inner-core g nil))
+                      (guarded `(if ,guard (progn ,@body) ,next)))
+                  (if (empty-list? bs)
+                      `(if ,pred ,guarded ,next)
+                      `(if ,pred (let ,bs ,guarded) ,next)))))))
+    ;; Expand all clauses into nested ifs ending in nil when nothing
+    ;; matches.
+    (setq expand-all
+          (lambda (g clauses)
+            (if (empty-list? clauses)
+                nil
+                (expand-clause g (car clauses)
+                               (expand-all g (cdr clauses))))))
+    (let ((g (gensym "match")))
+      `(let ((,g ,expr))
+         ,(expand-all g clauses)))))
