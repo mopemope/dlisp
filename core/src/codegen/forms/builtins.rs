@@ -149,6 +149,17 @@ pub fn compile_builtin<M: Module>(
             false,
         ),
         "char-at" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_char_at),
+        // Concurrency
+        "chan" => compile_nullary(ctx, op, list, ctx.builtins.funcs.dlisp_chan_new),
+        "send" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_chan_send),
+        "recv" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_chan_recv, false),
+        "try-recv" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_chan_try_recv, false),
+        "close" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_chan_close, false),
+        "channel?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_channel_p, false),
+        "atom" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_atom_new, false),
+        "deref" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_atom_deref, false),
+        "reset!" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_atom_reset),
+        "atom?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_atom_p, false),
         _ => unreachable!("Unknown builtin: {}", op),
     }
 }

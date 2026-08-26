@@ -149,6 +149,9 @@ pub unsafe extern "C" fn dlisp_eq(a: *mut DlispValue, b: *mut DlispValue) -> *mu
                 let e2 = vector_to_vec(b);
                 e1.len() == e2.len() && e1.iter().zip(e2.iter()).all(|(x, y)| values_eq(*x, *y))
             }
+            // Handles compare by identity (same wrapper object).
+            (ValueType::Channel, ValueType::Channel) => (*a).opaque_ptr() == (*b).opaque_ptr(),
+            (ValueType::Atom, ValueType::Atom) => (*a).opaque_ptr() == (*b).opaque_ptr(),
             _ => false,
         };
 

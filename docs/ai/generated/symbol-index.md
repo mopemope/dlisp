@@ -54,75 +54,83 @@ Registered in the evaluator registry.
 
 Registered into the default environment.
 
-- `% [compiled]` — core/src/builtins/mod.rs:37
-- `* [compiled]` — core/src/builtins/mod.rs:35
-- `+ [compiled]` — core/src/builtins/mod.rs:33
-- `- [compiled]` — core/src/builtins/mod.rs:34
-- `/ [compiled]` — core/src/builtins/mod.rs:36
-- `/= [compiled]` — core/src/builtins/mod.rs:46
-- `< [compiled]` — core/src/builtins/mod.rs:42
-- `<= [compiled]` — core/src/builtins/mod.rs:45
-- `= [compiled]` — core/src/builtins/mod.rs:43
-- `> [compiled]` — core/src/builtins/mod.rs:41
-- `>= [compiled]` — core/src/builtins/mod.rs:44
-- `abs` — core/src/builtins/mod.rs:49
-- `append [compiled]` — core/src/builtins/mod.rs:99
-- `args [compiled]` — core/src/builtins/mod.rs:85
-- `assoc [compiled]` — core/src/builtins/mod.rs:118
-- `butlast [compiled]` — core/src/builtins/mod.rs:103
-- `car [compiled]` — core/src/builtins/mod.rs:94
-- `cdr [compiled]` — core/src/builtins/mod.rs:96
-- `conj [compiled]` — core/src/builtins/mod.rs:113
-- `cons [compiled]` — core/src/builtins/mod.rs:98
-- `contains?` — core/src/builtins/mod.rs:122
-- `count [compiled]` — core/src/builtins/mod.rs:112
-- `cwd [compiled]` — core/src/builtins/mod.rs:82
-- `dissoc` — core/src/builtins/mod.rs:119
-- `drop [compiled]` — core/src/builtins/mod.rs:106
-- `empty? [compiled]` — core/src/builtins/mod.rs:206
-- `error?` — core/src/builtins/mod.rs:205
-- `exec` — core/src/builtins/mod.rs:89
-- `exit [compiled]` — core/src/builtins/mod.rs:84
-- `first [compiled]` — core/src/builtins/mod.rs:95
-- `flatten [compiled]` — core/src/builtins/mod.rs:104
-- `format` — core/src/builtins/mod.rs:63
-- `gensym` — core/src/builtins/mod.rs:130
-- `get [compiled]` — core/src/builtins/mod.rs:117
-- `getenv [compiled]` — core/src/builtins/mod.rs:80
-- `hash-map [compiled]` — core/src/builtins/mod.rs:116
-- `is-dir? [compiled]` — core/src/builtins/mod.rs:71
-- `is-file? [compiled]` — core/src/builtins/mod.rs:72
-- `keys [compiled]` — core/src/builtins/mod.rs:120
-- `last [compiled]` — core/src/builtins/mod.rs:102
-- `list [compiled]` — core/src/builtins/mod.rs:92
-- `list-dir [compiled]` — core/src/builtins/mod.rs:77
-- `list? [compiled]` — core/src/builtins/mod.rs:207
-- `map? [compiled]` — core/src/builtins/mod.rs:228
-- `max` — core/src/builtins/mod.rs:47
-- `merge` — core/src/builtins/mod.rs:123
-- `min` — core/src/builtins/mod.rs:48
-- `mod [compiled]` — core/src/builtins/mod.rs:38
-- `nil? [compiled]` — core/src/builtins/mod.rs:204
-- `not [compiled]` — core/src/builtins/mod.rs:93
-- `nth [compiled]` — core/src/builtins/mod.rs:111
-- `pow` — core/src/builtins/mod.rs:50
-- `print [compiled]` — core/src/builtins/mod.rs:53
-- `println` — core/src/builtins/mod.rs:54
-- `read-file [compiled]` — core/src/builtins/mod.rs:65
-- `rest [compiled]` — core/src/builtins/mod.rs:97
-- `reverse [compiled]` — core/src/builtins/mod.rs:100
-- `set-cwd [compiled]` — core/src/builtins/mod.rs:83
-- `setenv [compiled]` — core/src/builtins/mod.rs:81
-- `sh [compiled]` — core/src/builtins/mod.rs:88
-- `sleep [compiled]` — core/src/builtins/mod.rs:64
-- `sort` — core/src/builtins/mod.rs:101
-- `str [compiled]` — core/src/builtins/mod.rs:133
-- `take [compiled]` — core/src/builtins/mod.rs:105
-- `type-of [compiled]` — core/src/builtins/mod.rs:229
-- `vals` — core/src/builtins/mod.rs:121
-- `vector [compiled]` — core/src/builtins/mod.rs:110
-- `write-file` — core/src/builtins/mod.rs:66
-- `zip` — core/src/builtins/mod.rs:107
+- `% [compiled]` — core/src/builtins/mod.rs:38
+- `* [compiled]` — core/src/builtins/mod.rs:36
+- `+ [compiled]` — core/src/builtins/mod.rs:34
+- `- [compiled]` — core/src/builtins/mod.rs:35
+- `/ [compiled]` — core/src/builtins/mod.rs:37
+- `/= [compiled]` — core/src/builtins/mod.rs:47
+- `< [compiled]` — core/src/builtins/mod.rs:43
+- `<= [compiled]` — core/src/builtins/mod.rs:46
+- `= [compiled]` — core/src/builtins/mod.rs:44
+- `> [compiled]` — core/src/builtins/mod.rs:42
+- `>= [compiled]` — core/src/builtins/mod.rs:45
+- `abs` — core/src/builtins/mod.rs:50
+- `append [compiled]` — core/src/builtins/mod.rs:100
+- `args [compiled]` — core/src/builtins/mod.rs:86
+- `assoc [compiled]` — core/src/builtins/mod.rs:119
+- `atom [compiled]` — core/src/builtins/mod.rs:251
+- `atom? [compiled]` — core/src/builtins/mod.rs:254
+- `butlast [compiled]` — core/src/builtins/mod.rs:104
+- `car [compiled]` — core/src/builtins/mod.rs:95
+- `cdr [compiled]` — core/src/builtins/mod.rs:97
+- `chan [compiled]` — core/src/builtins/mod.rs:239
+- `close [compiled]` — core/src/builtins/mod.rs:246
+- `conj [compiled]` — core/src/builtins/mod.rs:114
+- `cons [compiled]` — core/src/builtins/mod.rs:99
+- `contains?` — core/src/builtins/mod.rs:123
+- `count [compiled]` — core/src/builtins/mod.rs:113
+- `cwd [compiled]` — core/src/builtins/mod.rs:83
+- `deref [compiled]` — core/src/builtins/mod.rs:252
+- `dissoc` — core/src/builtins/mod.rs:120
+- `drop [compiled]` — core/src/builtins/mod.rs:107
+- `empty? [compiled]` — core/src/builtins/mod.rs:207
+- `error?` — core/src/builtins/mod.rs:206
+- `exec` — core/src/builtins/mod.rs:90
+- `exit [compiled]` — core/src/builtins/mod.rs:85
+- `first [compiled]` — core/src/builtins/mod.rs:96
+- `flatten [compiled]` — core/src/builtins/mod.rs:105
+- `format` — core/src/builtins/mod.rs:64
+- `gensym` — core/src/builtins/mod.rs:131
+- `get [compiled]` — core/src/builtins/mod.rs:118
+- `getenv [compiled]` — core/src/builtins/mod.rs:81
+- `hash-map [compiled]` — core/src/builtins/mod.rs:117
+- `is-dir? [compiled]` — core/src/builtins/mod.rs:72
+- `is-file? [compiled]` — core/src/builtins/mod.rs:73
+- `keys [compiled]` — core/src/builtins/mod.rs:121
+- `last [compiled]` — core/src/builtins/mod.rs:103
+- `list [compiled]` — core/src/builtins/mod.rs:93
+- `list-dir [compiled]` — core/src/builtins/mod.rs:78
+- `list? [compiled]` — core/src/builtins/mod.rs:208
+- `map? [compiled]` — core/src/builtins/mod.rs:229
+- `max` — core/src/builtins/mod.rs:48
+- `merge` — core/src/builtins/mod.rs:124
+- `min` — core/src/builtins/mod.rs:49
+- `mod [compiled]` — core/src/builtins/mod.rs:39
+- `nil? [compiled]` — core/src/builtins/mod.rs:205
+- `not [compiled]` — core/src/builtins/mod.rs:94
+- `nth [compiled]` — core/src/builtins/mod.rs:112
+- `pow` — core/src/builtins/mod.rs:51
+- `print [compiled]` — core/src/builtins/mod.rs:54
+- `println` — core/src/builtins/mod.rs:55
+- `read-file [compiled]` — core/src/builtins/mod.rs:66
+- `recv [compiled]` — core/src/builtins/mod.rs:241
+- `reset! [compiled]` — core/src/builtins/mod.rs:253
+- `rest [compiled]` — core/src/builtins/mod.rs:98
+- `reverse [compiled]` — core/src/builtins/mod.rs:101
+- `send [compiled]` — core/src/builtins/mod.rs:240
+- `set-cwd [compiled]` — core/src/builtins/mod.rs:84
+- `setenv [compiled]` — core/src/builtins/mod.rs:82
+- `sh [compiled]` — core/src/builtins/mod.rs:89
+- `sleep [compiled]` — core/src/builtins/mod.rs:65
+- `sort` — core/src/builtins/mod.rs:102
+- `str [compiled]` — core/src/builtins/mod.rs:134
+- `take [compiled]` — core/src/builtins/mod.rs:106
+- `type-of [compiled]` — core/src/builtins/mod.rs:230
+- `vals` — core/src/builtins/mod.rs:122
+- `vector [compiled]` — core/src/builtins/mod.rs:111
+- `write-file` — core/src/builtins/mod.rs:67
+- `zip` — core/src/builtins/mod.rs:108
 
 ## Runtime FFI exports
 
@@ -131,9 +139,20 @@ Registered into the default environment.
 - `dlisp_add` — runtime/src/arith.rs:8
 - `dlisp_append` — runtime/src/lists.rs:101
 - `dlisp_args` — runtime/src/sys.rs:93
+- `dlisp_atom_deref` — runtime/src/concurrency.rs:358
+- `dlisp_atom_new` — runtime/src/concurrency.rs:343
+- `dlisp_atom_p` — runtime/src/concurrency.rs:398
+- `dlisp_atom_reset` — runtime/src/concurrency.rs:373
 - `dlisp_butlast` — runtime/src/lists.rs:186
 - `dlisp_car` — runtime/src/lists.rs:8
 - `dlisp_cdr` — runtime/src/lists.rs:29
+- `dlisp_chan_close` — runtime/src/concurrency.rs:326
+- `dlisp_chan_new` — runtime/src/concurrency.rs:144
+- `dlisp_chan_poll` — runtime/src/concurrency.rs:298
+- `dlisp_chan_recv` — runtime/src/concurrency.rs:222
+- `dlisp_chan_send` — runtime/src/concurrency.rs:164
+- `dlisp_chan_try_recv` — runtime/src/concurrency.rs:202
+- `dlisp_channel_p` — runtime/src/concurrency.rs:391
 - `dlisp_char_at` — runtime/src/strings.rs:349
 - `dlisp_conj` — runtime/src/collections.rs:61
 - `dlisp_cons` — runtime/src/constructors.rs:93
@@ -154,18 +173,18 @@ Registered into the default environment.
 - `dlisp_get` — runtime/src/collections.rs:10
 - `dlisp_getenv` — runtime/src/sys.rs:8
 - `dlisp_gt` — runtime/src/cmp.rs:24
-- `dlisp_gte` — runtime/src/cmp.rs:167
+- `dlisp_gte` — runtime/src/cmp.rs:170
 - `dlisp_is_dir` — runtime/src/io.rs:30
 - `dlisp_is_empty` — runtime/src/predicates.rs:73
 - `dlisp_is_file` — runtime/src/io.rs:52
-- `dlisp_is_truthy` — runtime/src/cmp.rs:241
+- `dlisp_is_truthy` — runtime/src/cmp.rs:244
 - `dlisp_keys` — runtime/src/maps.rs:208
 - `dlisp_keyword_p` — runtime/src/predicates.rs:52
 - `dlisp_last` — runtime/src/lists.rs:161
 - `dlisp_list_dir` — runtime/src/io.rs:74
 - `dlisp_list_p` — runtime/src/predicates.rs:16
 - `dlisp_lt` — runtime/src/cmp.rs:53
-- `dlisp_lte` — runtime/src/cmp.rs:198
+- `dlisp_lte` — runtime/src/cmp.rs:201
 - `dlisp_main` — runtime/src/task.rs:61
 - `dlisp_make_bool` — runtime/src/constructors.rs:119
 - `dlisp_make_closure` — runtime/src/constructors.rs:54
@@ -184,7 +203,7 @@ Registered into the default environment.
 - `dlisp_map_p` — runtime/src/predicates.rs:66
 - `dlisp_mod` — runtime/src/arith.rs:120
 - `dlisp_mul` — runtime/src/arith.rs:62
-- `dlisp_neq` — runtime/src/cmp.rs:229
+- `dlisp_neq` — runtime/src/cmp.rs:232
 - `dlisp_nil_p` — runtime/src/predicates.rs:9
 - `dlisp_number_p` — runtime/src/predicates.rs:27
 - `dlisp_number_to_string` — runtime/src/strings.rs:329

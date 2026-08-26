@@ -66,6 +66,12 @@ Macro utils:
 Type / error:
 - `nil?`, `error?`, `empty?`, `list?`, `number?`, `string?`, `symbol?`, `keyword?`, `vector?`, `map?`, `type-of`, `error-value`
 
+Concurrency:
+- `chan`, `send`, `recv`, `try-recv`, `close`, `channel?`
+- `atom`, `deref`, `reset!`, `atom?`
+
+上記の意味論: channel は unbounded FIFO で、send は配送可否を真偽で返し、recv は closed + drained で nil、close は冪等。atom は参照セルで、deref で読み reset! で書き換える(新しい値を返す)。詳細は spec.md 並行実行の節
+
 ## Bundled stdlib
 
 `(require "core")` で同梱標準ライブラリを一度だけ読み込む。

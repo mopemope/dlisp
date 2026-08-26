@@ -267,6 +267,46 @@ impl Default for JIT {
         builder.symbol("dlisp_args", dlisp_runtime::sys::dlisp_args as *const u8);
         builder.symbol("dlisp_exit", dlisp_runtime::sys::dlisp_exit as *const u8);
         builder.symbol("dlisp_sh", dlisp_runtime::os::dlisp_sh as *const u8);
+        builder.symbol(
+            "dlisp_chan_new",
+            dlisp_runtime::concurrency::dlisp_chan_new as *const u8,
+        );
+        builder.symbol(
+            "dlisp_chan_send",
+            dlisp_runtime::concurrency::dlisp_chan_send as *const u8,
+        );
+        builder.symbol(
+            "dlisp_chan_recv",
+            dlisp_runtime::concurrency::dlisp_chan_recv as *const u8,
+        );
+        builder.symbol(
+            "dlisp_chan_try_recv",
+            dlisp_runtime::concurrency::dlisp_chan_try_recv as *const u8,
+        );
+        builder.symbol(
+            "dlisp_chan_close",
+            dlisp_runtime::concurrency::dlisp_chan_close as *const u8,
+        );
+        builder.symbol(
+            "dlisp_channel_p",
+            dlisp_runtime::concurrency::dlisp_channel_p as *const u8,
+        );
+        builder.symbol(
+            "dlisp_atom_new",
+            dlisp_runtime::concurrency::dlisp_atom_new as *const u8,
+        );
+        builder.symbol(
+            "dlisp_atom_deref",
+            dlisp_runtime::concurrency::dlisp_atom_deref as *const u8,
+        );
+        builder.symbol(
+            "dlisp_atom_reset",
+            dlisp_runtime::concurrency::dlisp_atom_reset as *const u8,
+        );
+        builder.symbol(
+            "dlisp_atom_p",
+            dlisp_runtime::concurrency::dlisp_atom_p as *const u8,
+        );
 
         let module = JITModule::new(builder);
 

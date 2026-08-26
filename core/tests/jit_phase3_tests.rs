@@ -116,9 +116,25 @@ fn create_jit_module() -> JITModule {
         builder.symbol(name, dummy_ptr2 as *const u8);
     }
 
-    let nullary_symbols = ["dlisp_cwd", "dlisp_args"];
+    let nullary_symbols = ["dlisp_cwd", "dlisp_args", "dlisp_chan_new"];
     for name in nullary_symbols {
         builder.symbol(name, dummy_nullary as *const u8);
+    }
+
+    // Concurrency: unary channel/atom ops share the dummy unary signature.
+    for name in [
+        "dlisp_chan_recv",
+        "dlisp_chan_try_recv",
+        "dlisp_chan_close",
+        "dlisp_channel_p",
+        "dlisp_atom_new",
+        "dlisp_atom_deref",
+        "dlisp_atom_p",
+    ] {
+        builder.symbol(name, dummy_ptr as *const u8);
+    }
+    for name in ["dlisp_chan_send", "dlisp_atom_reset"] {
+        builder.symbol(name, dummy_ptr2 as *const u8);
     }
 
     // dlisp_make_int takes i64 -> ptr, dlisp_make_bool takes i8 -> ptr, dlisp_make_float takes f64 -> ptr
@@ -575,4 +591,63 @@ fn test_codegen_higher_order_predicates() {
         ]);
         compile_expr_in_function(&mut module, &ast, func_name);
     }
+}
+
+// === Concurrency ===
+
+#[test]
+fn test_codegen_channel_ops() {
+    let ops: [(&str, Value, &str); 5] = [
+        ("chan", Value::Nil, "test_chan_new"),
+        (
+            "send",
+            Value::List(vec![
+                Value::Symbol("send".to_string()),
+                Value::Integer(0),
+                Value::Integer(1),
+            ]),
+            "test_chan_send",
+        ),
+        (
+            "recv",
+            Value::List(vec![Value::Symbol("recv".to_string()), Value::Integer(0)]),
+            "test_chan_recv",
+        ),
+        (
+            "try-recv",
+            Value::List(vec![
+                Value::Symbol("try-recv".to_string()),
+                Value::Integer(0),
+            ]),
+            "test_chan_try_recv",
+        ),
+        (
+            "close",
+            Value::List(vec![Value::Symbol("close".to_string()), Value::Integer(0)]),
+            "test_chan_close",
+        ),
+    ];
+    for (name, ast, func_name) in ops {
+        let _ = name;
+        let mut module = create_jit_module();
+        compile_expr_in_function(&mut module, &ast, func_name);
+    }
+}
+
+#[test]
+fn test_codegen_atom_ops() {
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("deref".to_string()),
+        Value::List(vec![Value::Symbol("atom".to_string()), Value::Integer(7)]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_atom_deref");
+
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("reset!".to_string()),
+        Value::Integer(0),
+        Value::Integer(1),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_atom_reset");
 }

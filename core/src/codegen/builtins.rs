@@ -103,6 +103,17 @@ pub struct BuiltinDefinitions {
     pub dlisp_string_to_number: FuncId,
     pub dlisp_number_to_string: FuncId,
     pub dlisp_char_at: FuncId,
+    // Concurrency
+    pub dlisp_chan_new: FuncId,
+    pub dlisp_chan_send: FuncId,
+    pub dlisp_chan_recv: FuncId,
+    pub dlisp_chan_try_recv: FuncId,
+    pub dlisp_chan_close: FuncId,
+    pub dlisp_channel_p: FuncId,
+    pub dlisp_atom_new: FuncId,
+    pub dlisp_atom_deref: FuncId,
+    pub dlisp_atom_reset: FuncId,
+    pub dlisp_atom_p: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -579,6 +590,44 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_char_at", Linkage::Import, &mul_sig)
         .map_err(|e| e.to_string())?;
 
+    // --- Concurrency ---
+    // dlisp_chan_new() -> DlispValue*
+    let mut nullary_ret_sig = module.make_signature();
+    nullary_ret_sig.returns.push(AbiParam::new(int));
+    let chan_new_id = module
+        .declare_function("dlisp_chan_new", Linkage::Import, &nullary_ret_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_chan_send(DlispValue*, DlispValue*) -> DlispValue* (bool)
+    let chan_send_id = module
+        .declare_function("dlisp_chan_send", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_chan_recv(DlispValue*) -> DlispValue*
+    let chan_recv_id = module
+        .declare_function("dlisp_chan_recv", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let chan_try_recv_id = module
+        .declare_function("dlisp_chan_try_recv", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let chan_close_id = module
+        .declare_function("dlisp_chan_close", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let channel_p_id = module
+        .declare_function("dlisp_channel_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_atom_new(DlispValue*) -> DlispValue*
+    let atom_new_id = module
+        .declare_function("dlisp_atom_new", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let atom_deref_id = module
+        .declare_function("dlisp_atom_deref", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let atom_reset_id = module
+        .declare_function("dlisp_atom_reset", Linkage::Import, &mul_sig)
+        .map_err(|e| e.to_string())?;
+    let atom_p_id = module
+        .declare_function("dlisp_atom_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
     // Predicates (unary)
     let nil_p_id = module
         .declare_function("dlisp_nil_p", Linkage::Import, &car_sig)
@@ -774,5 +823,16 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_string_to_number: string_to_number_id,
         dlisp_number_to_string: number_to_string_id,
         dlisp_char_at: char_at_id,
+        // Concurrency
+        dlisp_chan_new: chan_new_id,
+        dlisp_chan_send: chan_send_id,
+        dlisp_chan_recv: chan_recv_id,
+        dlisp_chan_try_recv: chan_try_recv_id,
+        dlisp_chan_close: chan_close_id,
+        dlisp_channel_p: channel_p_id,
+        dlisp_atom_new: atom_new_id,
+        dlisp_atom_deref: atom_deref_id,
+        dlisp_atom_reset: atom_reset_id,
+        dlisp_atom_p: atom_p_id,
     })
 }

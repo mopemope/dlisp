@@ -9,9 +9,13 @@ use crate::value::{DlispValue, ValueType};
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_print(val: *mut DlispValue) {
     unsafe {
+        // Hold the stdout lock across value + newline so concurrent spawned
+        // tasks on OS threads cannot interleave mid-line.
+        let stdout = std::io::stdout();
+        let mut out = stdout.lock();
         dlisp_print_value(val);
-        println!(); // Newline for the main print
-        let _ = std::io::stdout().flush();
+        let _ = writeln!(out);
+        let _ = out.flush();
     }
 }
 
@@ -99,6 +103,12 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
             }
             ValueType::Closure => {
                 print!("<closure>");
+            }
+            ValueType::Channel => {
+                print!("<channel>");
+            }
+            ValueType::Atom => {
+                print!("<atom>");
             }
             ValueType::NativePtr => {
                 print!("<native_ptr>");

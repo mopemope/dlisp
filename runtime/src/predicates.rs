@@ -117,6 +117,8 @@ pub unsafe extern "C" fn dlisp_type_of(val: *mut DlispValue) -> *mut DlispValue 
                 ValueType::Vector => "vector",
                 ValueType::Map => "map",
                 ValueType::Closure => "closure",
+                ValueType::Channel => "channel",
+                ValueType::Atom => "atom",
                 ValueType::NativePtr => "native_ptr",
             }
         };

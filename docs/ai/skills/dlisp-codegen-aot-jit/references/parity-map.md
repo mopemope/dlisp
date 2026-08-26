@@ -119,6 +119,30 @@ interpreter execution resolves user bindings first, so programs that shadow
 these names may behave differently depending on which functions get compiled.
 This is a pre-existing dispatch design; avoid shadowing compiled builtin names.
 
+## Concurrency builtins (chan / send / recv / try-recv / close, atom family)
+Value-level semantics are identical on every path by construction: the
+interpreter builtins and the compiled lowerings call the same runtime FFI
+(`runtime/src/concurrency.rs`), whose state lives in GC-allocated blocks so
+queued values stay traced. `send` returns a bool instead of raising, so no
+catchable-error divergence exists for these builtins.
+
+Handles handed to the interpreter are raw wrapper addresses, which Boehm
+cannot see inside interpreter environments; every channel/atom wrapper is
+therefore pinned for process lifetime in a registry allocated from GC
+memory (`pin_handle` in `concurrency.rs`). Creating sync primitives in
+unbounded loops would grow that registry accordingly.
+
+The one intentional difference is *waiting*: interpreted `recv` calls
+`dlisp_chan_poll` with a 1ms timeout plus `yield_now`, because blocking the
+single-threaded executor indefinitely would stall cooperative tasks.
+Compiled `recv` uses the blocking `dlisp_chan_recv`. Both observe value and
+closed state under a single lock acquisition (`dlisp_chan_poll`), so no
+sent value can be lost to a later close observation. Keep spawn/recv pairs
+in the same function anyway: an interpreted `(spawn ...)` (LocalSet task)
+combined with a `recv` inside a separately compiled function adds up to 1ms
+scheduling latency per step and is best avoided (see
+`example-lisp/concurrency.lisp`, byte-exact golden).
+
 ## Adding a compiled builtin (checklist)
 1. runtime FFI export in `runtime/src/<feature>.rs` (+ `lib.rs` re-export)
 2. symbol registration in `core/src/jit.rs`

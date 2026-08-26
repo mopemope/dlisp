@@ -18,6 +18,7 @@ use tempfile::TempDir;
 
 const GOLDEN_EXAMPLES: &[&str] = &[
     "closure_indirect_test.lisp",
+    "concurrency.lisp",
     "factorial.lisp",
     "fib.lisp",
     "hello.lisp",

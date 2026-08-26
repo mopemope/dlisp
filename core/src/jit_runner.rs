@@ -1,8 +1,8 @@
 use crate::ast::Value;
-use dlisp_runtime::value::{DlispValue, ListData, ValueType, VectorData};
+use dlisp_runtime::value::{DlispValue, ListData, MapData, ValueType, VectorData};
 use std::ffi::{CStr, CString, c_void};
 
-unsafe fn value_to_runtime(value: &Value) -> Option<*mut DlispValue> {
+pub(crate) unsafe fn value_to_runtime(value: &Value) -> Option<*mut DlispValue> {
     match value {
         Value::Integer(v) => Some(dlisp_runtime::dlisp_make_int(*v)),
         Value::Float(v) => Some(dlisp_runtime::dlisp_make_float(*v)),
@@ -36,11 +36,29 @@ unsafe fn value_to_runtime(value: &Value) -> Option<*mut DlispValue> {
             }
             Some(vec)
         }
+        Value::Map(entries) => {
+            let mut map = unsafe { dlisp_runtime::maps::dlisp_make_map() };
+            for (k, v) in entries {
+                let key_ptr = unsafe { value_to_runtime(k) }?;
+                let val_ptr = unsafe { value_to_runtime(v) }?;
+                map = unsafe { dlisp_runtime::maps::dlisp_map_assoc(map, key_ptr, val_ptr) };
+            }
+            Some(map)
+        }
+        Value::Channel(addr) | Value::Atom(addr) => {
+            // The handle is the address of the canonical GC-allocated
+            // wrapper `DlispValue`, so it can be passed to the FFI as-is.
+            let ptr = *addr as *mut c_void;
+            if ptr.is_null() {
+                return None;
+            }
+            Some(ptr as *mut DlispValue)
+        }
         _ => None,
     }
 }
 
-unsafe fn runtime_to_value(ptr: *mut DlispValue) -> Option<Value> {
+pub(crate) unsafe fn runtime_to_value(ptr: *mut DlispValue) -> Option<Value> {
     if ptr.is_null() {
         return Some(Value::Nil);
     }
@@ -65,6 +83,9 @@ unsafe fn runtime_to_value(ptr: *mut DlispValue) -> Option<Value> {
         }
         ValueType::List => unsafe { list_to_value(ptr) },
         ValueType::Vector => unsafe { vector_to_value(ptr) },
+        ValueType::Map => unsafe { map_to_value(ptr) },
+        ValueType::Channel => Some(Value::Channel(ptr as u64)),
+        ValueType::Atom => Some(Value::Atom(ptr as u64)),
         _ => None,
     }
 }
@@ -102,6 +123,25 @@ unsafe fn vector_to_value(ptr: *mut DlispValue) -> Option<Value> {
         items.push(unsafe { runtime_to_value(item_ptr) }?);
     }
     Some(Value::Vector(items))
+}
+
+unsafe fn map_to_value(ptr: *mut DlispValue) -> Option<Value> {
+    let value = unsafe { &*ptr };
+    if value.type_ != ValueType::Map {
+        return None;
+    }
+
+    let map_data: &MapData = unsafe { &*value.payload.map_val };
+    let mut entries = std::collections::HashMap::with_capacity(map_data.len);
+    for i in 0..map_data.cap {
+        let slot = unsafe { *map_data.elements.add(i) };
+        if let Some((k, v)) = slot {
+            let key = unsafe { runtime_to_value(k) }?;
+            let val = unsafe { runtime_to_value(v) }?;
+            entries.insert(key, val);
+        }
+    }
+    Some(Value::Map(entries))
 }
 
 unsafe fn call_compiled_function(

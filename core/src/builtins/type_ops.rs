@@ -124,6 +124,8 @@ pub fn type_of(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Resul
             Value::Vector(_) => "vector",
             Value::Map(_) => "map",
             Value::Nil => "nil",
+            Value::Channel(_) => "channel",
+            Value::Atom(_) => "atom",
         };
         Ok(Value::String(type_name.to_string()))
     })

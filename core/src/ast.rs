@@ -35,6 +35,10 @@ pub enum Value {
     List(Vec<Value>),
     Vector(Vec<Value>),
     Map(HashMap<Value, Value>),
+    /// Handle to a runtime channel (address of its GC-allocated state).
+    Channel(u64),
+    /// Handle to a runtime atom (address of its GC-allocated state).
+    Atom(u64),
     Nil,
 }
 
@@ -55,6 +59,8 @@ impl Value {
             Value::NativeFunc(_) => 11,
             Value::UserFunc { .. } => 12,
             Value::Macro { .. } => 13,
+            Value::Channel(_) => 14,
+            Value::Atom(_) => 15,
         }
     }
 
@@ -119,6 +125,8 @@ impl PartialEq for Value {
                     body: b_body,
                 },
             ) => a_args == b_args && a_rest == b_rest && a_body == b_body,
+            (Value::Channel(a), Value::Channel(b)) => a == b,
+            (Value::Atom(a), Value::Atom(b)) => a == b,
             _ => false,
         }
     }
@@ -177,6 +185,7 @@ impl Hash for Value {
                 rest_param.hash(state);
                 body.hash(state);
             }
+            Value::Channel(addr) | Value::Atom(addr) => addr.hash(state),
         }
     }
 }
@@ -255,6 +264,8 @@ impl Ord for Value {
                 .cmp(b_a)
                 .then_with(|| a_r.cmp(b_r))
                 .then_with(|| a_b.cmp(b_b)),
+            (Value::Channel(a), Value::Channel(b)) => a.cmp(b),
+            (Value::Atom(a), Value::Atom(b)) => a.cmp(b),
             _ => Ordering::Equal, // Should be covered by discriminant check
         }
     }
@@ -304,6 +315,8 @@ impl fmt::Display for Value {
             Value::NativeFunc(_) => write!(f, "<native-func>"),
             Value::UserFunc { .. } => write!(f, "<user-func>"),
             Value::Macro { .. } => write!(f, "<macro>"),
+            Value::Channel(_) => write!(f, "<channel>"),
+            Value::Atom(_) => write!(f, "<atom>"),
         }
     }
 }

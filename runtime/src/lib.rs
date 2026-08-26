@@ -6,6 +6,7 @@
 pub mod arith;
 pub mod cmp;
 pub mod collections;
+pub mod concurrency;
 pub mod constructors;
 pub mod gc;
 pub mod higher_order;
@@ -27,6 +28,11 @@ mod verify_tests;
 pub use arith::{dlisp_add, dlisp_div, dlisp_mod, dlisp_mul, dlisp_sub};
 pub use cmp::{dlisp_eq, dlisp_gt, dlisp_gte, dlisp_is_truthy, dlisp_lt, dlisp_lte, dlisp_neq};
 pub use collections::{dlisp_conj, dlisp_get};
+pub use concurrency::{
+    dlisp_atom_deref, dlisp_atom_new, dlisp_atom_p, dlisp_atom_reset, dlisp_chan_close,
+    dlisp_chan_new, dlisp_chan_poll, dlisp_chan_recv, dlisp_chan_send, dlisp_chan_try_recv,
+    dlisp_channel_p,
+};
 pub use constructors::{
     dlisp_cons, dlisp_make_bool, dlisp_make_closure, dlisp_make_cons, dlisp_make_float,
     dlisp_make_int, dlisp_make_keyword, dlisp_make_nil, dlisp_make_string, dlisp_make_symbol,

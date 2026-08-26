@@ -3,6 +3,7 @@ use crate::environment::Environment;
 
 pub mod add;
 pub mod cmp;
+pub mod concurrency;
 pub mod div;
 pub mod eq;
 pub mod error_ops;
@@ -233,4 +234,22 @@ pub fn install(env: &mut Environment) {
         "error-value".to_string(),
         Value::NativeFunc(error_ops::error_value),
     );
+
+    // Concurrency
+    env.set("chan".to_string(), Value::NativeFunc(concurrency::chan));
+    env.set("send".to_string(), Value::NativeFunc(concurrency::send));
+    env.set("recv".to_string(), Value::NativeFunc(concurrency::recv));
+    env.set(
+        "try-recv".to_string(),
+        Value::NativeFunc(concurrency::try_recv),
+    );
+    env.set("close".to_string(), Value::NativeFunc(concurrency::close));
+    env.set(
+        "channel?".to_string(),
+        Value::NativeFunc(concurrency::channel_p),
+    );
+    env.set("atom".to_string(), Value::NativeFunc(concurrency::atom_new));
+    env.set("deref".to_string(), Value::NativeFunc(concurrency::deref));
+    env.set("reset!".to_string(), Value::NativeFunc(concurrency::reset));
+    env.set("atom?".to_string(), Value::NativeFunc(concurrency::atom_p));
 }

@@ -13,6 +13,8 @@ pub enum ValueType {
     Keyword,
     Closure,
     NativePtr,
+    Channel,
+    Atom,
 }
 
 #[repr(C)]
@@ -26,6 +28,7 @@ pub union ValuePayload {
     pub vector_val: *mut VectorData,
     pub map_val: *mut MapData,
     pub closure_val: *mut ClosureData,
+    pub ptr_val: *mut std::ffi::c_void,
 }
 
 #[repr(C)]
@@ -118,5 +121,17 @@ impl DlispValue {
             type_: ValueType::Vector,
             payload: ValuePayload { vector_val: vec },
         }
+    }
+
+    /// Wraps an opaque GC-allocated state pointer (channel, atom, ...).
+    pub fn new_opaque(type_: ValueType, state: *mut std::ffi::c_void) -> Self {
+        Self {
+            type_,
+            payload: ValuePayload { ptr_val: state },
+        }
+    }
+
+    pub fn opaque_ptr(&self) -> *mut std::ffi::c_void {
+        unsafe { self.payload.ptr_val }
     }
 }

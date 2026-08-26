@@ -49,6 +49,9 @@ pub fn eq(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Val
                 (Value::String(a), Value::String(b)) => a == b,
                 (Value::Nil, Value::Nil) => true,
                 (Value::Bool(a), Value::Bool(b)) => a == b,
+                // Handles compare by identity (same underlying object).
+                (Value::Channel(a), Value::Channel(b)) => a == b,
+                (Value::Atom(a), Value::Atom(b)) => a == b,
                 _ => false,
             }
         }

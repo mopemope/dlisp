@@ -20,6 +20,7 @@
 - `Bool`
 - `Nil`
 - 関数値、macro 値、error 値も内部的に扱う
+- channel / atom ハンドルも値として扱う。詳細は並行実行の節
 
 条件式では `nil` と整数 `0` を偽として扱い、それ以外は真として扱う。
 
@@ -84,7 +85,11 @@
 - `(require "core")` の stdlib は Clojure 風のヘルパーを提供する: `member?`, `distinct`, `frequencies`, `group-by`, `merge-with`(2 map), `get-in`, `assoc-in`, `update-in`(unary f、パスは vector), `partition`, `interleave`。これらは Lisp 実装で、interpreter / JIT / AOT 全経路で compile される
 
 ## 並行実行
-- `spawn` は別タスクで関数適用を走らせる
+- `spawn` は別タスクで関数適用を走らせる。`(spawn f arg...)` は zero-arg thunk に lower される
+- channel: `(chan)` で作る unbounded FIFO。`(send ch v)` は配送できれば `true`、closed なら `false` を返す(例外は投げない)。`(recv ch)` は値が来るまで待ち、closed + drained なら `nil`。`(try-recv ch)` は非ブロック。`(close ch)` は冪等
+- atom: `(atom v)` で作る可変参照セル。`(deref a)` で読み、`(reset! a v)` で書き換える(新しい値を返す)。同一ハンドルの `=` 比較は identity
+- channel / atom は interpreter、JIT、AOT の全経路で同一の意味論を持つ。`send` が `true` を返した値は必ずいずれかの `recv` で受け取れる。待機方法のみ経路差があり、interpreted コードは最大 1ms の timeout poll + yield、compiled コードは OS thread 上で block する。spawn と対応する recv は同じ compilation unit(function)に置くこと
+- channel / atom オブジェクトは GC に対して process lifetime で pin される(大量生成は避けること)
 - REPL と evaluator は async ベースで動作する
 
 ## JIT / AOT

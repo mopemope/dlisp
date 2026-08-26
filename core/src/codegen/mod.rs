@@ -110,6 +110,17 @@ pub const COMPILED_BUILTINS: &[&str] = &[
     "exit",
     "sh",
     "sleep",
+    // concurrency
+    "chan",
+    "send",
+    "recv",
+    "try-recv",
+    "close",
+    "channel?",
+    "atom",
+    "deref",
+    "reset!",
+    "atom?",
 ];
 
 #[derive(Clone)]
