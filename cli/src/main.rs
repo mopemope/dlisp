@@ -114,9 +114,17 @@ mod tests {
 
     use crate::config::get_history_path;
     use std::env;
+    use std::sync::Mutex;
+
+    // `dirs::state_dir()` reads `XDG_STATE_HOME` at call time, but env vars
+    // are process-global on macOS (where state_dir() is always None), so
+    // serialize tests that mutate the environment.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_get_history_path_xdg() {
+        let _guard = ENV_LOCK.lock().unwrap();
+
         // Create a temporary directory to act as XDG_STATE_HOME
         let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
         let temp_path = temp_dir.path().to_path_buf();

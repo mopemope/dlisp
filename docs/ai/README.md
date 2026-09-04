@@ -9,7 +9,14 @@
 
 ## 配置
 - canonical Skill source: `docs/ai/skills/`
-- Codex runtime skills: `~/.codex/skills/`
+- opencode / Claude Code: `.claude/skills/` に `docs/ai/skills/` への symlink をコミット。repo checkout 時点で自動検出される(opencode は `.claude/skills/` も探索する)
+- Codex runtime skills: `~/.codex/skills/`(`scripts/install-runtime-skills.sh` で展開)
+- opencode / Claude Code の global 配置: `scripts/install-runtime-skills.sh [opencode|claude]`
+- repo 内 symlink の(再)作成: `scripts/install-runtime-skills.sh repo-links`
+- Windows などで symlink が実体化・欠落した場合は `scripts/install-runtime-skills.sh repo-links` で再展開する
+
+## ドキュメント整合性
+- `AGENTS.md` と `docs/ai/**/*.md` 内のファイルパス・`--test` ターゲット・`-p` クレート名は `scripts/check_doc_refs.py` が機械検査する(`scripts/check.sh` に組み込み済み)。doc を編集したら壊れた参照を残さないこと。
 
 ## 使い分け
 - `AGENTS.md`: この repo で最初に守る短いルールだけを書く。

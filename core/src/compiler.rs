@@ -73,6 +73,11 @@ impl AOTCompiler {
             }
         }
 
+        // cranelift-object has no Mach-O mapping for Aarch64AdrPrelPgHi21
+        // (emitted by non-PIC near external-name loads), which panics on
+        // arm64 macOS. PIC lowering emits MachO-supported GOT relocations.
+        flag_builder.set("is_pic", "true").unwrap();
+
         // use default ISA
         let isa_builder = cranelift_native::builder().expect("host machine is not supported");
         let isa = isa_builder

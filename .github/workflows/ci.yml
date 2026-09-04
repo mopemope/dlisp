@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Boehm GC, linker)
+        run: sudo apt-get update && sudo apt-get install -y libgc-dev pkg-config build-essential
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Static gate (fmt / clippy / surface / codegen parity / doc refs)
+        run: bash scripts/check.sh
+
+      - name: Workspace tests
+        run: cargo test --workspace --quiet

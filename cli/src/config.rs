@@ -4,7 +4,15 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 pub fn get_state_dir() -> Option<PathBuf> {
-    let mut path = dirs::state_dir().or_else(dirs::home_dir)?;
+    // XDG spec: relative XDG_STATE_HOME values must be ignored. `dirs`
+    // follows this on Linux but returns None for state_dir() on
+    // macOS/Windows, so apply the same rule here for consistent behavior.
+    let base = std::env::var_os("XDG_STATE_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(dirs::state_dir)
+        .or_else(dirs::home_dir)?;
+    let mut path = base;
     path.push("dlisp");
     if fs::create_dir_all(&path).is_err() {
         return None;

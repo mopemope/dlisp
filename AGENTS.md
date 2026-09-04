@@ -22,6 +22,7 @@
 - builtins / language surface: `core/src/builtins/mod.rs`, 対象 `core/src/builtins/*.rs` -> 対象 builtin の単体/統合テスト。必要なら `docs/ai/skills/dlisp-builtins-surface/`。
 - JIT / AOT / codegen: `core/src/codegen/`, `core/src/jit.rs`, `core/src/compiler.rs`, `cli/src/compile.rs` -> JIT/codegen/CLI compile テスト。必要なら `docs/ai/skills/dlisp-codegen-aot-jit/`。
 - runtime / FFI / GC: `runtime/src/value.rs`, `runtime/src/lib.rs`, `runtime/src/{gc,constructors,lists,maps,collections,arith,cmp,strings,predicates,print,task,io,sys,os,vectors,higher_order}.rs` -> `cargo test -p dlisp_runtime --quiet` と必要な compile 経路。必要なら `docs/ai/skills/dlisp-runtime-ffi/`。
+- stdlib (`stdlib/src/core.lisp`): Lisp 実装の標準ライブラリ -> `core/tests/stdlib_tests.rs`, `require_tests`, `loop_recur_tests`。制約(定義順、`nth` は vector のみ、interpreter-only form 禁止、nil 中立値)は `docs/ai/skills/dlisp-codegen-aot-jit/references/parity-map.md` の stdlib 節を参照。
 - docs / public surface: 先に code と test を確認し、`FUNCTIONS.md` / `spec.md` / `README.md` の責務に合わせて編集する。必要なら `docs/ai/skills/dlisp-language-surface/`。
 
 ## 主要クレート
@@ -55,11 +56,12 @@
 - CLI / example / AOT 系: `cargo test -p dlisp --test integration_tests --quiet`
 - runtime crate 単体: `cargo test -p dlisp_runtime --quiet`
 - 複数クレートを跨いだ変更だけ: `cargo test --workspace --quiet`
+- 1 件だけ絞り込む: `cargo test -p dlisp-core --test <target> -- <filter>`(例: `-- test_match_guards`)
 
 ## Skill 運用
 - canonical source は `docs/ai/skills/` に置く。
-- Codex runtime 配置先は `~/.codex/skills/`。
-- 導入や更新は `scripts/install-runtime-skills.sh` を使う。
+- repo 内の `.claude/skills/` は `docs/ai/skills/` への symlink(opencode / Claude Code が自動検出)。symlink が展開されていたら `scripts/install-runtime-skills.sh repo-links` で再作成する。
+- Codex runtime 配置先は `~/.codex/skills/`。opencode / Claude Code の global 配置は `scripts/install-runtime-skills.sh [opencode|claude]` を使う。
 - repo 調査とコード変更では `docs/ai/skills/dlisp-repo/` を使う。
 - 言語仕様と関数一覧の更新では `docs/ai/skills/dlisp-language-surface/` を使う。
 - 領域が明確な実装では、上記タスク別 skill を優先して読む。

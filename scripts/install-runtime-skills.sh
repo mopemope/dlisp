@@ -9,12 +9,34 @@ case "$MODE" in
   codex)
     DEST_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
     ;;
+  opencode)
+    DEST_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills"
+    ;;
+  claude)
+    DEST_DIR="${CLAUDE_CONFIG_DIR:-${CLAUDE_HOME:-$HOME/.claude}}/skills"
+    ;;
+  repo-links)
+    # (Re)create project-local symlinks in .claude/skills/ -> docs/ai/skills/
+    # so opencode / Claude Code discover them. Canonical source stays in
+    # docs/ai/skills/.
+    mkdir -p "$ROOT_DIR/.claude/skills"
+    for skill_dir in "$SOURCE_DIR"/*; do
+      [[ -d "$skill_dir" ]] || continue
+      skill_name="$(basename "$skill_dir")"
+      ln -sfn "../../docs/ai/skills/$skill_name" "$ROOT_DIR/.claude/skills/$skill_name"
+    done
+    echo "created repo links in $ROOT_DIR/.claude/skills"
+    exit 0
+    ;;
   list)
-    find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
+    for skill_dir in "$SOURCE_DIR"/*; do
+      [[ -d "$skill_dir" ]] || continue
+      basename "$skill_dir"
+    done | sort
     exit 0
     ;;
   *)
-    echo "usage: scripts/install-runtime-skills.sh [codex|list]" >&2
+    echo "usage: scripts/install-runtime-skills.sh [codex|opencode|claude|repo-links|list]" >&2
     exit 1
     ;;
 esac

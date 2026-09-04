@@ -11,5 +11,8 @@ crate-type = ["staticlib", "rlib"]
 tokio = { workspace = true }
 libc = { workspace = true }
 
+[build-dependencies]
+pkg-config = "0.3"
+
 [lints]
 workspace = true

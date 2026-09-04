@@ -3,7 +3,8 @@
 ## Source of truth
 - Parser: `core/src/parser.rs`
 - AST/value shape: `core/src/ast.rs`
-- Parser-local tests: inline tests in `core/src/parser.rs`, `core/src/parser_comments_test.rs`
+- Parser-local tests: inline tests in `core/src/parser.rs`
+- Comment tests: `core/tests/parser_comments_tests.rs`
 - Behavior tests using parsed values: `core/tests/backquote_tests.rs`, `keyword_tests.rs`, `vector_tests.rs`, `map_tests.rs`
 
 ## Change checklist
@@ -13,6 +14,5 @@
 - If parser output changes evaluator semantics, run the narrow evaluator test that covers the affected form/value.
 
 ## Validation
-- Parser-only: `cargo test -p dlisp-core parser --quiet`
-- Comment syntax: `cargo test -p dlisp-core parser_comments_test --quiet`
+- Parser/comment syntax: `cargo test -p dlisp-core --test parser_comments_tests --quiet`
 - Literal behavior: run the matching `core/tests/*_tests.rs` target.

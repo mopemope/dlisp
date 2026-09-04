@@ -31,3 +31,11 @@ target
 
 # REPL history
 history.txt
+
+# Agent skills: track symlinks into docs/ai/skills even when a global
+# gitignore excludes .claude/
+!.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/*

@@ -100,17 +100,32 @@ pub async fn compile_file(
                         anyhow::anyhow!("failed to locate libdlisp_runtime static library")
                     })?;
 
-                    let status = Command::new("cc")
-                        .arg("-no-pie")
+                    let mut link_cmd = Command::new("cc");
+                    link_cmd
                         .arg(&object_file)
                         .arg(&lib_path)
                         .arg("-lpthread")
                         .arg("-ldl")
                         .arg("-lm")
-                        .arg("-lgc")
-                        .arg("-o")
-                        .arg(&output_file)
-                        .status()?;
+                        .arg("-lgc");
+
+                    // Locate libgc the same way runtime/build.rs does
+                    // (pkg-config), so Homebrew/system prefixes resolve on
+                    // every platform without per-OS flag lists.
+                    if let Ok(output) = Command::new("pkg-config")
+                        .args(["--libs", "bdw-gc"])
+                        .output()
+                    {
+                        if output.status.success() {
+                            for flag in String::from_utf8_lossy(&output.stdout).split_whitespace() {
+                                if let Some(dir) = flag.strip_prefix("-L") {
+                                    link_cmd.arg(format!("-L{dir}"));
+                                }
+                            }
+                        }
+                    }
+
+                    let status = link_cmd.arg("-o").arg(&output_file).status()?;
 
                     if !status.success() {
                         eprintln!("Linking failed");
