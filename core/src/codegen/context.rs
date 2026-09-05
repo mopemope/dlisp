@@ -17,6 +17,10 @@ pub struct FunctionTranslationContext<'a, 'func, M: Module> {
     pub scopes: Vec<HashMap<String, Variable>>,
     // Stack of enclosing `(loop ...)` frames for `recur` lowering.
     pub loop_frames: Vec<LoopFrame>,
+    // Stack of enclosing `(try ...)` catch blocks for `throw` lowering.
+    // A thrown sentinel value escapes to the innermost catch block, or out
+    // of the current function when the stack is empty.
+    pub try_frames: Vec<Block>,
     // Map captured var name to offset (bytes) in env struct
     pub captured_vars: HashMap<String, u32>,
     pub env_param: Option<IrValue>,
@@ -293,6 +297,8 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
                 "setq" => self.compile_setq(list),
                 "defvar" => self.compile_defvar(list),
                 "if" => crate::codegen::forms::if_expr::compile_if(self, list),
+                "try" => crate::codegen::forms::try_catch::compile_try(self, list),
+                "throw" => crate::codegen::forms::try_catch::compile_throw(self, list),
                 "progn" | "do" => crate::codegen::forms::control::compile_progn(self, list),
                 "when" => crate::codegen::forms::control::compile_when(self, list, false),
                 "unless" => crate::codegen::forms::control::compile_when(self, list, true),
@@ -371,7 +377,46 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         let sig_ref = self.builder.import_signature(sig);
         let call = self.builder.ins().call_indirect(sig_ref, func_ptr, &args);
         let result = self.builder.inst_results(call)[0];
+        self.escape_on_thrown(result)
+    }
+
+    /// Wraps a user function call result: when the callee (or something it
+    /// called) threw, the result is the throw sentinel and execution escapes
+    /// to the innermost `try` catch block, or out of the current function.
+    pub(crate) fn escape_on_thrown(&mut self, result: IrValue) -> Result<IrValue, String> {
+        let sentinel = self.throw_sentinel()?;
+        let is_thrown = self.builder.ins().icmp(IntCC::Equal, result, sentinel);
+
+        let catch_block = self.try_frames.last().copied();
+        let escape_block = self.builder.create_block();
+        let cont_block = self.builder.create_block();
+        match catch_block {
+            Some(target) => {
+                self.builder
+                    .ins()
+                    .brif(is_thrown, target, &[], cont_block, &[]);
+            }
+            None => {
+                self.builder
+                    .ins()
+                    .brif(is_thrown, escape_block, &[], cont_block, &[]);
+                self.builder.switch_to_block(escape_block);
+                self.builder.seal_block(escape_block);
+                self.builder.ins().return_(&[result]);
+            }
+        }
+
+        self.builder.switch_to_block(cont_block);
+        self.builder.seal_block(cont_block);
         Ok(result)
+    }
+
+    fn throw_sentinel(&mut self) -> Result<IrValue, String> {
+        let func = self
+            .module
+            .declare_func_in_func(self.builtins.funcs.dlisp_throw_sentinel, self.builder.func);
+        let call = self.builder.ins().call(func, &[]);
+        Ok(self.builder.inst_results(call)[0])
     }
 
     fn compile_quoted_value(&mut self, val: &Value) -> Result<IrValue, String> {
@@ -497,7 +542,7 @@ impl<'a, 'func, M: Module> FunctionTranslationContext<'a, 'func, M> {
         let local_func = self.module.declare_func_in_func(func_id, self.builder.func);
         let call = self.builder.ins().call(local_func, &args);
         let result = self.builder.inst_results(call)[0];
-        Ok(result)
+        self.escape_on_thrown(result)
     }
 
     pub fn compile_top_level_expr(&mut self, expr: &Value) -> Result<IrValue, String> {

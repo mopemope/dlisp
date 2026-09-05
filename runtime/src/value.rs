@@ -15,6 +15,7 @@ pub enum ValueType {
     NativePtr,
     Channel,
     Atom,
+    Error,
 }
 
 #[repr(C)]
@@ -113,6 +114,16 @@ impl DlispValue {
         Self {
             type_: ValueType::Nil,
             payload: ValuePayload { int_val: 0 }, // Payload doesn't matter for Nil
+        }
+    }
+
+    /// Wraps a value inside an error marker (`Value::Error` on the interpreter side).
+    pub fn new_error(inner: *mut DlispValue) -> Self {
+        Self {
+            type_: ValueType::Error,
+            payload: ValuePayload {
+                ptr_val: inner as *mut std::ffi::c_void,
+            },
         }
     }
 

@@ -135,6 +135,7 @@ pub fn compile_lambda<M: Module>(
                 builtins: &inner_builtins,
                 scopes: vec![initial_scope],
                 loop_frames: Vec::new(),
+                try_frames: Vec::new(),
                 captured_vars: captured_offsets,
                 env_param: Some(env_param),
                 ptr_type: int,

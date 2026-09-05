@@ -25,7 +25,7 @@
 - `map`, `filter`, `reduce`, `some`, `every`, `find`, `for-each`, `map-indexed`, `update`, `map-keys`, `map-vals`
 
 非同期と例外:
-- `spawn`, `try`, `throw`
+- `spawn`, `try`, `throw` — `try`/`throw` は interpreter / JIT / AOT 全経路で compile 対応(sentinel 伝播)。詳細は spec.md 制御の節
 
 補足:
 - `defmacro` は registry ではなく evaluator 側で特別扱いされる
@@ -65,6 +65,7 @@ Macro utils:
 
 Type / error:
 - `nil?`, `error?`, `empty?`, `list?`, `number?`, `string?`, `symbol?`, `keyword?`, `vector?`, `map?`, `type-of`, `error-value`
+- `error?` / `error-value` / `type-of`(error 値)は全経路 compile 対応
 
 Concurrency:
 - `chan`, `send`, `recv`, `try-recv`, `close`, `channel?`

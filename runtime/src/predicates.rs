@@ -120,6 +120,7 @@ pub unsafe extern "C" fn dlisp_type_of(val: *mut DlispValue) -> *mut DlispValue 
                 ValueType::Channel => "channel",
                 ValueType::Atom => "atom",
                 ValueType::NativePtr => "native_ptr",
+                ValueType::Error => "error",
             }
         };
         let c_str = CString::new(name).unwrap();

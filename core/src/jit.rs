@@ -307,6 +307,34 @@ impl Default for JIT {
             "dlisp_atom_p",
             dlisp_runtime::concurrency::dlisp_atom_p as *const u8,
         );
+        builder.symbol(
+            "dlisp_throw_sentinel",
+            dlisp_runtime::errors::dlisp_throw_sentinel as *const u8,
+        );
+        builder.symbol(
+            "dlisp_thrown_pending",
+            dlisp_runtime::errors::dlisp_thrown_pending as *const u8,
+        );
+        builder.symbol(
+            "dlisp_take_thrown",
+            dlisp_runtime::errors::dlisp_take_thrown as *const u8,
+        );
+        builder.symbol(
+            "dlisp_throw",
+            dlisp_runtime::errors::dlisp_throw as *const u8,
+        );
+        builder.symbol(
+            "dlisp_make_error",
+            dlisp_runtime::errors::dlisp_make_error as *const u8,
+        );
+        builder.symbol(
+            "dlisp_error_p",
+            dlisp_runtime::errors::dlisp_error_p as *const u8,
+        );
+        builder.symbol(
+            "dlisp_error_value",
+            dlisp_runtime::errors::dlisp_error_value as *const u8,
+        );
 
         let module = JITModule::new(builder);
 

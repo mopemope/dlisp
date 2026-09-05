@@ -45,14 +45,36 @@ pub async fn apply(
 
             #[allow(clippy::collapsible_if)]
             if let Some(code_ptr) = jit_code {
-                if let Some(result) = unsafe {
+                // Detect a throw thrown *during this call* only: a previously
+                // swallowed throw (e.g. inside a higher-order builtin
+                // callback, a documented limitation) leaves the flag set, and
+                // keying off the absolute state would poison unrelated calls.
+                let pending_before = dlisp_runtime::errors::dlisp_thrown_pending() != 0;
+
+                let jit_result = unsafe {
                     crate::jit_runner::run_jit_function(
                         code_ptr as *const u8,
                         param_names.len(),
                         rest_param.is_some(),
                         &args,
                     )
-                } {
+                };
+
+                // A compiled function that threw returns the sentinel without
+                // a value; surface it as a catchable error instead of falling
+                // back to the interpreter (which would re-run the body).
+                if !pending_before && dlisp_runtime::errors::dlisp_thrown_pending() != 0 {
+                    let thrown_ptr = dlisp_runtime::errors::dlisp_take_thrown();
+                    let thrown_val = thrown_ptr
+                        .is_null()
+                        .then_some(Value::Nil)
+                        .or_else(|| unsafe { crate::jit_runner::runtime_to_value(thrown_ptr) })
+                        .unwrap_or(Value::Nil);
+                    interpreter.last_error = Some(thrown_val);
+                    return Err(EvalFailure::Message("DLISP_THROW".to_string()));
+                }
+
+                if let Some(result) = jit_result {
                     return Ok(result);
                 }
             }

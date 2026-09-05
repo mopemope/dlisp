@@ -98,6 +98,7 @@ fn test_add_lambda_jit() {
         builtins: &builtins,
         scopes: vec![HashMap::new()],
         loop_frames: Vec::new(),
+        try_frames: Vec::new(),
         captured_vars: HashMap::new(),
         env_param: None,
         ptr_type: int,

@@ -66,7 +66,7 @@
 - `while`, `dotimes`, `dolist`: 反復
 - `loop` / `recur`: スタック安全な反復。`(loop [name init ...] body...)` は束縛を持ち、body 中の任意位置の `(recur expr ...)` が全束縛を再束縛して次の反復へ進む。recur 引数の個数は束縛数と一致が必要。loop を囲まずに recur が評価器の外層へ到達した場合はエラー。interpreter / JIT / AOT の全経路で同一意味論
 - `match`: パターンマッチング(stdlib マクロ)。`(match expr (pattern body...)+)` の形で、expr は一度だけ評価される。pattern はリテラル(`=` の構造的等値)、シンボル束縛、`_` ワイルドカード、list/vector 分解 `[p0 p1]` / `[p0 p1 &rest r]`、map 分解 `{:k p}`(全キー存在必須)、ガード付き `(pat :when guard)`。ネストしたパターンも合成できる。guard 失敗は後続の節へ fall-through し、どの節もマッチしなければ `nil` を返す。guard は型検査しないため必要に応じ `number?` 等と併用する。macro 展開結果は lower 可能な式のみで構成され、interpreter / JIT / AOT の全経路で同一意味論
-- `try` / `throw`: 例外系
+- `try` / `throw`: 例外系。`(try body... (catch var handler-body...))` の形で、body 中の `throw` は残りの body を中断して catch 節へ進む。catch 変数には error marker(`(error-value e)` で素の値を取出し、`(error? e)` / `(type-of e)` は `"error"`)が束縛される。catch 節なしの `try` は未捕捉エラーを外層へ伝播する。interpreter / JIT / AOT の全経路で同一意味論。コンパイル済みコードでは sentinel 伝播で実装され、関数境界・lambda 呼び出し・loop 内でも伝播する。`map`/`filter` 等の higher-order builtin のコールバック内での `throw` と、spawn したタスクから別タスクの `try` への伝播は非対応
 
 ## 評価補助とメタプログラミング
 - `quote` は値を評価せずに返す
@@ -96,4 +96,5 @@
 - `defun` された関数は interpreter path と JIT path の両方を持ち得る
 - JIT 実行では boxed runtime value ABI を使って interpreter の `Value` と相互変換する
 - `dlisp compile` は Cranelift backend を使って object を作り、`cc` で `runtime` と link する
+- JIT 境界で throw が pending の場合、interpreter は body を再実行せず catchable error として扱う
 - 変更後は interpreter 系テストと JIT / compile 系テストの両方で確認する

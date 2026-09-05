@@ -41,6 +41,15 @@ extern "C" fn run_user_main_wrapper(_sb: *mut c_void, arg: *mut c_void) -> *mut 
         // transmute back to fn
         let user_main_ptr: extern "C" fn(*mut c_void) -> i64 = std::mem::transmute(arg);
         user_main_ptr(std::ptr::null_mut());
+        // An uncaught `throw` escaping the user main returns the sentinel
+        // and leaves the thrown value pending. Report it and fail the
+        // process so compiled programs surface errors like the interpreter
+        // does (which prints "Error in main:" and exits 1).
+        if crate::errors::dlisp_thrown_pending() != 0 {
+            let _thrown = crate::errors::dlisp_take_thrown();
+            eprintln!("\x1b[31mError in main:\x1b[0m DLISP_THROW");
+            std::process::exit(1);
+        }
         std::ptr::null_mut()
     }
 }
@@ -50,6 +59,14 @@ extern "C" fn run_closure_wrapper(_sb: *mut c_void, arg: *mut c_void) -> *mut c_
         let closure_ptr = arg as *mut Closure;
         let closure = &*closure_ptr;
         (closure.func)(closure.env);
+        // An uncaught `throw` inside a spawned task returns the sentinel and
+        // leaves the thrown value pending on this pooled thread's
+        // thread-local state. Clear it so later tasks on the same thread
+        // never observe a stale pending error.
+        let thrown = crate::errors::dlisp_take_thrown();
+        if !thrown.is_null() {
+            eprintln!("Uncaught throw in spawned task");
+        }
         std::ptr::null_mut()
     }
 }

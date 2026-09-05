@@ -54,6 +54,10 @@ pub(crate) unsafe fn value_to_runtime(value: &Value) -> Option<*mut DlispValue> 
             }
             Some(ptr as *mut DlispValue)
         }
+        Value::Error(inner) => {
+            let inner_ptr = unsafe { value_to_runtime(inner) }?;
+            Some(unsafe { dlisp_runtime::errors::dlisp_make_error(inner_ptr) })
+        }
         _ => None,
     }
 }
@@ -86,6 +90,15 @@ pub(crate) unsafe fn runtime_to_value(ptr: *mut DlispValue) -> Option<Value> {
         ValueType::Map => unsafe { map_to_value(ptr) },
         ValueType::Channel => Some(Value::Channel(ptr as u64)),
         ValueType::Atom => Some(Value::Atom(ptr as u64)),
+        ValueType::Error => {
+            let inner = unsafe { value.payload.ptr_val as *mut DlispValue };
+            let inner_val = if inner.is_null() {
+                Some(Value::Nil)
+            } else {
+                unsafe { runtime_to_value(inner) }
+            };
+            inner_val.map(|v| Value::Error(Box::new(v)))
+        }
         _ => None,
     }
 }

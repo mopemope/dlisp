@@ -130,6 +130,10 @@ fn create_jit_module() -> JITModule {
         "dlisp_atom_new",
         "dlisp_atom_deref",
         "dlisp_atom_p",
+        "dlisp_make_error",
+        "dlisp_error_p",
+        "dlisp_error_value",
+        "dlisp_throw",
     ] {
         builder.symbol(name, dummy_ptr as *const u8);
     }
@@ -150,6 +154,10 @@ fn create_jit_module() -> JITModule {
     builder.symbol("dlisp_substring", dummy_ptr as *const u8);
     builder.symbol("dlisp_string_replace", dummy_ptr as *const u8);
     builder.symbol("printf", dummy_ptr as *const u8);
+    // Errors (try/throw): nullary helpers
+    for name in ["dlisp_throw_sentinel", "dlisp_take_thrown"] {
+        builder.symbol(name, dummy_nullary as *const u8);
+    }
 
     JITModule::new(builder)
 }
@@ -181,6 +189,7 @@ fn compile_expr_in_function(module: &mut JITModule, ast: &Value, func_name: &str
         builtins: &builtins,
         scopes: vec![HashMap::new()],
         loop_frames: Vec::new(),
+        try_frames: Vec::new(),
         captured_vars: HashMap::new(),
         env_param: None,
         ptr_type: int,
@@ -650,4 +659,48 @@ fn test_codegen_atom_ops() {
         Value::Integer(1),
     ]);
     compile_expr_in_function(&mut module, &ast, "test_atom_reset");
+}
+
+// === Errors (try/throw) ===
+
+#[test]
+fn test_codegen_try_throw() {
+    // (throw 42)
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![Value::Symbol("throw".to_string()), Value::Integer(42)]);
+    compile_expr_in_function(&mut module, &ast, "test_throw");
+
+    // (try (throw 42) (catch e (error-value e)))
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("try".to_string()),
+        Value::List(vec![Value::Symbol("throw".to_string()), Value::Integer(42)]),
+        Value::List(vec![
+            Value::Symbol("catch".to_string()),
+            Value::Symbol("e".to_string()),
+            Value::List(vec![
+                Value::Symbol("error-value".to_string()),
+                Value::Symbol("e".to_string()),
+            ]),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_try_catch");
+
+    // (try 7 (catch e :never)) — no-throw path
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![
+        Value::Symbol("try".to_string()),
+        Value::Integer(7),
+        Value::List(vec![
+            Value::Symbol("catch".to_string()),
+            Value::Symbol("e".to_string()),
+            Value::Keyword("never".to_string()),
+        ]),
+    ]);
+    compile_expr_in_function(&mut module, &ast, "test_try_no_throw");
+
+    // (error? x)
+    let mut module = create_jit_module();
+    let ast = Value::List(vec![Value::Symbol("error?".to_string()), Value::Nil]);
+    compile_expr_in_function(&mut module, &ast, "test_error_p");
 }

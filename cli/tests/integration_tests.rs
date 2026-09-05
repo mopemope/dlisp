@@ -463,3 +463,108 @@ fn test_compile_supports_phase4_control_surface() {
         .stdout(predicate::str::contains("(11 22)"))
         .stdout(predicate::str::contains("5"));
 }
+
+#[test]
+fn test_compile_try_throw() {
+    let (_dir, script, output) = write_temp_script(
+        "compiled_try_throw",
+        r#"
+(defun thrower (v) (throw v))
+
+(defun main ()
+  (print (try (thrower "deep") (catch e (string-append "caught: " (error-value e)))))
+  (print (try (+ 1 1) (catch e :never)))
+  (print (try (thrower 99) (catch e (+ (error-value e) 1))))
+  (print (type-of (try (thrower :kw) (catch e e))))
+  (print (error? (try (thrower "x") (catch e e)))))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("caught: deep"))
+        .stdout(predicate::str::contains("2"))
+        .stdout(predicate::str::contains("100"))
+        .stdout(predicate::str::contains("error"))
+        .stdout(predicate::str::contains("true"));
+}
+
+#[test]
+fn test_compile_try_throw_across_functions_and_loop() {
+    let (_dir, script, output) = write_temp_script(
+        "compiled_try_throw_boundary",
+        r#"
+(defun throw-if-negative (n) (if (< n 0) (throw :negative) (* n n)))
+(defun safe-sq (n) (try (throw-if-negative n) (catch e (error-value e))))
+
+(defun main ()
+  (print (safe-sq 5))
+  (print (safe-sq -3))
+  (let ((g (lambda () (throw :from-lambda))))
+    (print (try (g) (catch e (error-value e)))))
+  (let ((i 0) (caught 0))
+    (while (< i 10)
+      (try (if (= (% i 2) 0) (throw :even) i) (catch e (setq caught (+ caught 1))))
+      (setq i (+ i 1)))
+    (print caught)))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("25"))
+        .stdout(predicate::str::contains(":negative"))
+        .stdout(predicate::str::contains(":from-lambda"))
+        .stdout(predicate::str::contains("5"));
+}
+
+#[test]
+fn test_compile_uncaught_throw_exits_nonzero() {
+    // An uncaught throw escaping main must fail the compiled program the
+    // same way the interpreter fails the script (nonzero exit), not exit 0
+    // silently.
+    let (_dir, script, output) = write_temp_script(
+        "compiled_uncaught_throw",
+        r#"
+(defun main ()
+  (print :before)
+  (throw :boom)
+  (print :after))
+"#,
+    );
+
+    let mut compile_cmd = dlisp_cmd();
+    compile_cmd
+        .arg("compile")
+        .arg(&script)
+        .arg("-o")
+        .arg(&output)
+        .assert()
+        .success();
+
+    Command::new(&output)
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains(":before"))
+        .stdout(predicate::str::contains(":after").not());
+}

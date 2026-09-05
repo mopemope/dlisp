@@ -113,6 +113,11 @@ unsafe fn dlisp_print_value(val: *mut DlispValue) {
             ValueType::NativePtr => {
                 print!("<native_ptr>");
             }
+            ValueType::Error => {
+                print!("<error ");
+                dlisp_print_value((*val).payload.ptr_val as *mut DlispValue);
+                print!(">");
+            }
             ValueType::Map => {
                 print!("{{");
                 let map_data = (*val).payload.map_val;

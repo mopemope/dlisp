@@ -85,7 +85,7 @@ Registered into the default environment.
 - `dissoc` — core/src/builtins/mod.rs:120
 - `drop [compiled]` — core/src/builtins/mod.rs:107
 - `empty? [compiled]` — core/src/builtins/mod.rs:207
-- `error?` — core/src/builtins/mod.rs:206
+- `error? [compiled]` — core/src/builtins/mod.rs:206
 - `exec` — core/src/builtins/mod.rs:90
 - `exit [compiled]` — core/src/builtins/mod.rs:85
 - `first [compiled]` — core/src/builtins/mod.rs:96
@@ -161,6 +161,8 @@ Registered into the default environment.
 - `dlisp_div` — runtime/src/arith.rs:89
 - `dlisp_drop` — runtime/src/lists.rs:333
 - `dlisp_eq` — runtime/src/cmp.rs:82
+- `dlisp_error_p` — runtime/src/errors.rs:77
+- `dlisp_error_value` — runtime/src/errors.rs:89
 - `dlisp_every` — runtime/src/higher_order.rs:200
 - `dlisp_exit` — runtime/src/sys.rs:109
 - `dlisp_file_exists` — runtime/src/io.rs:8
@@ -185,10 +187,11 @@ Registered into the default environment.
 - `dlisp_list_p` — runtime/src/predicates.rs:16
 - `dlisp_lt` — runtime/src/cmp.rs:53
 - `dlisp_lte` — runtime/src/cmp.rs:201
-- `dlisp_main` — runtime/src/task.rs:61
+- `dlisp_main` — runtime/src/task.rs:78
 - `dlisp_make_bool` — runtime/src/constructors.rs:119
 - `dlisp_make_closure` — runtime/src/constructors.rs:54
 - `dlisp_make_cons` — runtime/src/constructors.rs:74
+- `dlisp_make_error` — runtime/src/errors.rs:64
 - `dlisp_make_float` — runtime/src/constructors.rs:110
 - `dlisp_make_int` — runtime/src/constructors.rs:7
 - `dlisp_make_keyword` — runtime/src/constructors.rs:31
@@ -214,9 +217,9 @@ Registered into the default environment.
 - `dlisp_set_cwd` — runtime/src/sys.rs:74
 - `dlisp_setenv` — runtime/src/sys.rs:30
 - `dlisp_sh` — runtime/src/os.rs:8
-- `dlisp_sleep` — runtime/src/task.rs:131
+- `dlisp_sleep` — runtime/src/task.rs:148
 - `dlisp_some` — runtime/src/higher_order.rs:165
-- `dlisp_spawn` — runtime/src/task.rs:89
+- `dlisp_spawn` — runtime/src/task.rs:106
 - `dlisp_str` — runtime/src/strings.rs:9
 - `dlisp_string_append` — runtime/src/strings.rs:98
 - `dlisp_string_contains` — runtime/src/strings.rs:280
@@ -237,6 +240,10 @@ Registered into the default environment.
 - `dlisp_substring` — runtime/src/strings.rs:65
 - `dlisp_symbol_p` — runtime/src/predicates.rs:45
 - `dlisp_take` — runtime/src/lists.rs:298
+- `dlisp_take_thrown` — runtime/src/errors.rs:44
+- `dlisp_throw` — runtime/src/errors.rs:52
+- `dlisp_throw_sentinel` — runtime/src/errors.rs:32
+- `dlisp_thrown_pending` — runtime/src/errors.rs:38
 - `dlisp_type_of` — runtime/src/predicates.rs:103
 - `dlisp_vector_copy` — runtime/src/vectors.rs:182
 - `dlisp_vector_count` — runtime/src/vectors.rs:145

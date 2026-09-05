@@ -8,6 +8,7 @@ pub mod cmp;
 pub mod collections;
 pub mod concurrency;
 pub mod constructors;
+pub mod errors;
 pub mod gc;
 pub mod higher_order;
 pub mod io;
@@ -36,6 +37,10 @@ pub use concurrency::{
 pub use constructors::{
     dlisp_cons, dlisp_make_bool, dlisp_make_closure, dlisp_make_cons, dlisp_make_float,
     dlisp_make_int, dlisp_make_keyword, dlisp_make_nil, dlisp_make_string, dlisp_make_symbol,
+};
+pub use errors::{
+    dlisp_error_p, dlisp_error_value, dlisp_make_error, dlisp_take_thrown, dlisp_throw,
+    dlisp_throw_sentinel, dlisp_thrown_pending,
 };
 pub use gc::{
     GC_allow_register_threads, GC_call_with_stack_base, GC_get_stack_base, GC_init, GC_malloc,

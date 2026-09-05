@@ -72,6 +72,8 @@ pub fn compile_builtin<M: Module>(
         "map?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_map_p, false),
         "vector?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_p, false),
         "type-of" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_type_of, false),
+        "error?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_error_p, false),
+        "error-value" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_error_value, false),
         // Phase 3 additions
         "file-exists?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_file_exists, false),
         "is-dir?" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_is_dir, false),

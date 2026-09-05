@@ -393,3 +393,179 @@ async fn test_jit_match_semantics() {
         ])
     );
 }
+
+#[tokio::test]
+async fn test_jit_try_throw_catch() {
+    // Basic throw/catch inside a JIT-compiled function.
+    assert_eq!(
+        eval_code(
+            r#"(defun f () (try (throw 42) (catch e (error-value e))))
+               (f)"#
+        )
+        .await,
+        Value::Integer(42)
+    );
+
+    // The caught value is an error marker on the compiled path, same as the
+    // interpreter.
+    assert_eq!(
+        eval_code(
+            r#"(defun f () (try (throw :tagged) (catch e (type-of e))))
+               (f)"#
+        )
+        .await,
+        Value::String("error".to_string())
+    );
+
+    assert_eq!(
+        eval_code(
+            r#"(defun f () (try (throw "boom") (catch e (error? e))))
+               (f)"#
+        )
+        .await,
+        Value::Bool(true)
+    );
+
+    // No-throw path returns the body value.
+    assert_eq!(
+        eval_code(
+            r#"(defun f () (try (* 2 21) (catch e :never)))
+               (f)"#
+        )
+        .await,
+        Value::Integer(42)
+    );
+}
+
+#[tokio::test]
+async fn test_jit_throw_across_call_boundary() {
+    // A throw inside a callee propagates through the compiled caller into
+    // the caller's try.
+    assert_eq!(
+        eval_code(
+            r#"(defun thrower () (throw "deep"))
+               (defun middle () (thrower) :not-reached)
+               (defun f () (try (middle) (catch e (error-value e))))
+               (f)"#
+        )
+        .await,
+        Value::String("deep".to_string())
+    );
+
+    // Throw inside a JIT-compiled callee reached from a top-level try.
+    assert_eq!(
+        eval_code(
+            r#"(defun thrower (v) (throw v))
+               (try (thrower :kw) (catch e (error-value e)))"#
+        )
+        .await,
+        Value::Keyword("kw".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_jit_throw_in_lambda_propagates() {
+    // A throw inside a lambda escapes the lambda and is caught by the
+    // enclosing function's try (indirect call sentinel propagation).
+    assert_eq!(
+        eval_code(
+            r#"(defun f ()
+                 (let ((g (lambda () (throw :from-lambda))))
+                   (try (g) (catch e (error-value e)))))
+               (f)"#
+        )
+        .await,
+        Value::Keyword("from-lambda".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_jit_try_inside_loop() {
+    // try/throw interacting with while-loop lowering and setq.
+    assert_eq!(
+        eval_code(
+            r#"(defun f (n)
+                 (let ((i 0) (caught 0))
+                   (while (< i n)
+                     (try (if (= (% i 2) 0) (throw :even) i)
+                          (catch e (setq caught (+ caught 1))))
+                     (setq i (+ i 1)))
+                   caught))
+               (f 10)"#
+        )
+        .await,
+        Value::Integer(5)
+    );
+}
+
+#[tokio::test]
+async fn test_jit_try_body_stops_at_throw() {
+    // Expressions after a throw in the body never run.
+    assert_eq!(
+        eval_code(
+            r#"(defun f ()
+                 (try (println "before") (throw :after) (println "unreachable")
+                      (catch e (error-value e))))
+               (f)"#
+        )
+        .await,
+        Value::Keyword("after".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_jit_nested_try() {
+    // Inner try catches first; rethrow reaches the outer try.
+    assert_eq!(
+        eval_code(
+            r#"(defun f ()
+                 (try
+                   (try (throw :inner) (catch e (throw (error-value e))))
+                   (catch e2 (error-value e2))))
+               (f)"#
+        )
+        .await,
+        Value::Keyword("inner".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_jit_uncaught_throw_surfaces_at_call() {
+    // An uncaught throw inside a compiled function surfaces as a catchable
+    // error at the interpreter call site instead of re-running the body.
+    assert_eq!(
+        eval_code(
+            r#"(defun f () (throw 7))
+               (try (f) (catch e (error-value e)))"#
+        )
+        .await,
+        Value::Integer(7)
+    );
+}
+
+#[tokio::test]
+async fn test_jit_gate_compiles_try_catch() {
+    // Guards against the JIT gate silently rejecting functions containing
+    // try/catch (e.g. by misreading the `(catch var ...)` clause as a call
+    // to an unbound `catch`): such defuns must stay compiled, otherwise
+    // the compiled-path tests above would quietly exercise the interpreter.
+    let env = default_env();
+    let mut interpreter = Interpreter::new();
+    let code = r#"
+        (defun f () (try (throw 42) (catch e (error-value e))))
+        (defun g (n) (try (if (< n 0) (throw :neg) (* n n)) (catch e (error-value e))))
+        (defun h () (try (try (throw :in)) (catch e (error-value e))))
+        (defun k () (try (+ 1 2)))
+    "#;
+    for val in parse(code).unwrap() {
+        interpreter.eval(val, &mut env.clone()).await.unwrap();
+    }
+    for name in ["f", "g", "h", "k"] {
+        match env.borrow().get(name) {
+            Some(Value::UserFunc { jit_code, .. }) => {
+                assert!(jit_code.is_some(), "{name} should be JIT-compiled");
+            }
+            other => panic!("{name} is not a UserFunc: {other:?}"),
+        }
+    }
+}

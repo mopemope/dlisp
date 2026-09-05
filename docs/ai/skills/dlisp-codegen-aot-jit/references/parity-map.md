@@ -34,6 +34,7 @@ Compiled special forms include:
   束縛を一時変数経由で再定義し body 先頭へ jump; interpreter の
   abort-on-recur 段階的実行に対応するため後続式は dead block へ)
 - Quoting/concurrency: `quote`, `spawn`
+- Errors: `try` / `throw` (sentinel propagation; see below)
 
 ## Interpreter-only by default
 Builtins absent from `COMPILED_BUILTINS` are interpreter-only. The JIT gate
@@ -41,15 +42,59 @@ keeps such functions on the interpreter automatically; AOT compilation fails
 with an explicit error naming the function and builtin.
 
 Still interpreter-only examples include `sort`, `zip`, `format`,
-`gensym`, `write-file`, `exec`, `select-keys`, `dissoc`, `merge`, `keys`,
+`gensym`, `write-file`, `exec`, `select-keys`, `dissoc`, `merge`,
 `vals`, and the numeric helpers `abs`, `min`, `max`, `pow`.
+`error?` and `error-value` are compiled builtins.
 `range` used to be an interpreter-only builtin; it now lives in the bundled
 stdlib (`stdlib/src/core.lisp`) as Lisp code and compiles on every path.
 
-Interpreter-only special forms (`try`, `throw`, `eval`, `apply`,
+Interpreter-only special forms (`eval`, `apply`,
 `macroexpand`, `load`, `require`, `defmacro`, `map-indexed`, `update`,
 `map-keys`, `map-vals`) are rejected by the AOT precheck via
 `is_interpreter_only_special_form` with an explicit error.
+
+## Error handling (try / throw) on compiled paths
+`try`/`throw` compile on every path via sentinel propagation
+(`runtime/src/errors.rs`):
+- `throw` stores the thrown value in thread-local state and returns a
+  reserved sentinel pointer (`dlisp_throw_sentinel`).
+- User call sites (`compile_function_call`, `compile_indirect_call`) compare
+  the result against the sentinel and escape: jump to the innermost `try`
+  catch block, or return the sentinel out of the current function.
+- `try` registers its catch block on `ctx.try_frames` while the body is
+  compiled; the handler takes the pending value, wraps it in an error
+  marker (`dlisp_make_error`), and binds the catch variable — matching the
+  interpreter's `Value::Error` wrapper.
+- The JIT boundary in `core/src/interpreter/apply.rs` converts a throw
+  raised *during the call* (transition on `dlisp_thrown_pending`, not the
+  absolute flag — a stale flag from a swallowed higher-order-callback throw
+  must not poison unrelated calls) into
+  `EvalFailure::Message("DLISP_THROW")` + `interpreter.last_error` so an
+  enclosing interpreter `try` can catch it without re-running the body.
+- A catch-less `try` escapes to the enclosing try's catch block when one
+  exists (the frame stack is popped before the escape target is chosen) and
+  otherwise returns the sentinel out of the current function, matching the
+  interpreter's outward bubbling. `(try)` evaluates to nil on all paths.
+- An uncaught throw escaping the AOT user main is detected by the runtime
+  entry shim (`run_user_main_wrapper` in `runtime/src/task.rs`), which
+  prints `Error in main: DLISP_THROW` and exits 1 like the interpreter.
+- The JIT gate treats the trailing `(catch var handler...)` clause of `try`
+  as structure (not a call); the catch variable is scoped to the handler
+  body. `test_jit_gate_compiles_try_catch` pins this.
+- Caught values print as `<error v>`; `type-of` returns `"error"`.
+
+Limitations (compile-time safe, but documented):
+- Throws thrown inside closures passed to higher-order builtins
+  (`map`/`filter`/`reduce`/`some`/`every`/`find`/`for-each`) are NOT
+  propagated: the runtime helpers do not check for the sentinel, so a
+  thrown value can end up as a list element. Keep `throw` out of
+  higher-order callbacks on compiled paths.
+- An uncaught `throw` in a spawned task (OS thread) is reported as
+  "Uncaught throw in spawned task" and cleared; it cannot be caught by a
+  `try` in another task.
+- Runtime FFI type errors still abort (`eprintln!` + `process::abort`) —
+  see the error-reporting divergences above; converting those aborts into
+  catchable throws is future work.
 
 ## Known minor divergences: error reporting
 Compiled code cannot raise catchable errors, so a few builtins differ from

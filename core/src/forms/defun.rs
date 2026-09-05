@@ -28,6 +28,8 @@ pub(crate) fn is_codegen_special_form(name: &str) -> bool {
             | "dolist"
             | "loop"
             | "recur"
+            | "try"
+            | "throw"
     )
 }
 
@@ -41,9 +43,7 @@ pub(crate) fn is_codegen_special_form(name: &str) -> bool {
 pub(crate) fn is_interpreter_only_special_form(name: &str) -> bool {
     matches!(
         name,
-        "try"
-            | "throw"
-            | "eval"
+        "eval"
             | "apply"
             | "macroexpand"
             | "load"
@@ -185,6 +185,43 @@ fn find_uncompiled_call_inner(
                             env,
                             pending_functions,
                             &inner_locals,
+                        )?;
+                    }
+                    return None;
+                }
+
+                // `try`: the trailing `(catch var handler...)` clause is
+                // structure, not a call. The catch variable is a local of
+                // the handler body; the try body and handler body are
+                // scanned as expressions.
+                if op == "try" {
+                    let mut body_items: &[Value] = &items[1..];
+                    if let Some(Value::List(last_list)) = body_items.last()
+                        && !last_list.is_empty()
+                        && matches!(&last_list[0], Value::Symbol(s) if s == "catch")
+                    {
+                        let mut inner_locals: Vec<String> = locals.to_vec();
+                        if let Some(Value::Symbol(var)) = last_list.get(1) {
+                            inner_locals.push(var.clone());
+                        }
+                        for item in last_list.iter().skip(2) {
+                            find_uncompiled_call_inner(
+                                item,
+                                current_func,
+                                env,
+                                pending_functions,
+                                &inner_locals,
+                            )?;
+                        }
+                        body_items = &body_items[..body_items.len() - 1];
+                    }
+                    for item in body_items {
+                        find_uncompiled_call_inner(
+                            item,
+                            current_func,
+                            env,
+                            pending_functions,
+                            locals,
                         )?;
                     }
                     return None;

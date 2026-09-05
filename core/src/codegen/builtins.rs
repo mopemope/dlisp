@@ -114,6 +114,14 @@ pub struct BuiltinDefinitions {
     pub dlisp_atom_deref: FuncId,
     pub dlisp_atom_reset: FuncId,
     pub dlisp_atom_p: FuncId,
+    // Errors (try/throw)
+    pub dlisp_throw_sentinel: FuncId,
+    pub dlisp_thrown_pending: FuncId,
+    pub dlisp_take_thrown: FuncId,
+    pub dlisp_throw: FuncId,
+    pub dlisp_make_error: FuncId,
+    pub dlisp_error_p: FuncId,
+    pub dlisp_error_value: FuncId,
 }
 
 pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions, String> {
@@ -723,6 +731,38 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         .declare_function("dlisp_sh", Linkage::Import, &car_sig)
         .map_err(|e| e.to_string())?;
 
+    // Errors (try/throw)
+    // dlisp_throw_sentinel() -> DlispValue*
+    let throw_sentinel_id = module
+        .declare_function("dlisp_throw_sentinel", Linkage::Import, &args_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_thrown_pending() -> i64
+    let mut thrown_pending_sig = module.make_signature();
+    thrown_pending_sig.returns.push(AbiParam::new(types::I64));
+    let thrown_pending_id = module
+        .declare_function("dlisp_thrown_pending", Linkage::Import, &thrown_pending_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_take_thrown() -> DlispValue*
+    let take_thrown_id = module
+        .declare_function("dlisp_take_thrown", Linkage::Import, &args_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_throw(DlispValue*) -> DlispValue* (returns the sentinel)
+    let throw_id = module
+        .declare_function("dlisp_throw", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_make_error(DlispValue*) -> DlispValue*
+    let make_error_id = module
+        .declare_function("dlisp_make_error", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_error_p(DlispValue*) -> DlispValue* (Bool)
+    let error_p_id = module
+        .declare_function("dlisp_error_p", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    // dlisp_error_value(DlispValue*) -> DlispValue*
+    let error_value_id = module
+        .declare_function("dlisp_error_value", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+
     Ok(BuiltinDefinitions {
         printf: printf_id,
         dlisp_spawn: spawn_id,
@@ -834,5 +874,13 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_atom_deref: atom_deref_id,
         dlisp_atom_reset: atom_reset_id,
         dlisp_atom_p: atom_p_id,
+        // Errors (try/throw)
+        dlisp_throw_sentinel: throw_sentinel_id,
+        dlisp_thrown_pending: thrown_pending_id,
+        dlisp_take_thrown: take_thrown_id,
+        dlisp_throw: throw_id,
+        dlisp_make_error: make_error_id,
+        dlisp_error_p: error_p_id,
+        dlisp_error_value: error_value_id,
     })
 }
