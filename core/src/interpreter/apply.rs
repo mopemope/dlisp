@@ -45,10 +45,12 @@ pub async fn apply(
 
             #[allow(clippy::collapsible_if)]
             if let Some(code_ptr) = jit_code {
-                // Detect a throw thrown *during this call* only: a previously
+                // Detect a throw raised *during this call*: a previously
                 // swallowed throw (e.g. inside a higher-order builtin
-                // callback, a documented limitation) leaves the flag set, and
-                // keying off the absolute state would poison unrelated calls.
+                // callback, a documented limitation) leaves the flag set,
+                // and keying off the absolute state would poison unrelated
+                // calls. run_jit_function returns None for the throw
+                // sentinel, so a genuine throw here always sets the flag.
                 let pending_before = dlisp_runtime::errors::dlisp_thrown_pending() != 0;
 
                 let jit_result = unsafe {
@@ -60,10 +62,17 @@ pub async fn apply(
                     )
                 };
 
-                // A compiled function that threw returns the sentinel without
-                // a value; surface it as a catchable error instead of falling
-                // back to the interpreter (which would re-run the body).
-                if !pending_before && dlisp_runtime::errors::dlisp_thrown_pending() != 0 {
+                // A compiled function that threw returns the sentinel
+                // (surfaced as None by run_jit_function) while leaving the
+                // flag set. Only that combination is a throw escaping this
+                // call: a sentinel merely captured as a list element by the
+                // documented higher-order-builtin limitation returns a
+                // normal value with the flag also set, which must NOT be
+                // reported as a throw.
+                if jit_result.is_none()
+                    && !pending_before
+                    && dlisp_runtime::errors::dlisp_thrown_pending() != 0
+                {
                     let thrown_ptr = dlisp_runtime::errors::dlisp_take_thrown();
                     let thrown_val = thrown_ptr
                         .is_null()

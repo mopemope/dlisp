@@ -7,6 +7,9 @@
 (defun safe-call (f arg)
   (try (f arg) (catch e (string-append "caught: " (str (error-value e))))))
 
+(defun adder (x)
+  (+ x 1))
+
 (defun main ()
   ;; Basic catch with error unwrapping.
   (print (try (thrower 42) (catch e (error-value e))))
@@ -29,6 +32,10 @@
   ;; Throw inside a lambda escapes the lambda into the caller's try.
   (let ((g (lambda () (throw :from-lambda))))
     (print (try (g) (catch e (error-value e)))))
+  ;; A try/catch inside a lambda compiles and catches there.
+  (print (map (lambda (y) (try (adder y) (catch e :caught))) '(1 2)))
+  (let ((g (lambda () (try (throw :in-lambda) (catch e (error-value e))))))
+    (print (g)))
   ;; A catch-less try escapes to the enclosing try, not out of the function.
   (print (try (try (thrower 7)) (catch e (error-value e))))
   (print (try (try (thrower :rethrown)) (catch e (error-value e))))

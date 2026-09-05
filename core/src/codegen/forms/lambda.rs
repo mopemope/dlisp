@@ -260,6 +260,31 @@ fn find_free_vars(
                         }
                     }
                 }
+                Value::Symbol(op) if op == "try" => {
+                    // (try body... (catch var handler...)): the catch clause
+                    // is structure, not a call. `catch` and the catch
+                    // variable bind in the handler body; the try body is
+                    // scanned normally. Mirrors find_uncompiled_call_inner.
+                    if list.len() >= 2 {
+                        let mut body_items: &[Value] = &list[1..];
+                        if let Some(Value::List(last_list)) = body_items.last()
+                            && !last_list.is_empty()
+                            && matches!(&last_list[0], Value::Symbol(s) if s == "catch")
+                        {
+                            let mut new_bound = bound.clone();
+                            if let Some(Value::Symbol(var)) = last_list.get(1) {
+                                new_bound.insert(var.clone());
+                            }
+                            for sub in last_list.iter().skip(2) {
+                                find_free_vars(sub, &mut new_bound, free);
+                            }
+                            body_items = &body_items[..body_items.len() - 1];
+                        }
+                        for sub in body_items {
+                            find_free_vars(sub, bound, free);
+                        }
+                    }
+                }
                 _ => {
                     for sub in list {
                         find_free_vars(sub, bound, free);

@@ -306,5 +306,13 @@ pub unsafe fn run_jit_function(
     }
 
     let result = unsafe { call_compiled_function(code_ptr, &runtime_args) }?;
+    // A thrown error returns the throw sentinel; surface it as a failure
+    // (None) instead of converting it to a value. Identity comparison on
+    // the raw pointer does not depend on thread-local flag state, so a
+    // stale pending flag cannot turn a real throw into a swallowed
+    // Error(Nil) result.
+    if result == dlisp_runtime::errors::dlisp_throw_sentinel() {
+        return None;
+    }
     unsafe { runtime_to_value(result) }
 }

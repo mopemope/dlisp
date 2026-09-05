@@ -569,3 +569,59 @@ async fn test_jit_gate_compiles_try_catch() {
         }
     }
 }
+
+#[tokio::test]
+async fn test_jit_try_catch_inside_lambda() {
+    // A try/catch inside a lambda must not misidentify `catch` and the
+    // catch variable as free variables of the lambda (which would emit
+    // unresolvable symbol imports and break JIT/AOT compilation).
+    assert_eq!(
+        eval_code(
+            r#"(defun f (x) (+ x 1))
+               (map (lambda (y) (try (f y) (catch e :caught))) '(1 2))"#
+        )
+        .await,
+        Value::List(vec![Value::Integer(2), Value::Integer(3)])
+    );
+
+    // The lambda-captured try still catches.
+    assert_eq!(
+        eval_code(
+            r#"(defun f ()
+                 (let ((g (lambda () (try (throw :in) (catch e (error-value e))))))
+                   (g)))
+               (f)"#
+        )
+        .await,
+        Value::Keyword("in".to_string())
+    );
+}
+
+#[tokio::test]
+async fn test_jit_thrown_value_in_list_element_is_not_a_throw() {
+    // Documented limitation: a throw inside a higher-order builtin callback
+    // leaves the sentinel captured as a list element with the pending flag
+    // set. The JIT boundary must report neither as an escaping throw:
+    // execution continues normally and later throws still surface.
+    assert_eq!(
+        eval_code(
+            r#"(defun swallower () (try (map (lambda (x) (throw 1)) '(1 2)) (catch e :swallowed)))
+               (swallower)"#
+        )
+        .await,
+        Value::List(vec![
+            Value::Error(Box::new(Value::Nil)),
+            Value::Error(Box::new(Value::Nil)),
+        ])
+    );
+
+    assert_eq!(
+        eval_code(
+            r#"(defun swallower () (try (map (lambda (x) (throw 1)) '(1 2)) (catch e :swallowed)))
+               (defun thrower () (throw :real))
+               (try (thrower) (catch e (error-value e)))"#
+        )
+        .await,
+        Value::Keyword("real".to_string())
+    );
+}
