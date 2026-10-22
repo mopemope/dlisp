@@ -59,7 +59,54 @@ pub async fn run_repl() -> anyhow::Result<()> {
         }
     }
     if let Some(ref path) = history_path {
-        rl.save_history(path)?;
+        save_history_quietly(&mut rl, path);
     }
     Ok(())
+}
+
+/// Best-effort history save: a save failure must not turn a clean REPL
+/// exit (CTRL-C / CTRL-D) into an error exit; warn and keep exit 0.
+fn save_history_quietly(rl: &mut DefaultEditor, path: &std::path::Path) -> bool {
+    if let Err(err) = rl.save_history(path) {
+        eprintln!(
+            "Warning: could not save REPL history to {}: {}",
+            path.display(),
+            err
+        );
+        return false;
+    }
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_save_history_quietly_reports_failure_without_panicking() {
+        let mut rl = DefaultEditor::new().expect("editor");
+        // An empty history is a no-op success in rustyline; memory one
+        // entry so the save actually writes.
+        rl.add_history_entry("(+ 1 2)").expect("history entry");
+        let temp = tempfile::tempdir().expect("tempdir");
+        // A directory named history.txt makes the save fail cleanly
+        // (rustyline creates missing parent dirs, so removal games won't
+        // force an error — point at an unopenable path instead).
+        std::fs::create_dir(temp.path().join("history.txt")).expect("poison path");
+
+        assert!(!save_history_quietly(
+            &mut rl,
+            &temp.path().join("history.txt")
+        ));
+    }
+
+    #[test]
+    fn test_save_history_quietly_succeeds_on_writable_path() {
+        let mut rl = DefaultEditor::new().expect("editor");
+        rl.add_history_entry("(+ 1 2)").expect("history entry");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("history.txt");
+
+        assert!(save_history_quietly(&mut rl, &path));
+    }
 }
