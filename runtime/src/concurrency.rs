@@ -50,10 +50,7 @@ fn registry() -> &'static Mutex<HandleRegistry> {
 /// Pins a freshly created channel/atom wrapper so the collector keeps it
 /// alive even when only non-scanned memory (interpreter environments, tokio
 /// task state) holds its address.
-/// Pins a freshly created channel/atom wrapper so the collector keeps it
-/// alive even when only non-scanned memory (interpreter environments, tokio
-/// task state) holds its address.
-fn pin_handle(wrapper: *mut DlispValue) {
+pub(crate) fn pin_handle(wrapper: *mut DlispValue) {
     debug_assert!(!wrapper.is_null());
     let mut reg = registry()
         .lock()

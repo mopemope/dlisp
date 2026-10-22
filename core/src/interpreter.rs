@@ -1,7 +1,7 @@
 use crate::ast::Value;
 use crate::environment::Environment;
 use async_recursion::async_recursion;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use crate::jit::JIT;
@@ -11,6 +11,24 @@ pub mod apply;
 use crate::eval_failure::EvalFailure;
 use crate::forms::registry::{FormRegistry, standard_registry};
 
+/// Default maximum concurrent `eval`/`expand` nesting before evaluation
+/// aborts with a catchable depth error.
+///
+/// Sized below the measured stack-overflow point of interpreted recursion on
+/// the 8 MiB main thread (crashes observed at ~400+ nested interpreted
+/// calls) but above anything sane programs need. Embeddings running the
+/// interpreter on smaller stacks can lower it via the `DLISP_MAX_EVAL_DEPTH`
+/// environment variable or by setting `max_eval_depth` directly.
+pub const DEFAULT_MAX_EVAL_DEPTH: usize = 256;
+
+fn effective_max_eval_depth() -> usize {
+    std::env::var("DLISP_MAX_EVAL_DEPTH")
+        .ok()
+        .and_then(|v| v.trim().parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(DEFAULT_MAX_EVAL_DEPTH)
+}
+
 /// Tree-walking evaluator with a special form registry and JIT handle.
 ///
 /// `forms` decides which symbols are special forms; everything else is
@@ -19,6 +37,12 @@ pub struct Interpreter {
     pub jit: JIT,
     pub forms: FormRegistry,
     pub last_error: Option<Value>,
+    /// Maximum concurrent `eval`/`expand` nesting. Exceeding it raises a
+    /// catchable `EvalFailure::Message` ("Maximum evaluation depth ...")
+    /// instead of overflowing the stack; it also terminates self-expanding
+    /// macro loops.
+    pub max_eval_depth: usize,
+    walk_depth: Cell<usize>,
 }
 
 impl Default for Interpreter {
@@ -33,11 +57,39 @@ impl Interpreter {
             jit: JIT::new(),
             forms: standard_registry(),
             last_error: None,
+            max_eval_depth: effective_max_eval_depth(),
+            walk_depth: Cell::new(0),
         }
     }
 
-    #[async_recursion(?Send)]
+    /// Enters one `eval`/`expand` nesting level, raising the catchable
+    /// depth error when `max_eval_depth` would be exceeded. Returns the
+    /// new nesting depth (one above the pre-entry value).
+    fn enter_walk(&mut self) -> Result<usize, EvalFailure> {
+        let depth = self.walk_depth.get() + 1;
+        if depth > self.max_eval_depth {
+            return Err(EvalFailure::message(format!(
+                "Maximum evaluation depth exceeded (limit {})",
+                self.max_eval_depth
+            )));
+        }
+        self.walk_depth.set(depth);
+        Ok(depth)
+    }
+
     pub async fn eval(
+        &mut self,
+        val: Value,
+        env: &mut Rc<RefCell<Environment>>,
+    ) -> Result<Value, EvalFailure> {
+        let depth = self.enter_walk()?;
+        let result = self.eval_inner(val, env).await;
+        self.walk_depth.set(depth - 1);
+        result
+    }
+
+    #[async_recursion(?Send)]
+    async fn eval_inner(
         &mut self,
         val: Value,
         env: &mut Rc<RefCell<Environment>>,
@@ -103,8 +155,19 @@ impl Interpreter {
         }
     }
 
-    #[async_recursion(?Send)]
     pub async fn expand(
+        &mut self,
+        val: Value,
+        env: &mut Rc<RefCell<Environment>>,
+    ) -> Result<Value, EvalFailure> {
+        let depth = self.enter_walk()?;
+        let result = self.expand_inner(val, env).await;
+        self.walk_depth.set(depth - 1);
+        result
+    }
+
+    #[async_recursion(?Send)]
+    async fn expand_inner(
         &mut self,
         val: Value,
         env: &mut Rc<RefCell<Environment>>,

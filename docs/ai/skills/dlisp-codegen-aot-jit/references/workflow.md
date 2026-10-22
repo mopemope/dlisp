@@ -13,6 +13,7 @@
 - Add/adjust runtime ABI declarations before lowering calls to new runtime functions.
 - Keep function signatures aligned across runtime externs, `BuiltinDefinitions`, and call lowering.
 - Add compile-path tests for any public behavior that should work after `dlisp compile`.
+- Assert `Value::UserFunc { jit_code: Some(_), .. }` for functions expected to JIT; successful evaluation may otherwise exercise interpreter fallback. Use `dlisp-parity-debugging` when paths disagree.
 
 ## Validation
 - JIT/codegen: `cargo test -p dlisp-core --test jit_phase3_tests --quiet`

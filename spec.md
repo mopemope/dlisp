@@ -90,6 +90,8 @@
 - atom: `(atom v)` で作る可変参照セル。`(deref a)` で読み、`(reset! a v)` で書き換える(新しい値を返す)。同一ハンドルの `=` 比較は identity
 - channel / atom は interpreter、JIT、AOT の全経路で同一の意味論を持つ。`send` が `true` を返した値は必ずいずれかの `recv` で受け取れる。待機方法のみ経路差があり、interpreted コードは最大 1ms の timeout poll + yield、compiled コードは OS thread 上で block する。spawn と対応する recv は同じ compilation unit(function)に置くこと
 - channel / atom オブジェクトは GC に対して process lifetime で pin される(大量生成は避けること)
+- compiled (AOT) `spawn` は、closure wrapper とその record も同様に process lifetime で pin する。
+  spawn した closure を無限ループで大量生成すると registry が伸び続ける点は channel / atom と同じ
 - REPL と evaluator は async ベースで動作する
 
 ## JIT / AOT
@@ -98,3 +100,18 @@
 - `dlisp compile` は Cranelift backend を使って object を作り、`cc` で `runtime` と link する
 - JIT 境界で throw が pending の場合、interpreter は body を再実行せず catchable error として扱う
 - 変更後は interpreter 系テストと JIT / compile 系テストの両方で確認する
+
+## 深さ制限と終了コード
+- パース前プリスキャンで、括弧ネストが `MAX_EXPRESSION_NESTING` (4096) を超える入力は
+  "expression nesting too deep" としてパースエラーになる。同様に 64 ビット符号付き整数に
+  収まらない整数リテラルは "integer literal out of range" としてパースエラーになる
+- interpreter / JIT の評価は同時ネスト深さ `DLISP_MAX_EVAL_DEPTH` (既定 256) を超えると
+  catchable な "Maximum evaluation depth exceeded (limit N)" を返す。自己展開マクロも
+  同一カウンタで停止する。既定値は 8MB メインスレッドの実測スタック限界
+  (〜400ネストで overflow、256 は安全側)より低く設定されている。小スタックスレッドに
+  埋め込む場合は環境変数 `DLISP_MAX_EVAL_DEPTH`、または `Interpreter::max_eval_depth`
+  を小さく設定すること
+- 終了コード:`dlisp file.lisp` (REPL / JIT path) と `dlisp compile` は成功で `0`、
+  パースエラー / 評価エラー / コンパイルエラーで `1`、コマンドライン引数の誤り (clap) で `2`。
+  AOT バイナリの未捕捉 throw は `1`。内部異常 (FFI 型エラーの abort 等) は非ゼロで死ぬが
+  コードは安定しない

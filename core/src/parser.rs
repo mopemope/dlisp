@@ -1,6 +1,89 @@
 use crate::ast::Value;
 use chumsky::prelude::*;
 
+/// Maximum allowed expression nesting depth accepted by [`parse`].
+///
+/// Inputs deeper than this are rejected with a tidy parse error before the
+/// recursive descent parser (or the evaluator) can overflow the stack.
+/// Measured crash points put the parser above this limit by a wide margin.
+pub const MAX_EXPRESSION_NESTING: usize = 4096;
+
+/// The parser's symbol-character set, mirrored from the `symbol_char`
+/// combinator below so scanning skips the same token shapes.
+fn is_symbol_char(c: char) -> bool {
+    c.is_alphanumeric() || "+-*/!@$%^&_=<>?:".contains(c)
+}
+
+enum ScanError {
+    /// Byte offset of the opener that would exceed the nesting limit.
+    TooDeep(usize),
+    /// Byte offset of the start of an out-of-range integer literal.
+    IntOverflow(usize),
+}
+
+/// Single left-to-right pass over the source, ahead of the real parser.
+///
+/// Tracks bracket nesting (skipping string contents and `;` comments) and
+/// detects integer literals whose digit runs do not fit in `i64`. Symbol
+/// runs (e.g. `my-123456…`) are skipped as a whole so only true numeric
+/// literals are range-checked.
+fn scan_source(src: &str) -> Result<(), ScanError> {
+    let mut depth: usize = 0;
+    let mut in_string = false;
+    let mut in_comment = false;
+    let mut chars = src.char_indices().peekable();
+
+    while let Some((start, c)) = chars.next() {
+        if in_comment {
+            if c == '\n' {
+                in_comment = false;
+            }
+            continue;
+        }
+        if in_string {
+            if c == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match c {
+            ';' => in_comment = true,
+            '"' => in_string = true,
+            '(' | '[' | '{' => {
+                if depth == MAX_EXPRESSION_NESTING {
+                    return Err(ScanError::TooDeep(start));
+                }
+                depth += 1;
+            }
+            ')' | ']' | '}' => {
+                depth = depth.saturating_sub(1);
+            }
+            c if is_symbol_char(c) => {
+                // Consume the whole symbol-style run, then range-check it
+                // only when it is exactly an optionally-signed digit run.
+                let mut end = start + c.len_utf8();
+                while let Some(&(i, next)) = chars.peek() {
+                    if !is_symbol_char(next) {
+                        break;
+                    }
+                    end = i + next.len_utf8();
+                    chars.next();
+                }
+                let token = &src[start..end];
+                let digits = token.strip_prefix('-').unwrap_or(token);
+                if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) {
+                    // Parse with the sign kept so i64::MIN stays valid.
+                    if token.parse::<i64>().is_err() {
+                        return Err(ScanError::IntOverflow(start));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Rich<'src, char>>> {
     let float = just('-')
         .or_not()
@@ -18,14 +101,19 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
             Value::Float(s.parse().unwrap())
         });
 
-    let int = just('-').or_not().then(text::int(10)).map(|(sign, s)| {
-        let mut res = String::new();
-        if sign.is_some() {
-            res.push('-');
-        }
-        res.push_str(s);
-        Value::Integer(res.parse().unwrap())
-    });
+    let int = just('-')
+        .or_not()
+        .then(text::int(10))
+        .try_map(|(sign, s), span| {
+            let mut res = String::new();
+            if sign.is_some() {
+                res.push('-');
+            }
+            res.push_str(s);
+            res.parse::<i64>()
+                .map(Value::Integer)
+                .map_err(|_| Rich::custom(span, "integer literal out of range"))
+        });
     // Keywords nil/true/false must not be followed by symbol characters,
     // otherwise "nil?" should parse as a single symbol.
     let not_symbol_next =
@@ -148,6 +236,19 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
 }
 
 pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Rich<'_, char>>> {
+    if let Err(err) = scan_source(src) {
+        let (pos, msg) = match err {
+            ScanError::TooDeep(pos) => (
+                pos,
+                format!(
+                    "expression nesting too deep (exceeds limit {})",
+                    MAX_EXPRESSION_NESTING
+                ),
+            ),
+            ScanError::IntOverflow(pos) => (pos, "integer literal out of range".to_string()),
+        };
+        return Err(vec![Rich::custom(SimpleSpan::from(pos..pos + 1), msg)]);
+    }
     parser().parse(src).into_result()
 }
 
@@ -271,6 +372,51 @@ mod tests {
     fn test_parse_map_odd_elements() {
         let res = parse("{:a 1 :b}");
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_parse_integer_literal_overflow_is_error() {
+        // An i64-overflowing integer literal must become a parse error,
+        // never an unwrap panic (regression for echo 999...9 | dlisp file).
+        assert!(parse("99999999999999999999999").is_err());
+        assert!(parse("-99999999999999999999999").is_err());
+        // i64 boundary values must keep parsing successfully.
+        assert_eq!(
+            parse("9223372036854775807").unwrap()[0],
+            Value::Integer(i64::MAX)
+        );
+        assert_eq!(
+            parse("-9223372036854775808").unwrap()[0],
+            Value::Integer(i64::MIN)
+        );
+    }
+
+    #[test]
+    fn test_parse_excessive_nesting_is_error() {
+        // Nesting past MAX_EXPRESSION_NESTING must be rejected with a tidy
+        // parse error instead of exhausting the stack (a 65k-deep tree
+        // crashed the CLI before the pre-scan existed).
+        let src = format!("{}1{}", "(".repeat(10_000), ")".repeat(10_000));
+        assert!(parse(&src).is_err());
+    }
+
+    #[test]
+    fn test_parse_nesting_at_limit_still_parses() {
+        // Depth exactly equal to MAX_EXPRESSION_NESTING must keep parsing.
+        // Built and dropped in a big-stack thread: the deeply recursive
+        // parser/Value drop needs far more than a 2 MiB test thread.
+        let handle = std::thread::Builder::new()
+            .stack_size(64 * 1024 * 1024)
+            .spawn(|| {
+                let src = format!(
+                    "{}1{}",
+                    "(".repeat(MAX_EXPRESSION_NESTING),
+                    ")".repeat(MAX_EXPRESSION_NESTING)
+                );
+                assert!(parse(&src).is_ok());
+            })
+            .unwrap();
+        handle.join().unwrap();
     }
 
     #[test]

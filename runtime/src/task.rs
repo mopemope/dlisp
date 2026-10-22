@@ -109,20 +109,32 @@ pub unsafe extern "C" fn dlisp_spawn(closure_ptr: *mut DlispValue) {
         std::process::abort();
     }
 
-    let closure_data = unsafe {
+    let closure_data_ptr = unsafe {
         if (*closure_ptr).type_ != ValueType::Closure {
             eprintln!("Type Error: spawn requires a closure");
             std::process::abort();
         }
 
-        let closure_data = (*closure_ptr).payload.closure_val;
-        if closure_data.is_null() {
+        let inner = (*closure_ptr).payload.closure_val;
+        if inner.is_null() {
             eprintln!("Runtime Error: closure data is null");
             std::process::abort();
         }
 
-        &*closure_data
+        inner
     };
+    let closure_data = unsafe { &*closure_data_ptr };
+
+    // Pin the closure wrapper and its data block for process lifetime:
+    // between this call and the blocking thread's first GC registration,
+    // only non-scanned memory (tokio task state holding the addresses as
+    // usize values) mentions them, so the collector could reclaim them in
+    // that window. Same trade-off as channel/atom pinning: closures spawned
+    // in unbounded loops grow the registry.
+    crate::concurrency::pin_handle(closure_ptr);
+    // The registry only needs the address rooted; the closure record is a
+    // GC block of its own shape, so cast it to the registry's element type.
+    crate::concurrency::pin_handle(closure_data_ptr.cast::<DlispValue>());
 
     let func_ptr_val = closure_data.func_ptr as usize;
     let env_ptr_val = closure_data.env as usize;

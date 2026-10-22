@@ -27,14 +27,35 @@ pub fn compile_builtin<M: Module>(
         ">" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_gt),
         "<" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_lt),
         "=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_eq),
-        // HOF Phase
-        "map" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_map),
-        "filter" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_filter),
-        "reduce" => compile_ternary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_reduce),
-        "some" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_some),
-        "every" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_every),
-        "find" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_find),
-        "for-each" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_for_each),
+        // HOF Phase — callbacks can throw, so results escape through the
+        // throw-sentinel wrapper like user function calls.
+        "map" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_map)
+        }
+        "filter" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_filter)
+        }
+        "reduce" => compile_ternary_builtin_with_throw_escape(
+            ctx,
+            op,
+            list,
+            ctx.builtins.funcs.dlisp_reduce,
+        ),
+        "some" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_some)
+        }
+        "every" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_every)
+        }
+        "find" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_find)
+        }
+        "for-each" => compile_binary_builtin_with_throw_escape(
+            ctx,
+            op,
+            list,
+            ctx.builtins.funcs.dlisp_for_each,
+        ),
         // Vector operations
         "vector" => compile_vector_literal(ctx, list),
         "count" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_vector_count, false),
@@ -376,6 +397,19 @@ fn compile_binary_builtin<M: Module>(
     Ok(ctx.builder.inst_results(call)[0])
 }
 
+/// Higher-order builtins invoke user callbacks that may throw, so a
+/// sentinel result must escape to the enclosing `try` like a user-call
+/// result (see `escape_on_thrown`).
+fn compile_binary_builtin_with_throw_escape<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    let result = compile_binary_builtin(ctx, op, list, func_id)?;
+    ctx.escape_on_thrown(result)
+}
+
 fn compile_ternary_builtin<M: Module>(
     ctx: &mut FunctionTranslationContext<M>,
     op: &str,
@@ -391,6 +425,17 @@ fn compile_ternary_builtin<M: Module>(
     let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
     let call = ctx.builder.ins().call(local_func, &[arg1, arg2, arg3]);
     Ok(ctx.builder.inst_results(call)[0])
+}
+
+/// Ternary variant of [`compile_binary_builtin_with_throw_escape`].
+fn compile_ternary_builtin_with_throw_escape<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    let result = compile_ternary_builtin(ctx, op, list, func_id)?;
+    ctx.escape_on_thrown(result)
 }
 
 fn compile_vector_literal<M: Module>(

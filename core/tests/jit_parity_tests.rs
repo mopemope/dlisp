@@ -16,6 +16,54 @@ async fn eval_code(code: &str) -> Value {
     last_val
 }
 
+/// Controlled fixture: both user functions are checked, then all compiled
+/// pointers are removed for the interpreter run. The probe calls no other
+/// user-defined functions, so it cannot retain a compiled nested callee.
+async fn eval_path_probe(compiled: bool, argument: i64) -> Value {
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+    for form in parse(include_str!("../../example-lisp/path_parity.lisp")).unwrap() {
+        interpreter.eval(form, &mut env).await.unwrap();
+    }
+    for name in ["path-probe", "main"] {
+        let mut function = env.borrow().get(name).expect("fixture function missing");
+        match &mut function {
+            Value::UserFunc { jit_code, .. } => {
+                assert!(
+                    jit_code.is_some(),
+                    "{name} must compile before parity testing"
+                );
+                if !compiled {
+                    *jit_code = None;
+                }
+            }
+            other => panic!("{name} is not a function: {other:?}"),
+        }
+        env.borrow_mut().set(name.to_string(), function);
+    }
+    interpreter
+        .eval(
+            Value::List(vec![
+                Value::Symbol("path-probe".to_string()),
+                Value::Integer(argument),
+            ]),
+            &mut env,
+        )
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn test_explicit_interpreter_and_jit_paths_match_expected_values() {
+    for compiled in [false, true] {
+        assert_eq!(eval_path_probe(compiled, 3).await, Value::Integer(11));
+        assert_eq!(
+            eval_path_probe(compiled, -1).await,
+            Value::Keyword("neg".to_string())
+        );
+    }
+}
+
 #[tokio::test]
 async fn test_jit_eq_deep_collection_equality() {
     // Deep equality on lists and vectors inside a JIT-compiled function
@@ -598,30 +646,140 @@ async fn test_jit_try_catch_inside_lambda() {
 }
 
 #[tokio::test]
-async fn test_jit_thrown_value_in_list_element_is_not_a_throw() {
-    // Documented limitation: a throw inside a higher-order builtin callback
-    // leaves the sentinel captured as a list element with the pending flag
-    // set. The JIT boundary must report neither as an escaping throw:
-    // execution continues normally and later throws still surface.
-    assert_eq!(
-        eval_code(
-            r#"(defun swallower () (try (map (lambda (x) (throw 1)) '(1 2)) (catch e :swallowed)))
-               (swallower)"#
-        )
-        .await,
-        Value::List(vec![
-            Value::Error(Box::new(Value::Nil)),
-            Value::Error(Box::new(Value::Nil)),
-        ])
-    );
+async fn test_jit_hof_throws_are_caught_for_every_helper() {
+    // Regression for the parity-map limitation that was fixed: throws
+    // inside higher-order builtins must reach the enclosing compiled `try`
+    // (the runtime helpers return the throw sentinel; the lowerings escape
+    // on it), matching the interpreter's special forms. Covers all seven
+    // helper shapes inside compiled code.
+    for (name, call) in [
+        ("map", "(map (lambda (x) (throw 1)) '(1 2))"),
+        ("filter", "(filter (lambda (x) (throw 1)) '(1 2))"),
+        ("reduce", "(reduce (lambda (a b) (throw 1)) 0 '(1 2))"),
+        ("some", "(some (lambda (x) (throw 1)) '(1 2))"),
+        ("every", "(every (lambda (x) (throw 1)) '(1 2))"),
+        ("find", "(find (lambda (x) (throw 1)) '(1 2))"),
+        ("for-each", "(for-each (lambda (x) (throw 1)) '(1 2))"),
+    ] {
+        let code = format!(
+            "(defun catcher-{name} () (try {call} (catch e (error-value e))))\n(catcher-{name})"
+        );
+        let result = eval_code_compiled(&code, &format!("catcher-{name}")).await;
+        assert_eq!(
+            result,
+            Value::Integer(1),
+            "{name} must propagate the callback throw"
+        );
+    }
+}
 
-    assert_eq!(
-        eval_code(
-            r#"(defun swallower () (try (map (lambda (x) (throw 1)) '(1 2)) (catch e :swallowed)))
-               (defun thrower () (throw :real))
-               (try (thrower) (catch e (error-value e)))"#
-        )
-        .await,
-        Value::Keyword("real".to_string())
-    );
+#[tokio::test]
+async fn test_jit_hof_throw_without_catch_reports_dlisp_throw() {
+    // Uncaught: the sentinel escapes the compiled function, and the JIT
+    // boundary must convert it to the catchable DLISP_THROW failure just
+    // like an ordinary uncaught throw.
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+    for form in parse(
+        r#"(defun swallower () (map (lambda (x) (throw 1)) '(1 2)))
+           (swallower)"#,
+    )
+    .unwrap()
+    {
+        match interpreter.eval(form, &mut env).await {
+            Ok(_) => {}
+            Err(failure) => {
+                let msg = failure.to_string();
+                assert!(
+                    msg.contains("DLISP_THROW"),
+                    "uncaught HOF throw must surface as DLISP_THROW, got: {msg}"
+                );
+                return;
+            }
+        }
+    }
+    panic!("the uncaught throw must be reported as an error, not return a value");
+}
+
+#[tokio::test]
+async fn test_jit_hof_catch_does_not_poison_later_throws() {
+    // Goroutine-equivalent regression: after a caught higher-order throw
+    // (which used to leave the pending flag set), an unrelated genuine
+    // throw must still surface on the compiled path.
+    let result = eval_code_compiled(
+        r#"(defun swallower () (try (for-each (lambda (x) (throw 1)) '(1 2)) (catch e :handled)))
+           (defun thrower () (throw :real))
+           (defun sink () (try (thrower) (catch e (error-value e))))
+           (swallower)
+           (sink)"#,
+        "sink",
+    )
+    .await;
+    assert_eq!(result, Value::Keyword("real".to_string()));
+}
+
+/// Evaluates `code` and asserts that `fn_name` was JIT-compiled by the
+/// eager `defun` gate, so a silent interpreter fallback cannot fake a pass.
+async fn eval_code_compiled(code: &str, fn_name: &str) -> Value {
+    let mut env = default_env();
+    let mut interpreter = Interpreter::new();
+    let mut last_val = Value::Nil;
+    for val in parse(code).unwrap() {
+        last_val = interpreter.eval(val, &mut env).await.unwrap();
+    }
+    let function = env.borrow().get(fn_name).expect("function must exist");
+    match function {
+        Value::UserFunc { jit_code, .. } => {
+            assert!(jit_code.is_some(), "{fn_name} must be JIT-compiled");
+        }
+        other => panic!("{fn_name} is not a UserFunc: {other:?}"),
+    }
+    last_val
+}
+
+#[tokio::test]
+async fn test_jit_hof_throw_is_caught_by_enclosing_try() {
+    // The callback's throw must escape the higher-order builtin and reach
+    // the enclosing compiled `try`, matching the interpreter's special
+    // forms. `map` is the representative case; every helper shape is pinned
+    // at the runtime FFI level in dlisp_runtime's verify tests.
+    let result = eval_code_compiled(
+        r#"(defun catcher () (try (map (lambda (x) (throw 1)) '(1 2)) (catch e (error-value e))))
+           (catcher)"#,
+        "catcher",
+    )
+    .await;
+    assert_eq!(result, Value::Integer(1));
+}
+
+#[tokio::test]
+async fn test_jit_hof_throw_paths_match_interpreter() {
+    // The same program must produce the same caught value on the compiled
+    // path and on the interpreter path (jit cleared).
+    let code =
+        r#"(defun catcher () (try (map (lambda (x) (throw 1)) '(1 2)) (catch e (error-value e))))"#;
+    {
+        let mut env = default_env();
+        let mut interpreter = Interpreter::new();
+        for form in parse(code).unwrap() {
+            interpreter.eval(form, &mut env).await.unwrap();
+        }
+        let mut function = env.borrow().get("catcher").expect("fixture");
+        match &mut function {
+            Value::UserFunc { jit_code, .. } => {
+                assert!(jit_code.is_some(), "catcher must be JIT-compiled");
+                *jit_code = None;
+            }
+            other => panic!("catcher is not a function: {other:?}"),
+        }
+        env.borrow_mut().set("catcher".to_string(), function);
+        let result = interpreter
+            .eval(
+                Value::List(vec![Value::Symbol("catcher".to_string())]),
+                &mut env,
+            )
+            .await
+            .unwrap();
+        assert_eq!(result, Value::Integer(1));
+    }
 }

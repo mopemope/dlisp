@@ -25,6 +25,20 @@ mod tests {
         unsafe { crate::dlisp_add(a, b) }
     }
 
+    unsafe extern "C" fn thrower1(_env: *mut DlispValue, x: *mut DlispValue) -> *mut DlispValue {
+        // Raises its argument as a catchable throw: dlisp_throw marks the
+        // thread with a pending value and returns the sentinel.
+        crate::dlisp_throw(x)
+    }
+
+    unsafe extern "C" fn thrower2(
+        _env: *mut DlispValue,
+        _a: *mut DlispValue,
+        _b: *mut DlispValue,
+    ) -> *mut DlispValue {
+        crate::dlisp_throw(crate::dlisp_make_int(1))
+    }
+
     fn unbox_bool(p: *mut DlispValue) -> bool {
         unsafe {
             assert!(!p.is_null());
@@ -166,6 +180,64 @@ mod tests {
             let sum = crate::dlisp_make_closure(std::ptr::null_mut(), add2 as *const _);
             let total = crate::dlisp_reduce(sum, dlisp_make_int(0), v);
             assert_eq!(unbox_int(total), 6);
+        }
+    }
+
+    #[test]
+    fn test_higher_order_helpers_propagate_throws() {
+        // A callback that calls dlisp_throw makes the higher-order helper
+        // return the throw sentinel immediately: no swallowed results, and
+        // `reduce` must not feed the sentinel to further callback calls.
+        dlisp_gc_init();
+
+        unsafe {
+            let make_list = |n: i64| {
+                let mut list = dlisp_make_nil();
+                for i in (1..=n).rev() {
+                    list = dlisp_cons(dlisp_make_int(i), list);
+                }
+                list
+            };
+            let coll = make_list(3);
+            let sentinel = crate::dlisp_throw_sentinel();
+            let throw1 = crate::dlisp_make_closure(std::ptr::null_mut(), thrower1 as *const _);
+            let throw2 = crate::dlisp_make_closure(std::ptr::null_mut(), thrower2 as *const _);
+
+            assert_eq!(
+                crate::dlisp_map(throw1, coll),
+                sentinel,
+                "map must propagate a callback throw"
+            );
+            assert_eq!(
+                crate::dlisp_filter(throw1, coll),
+                sentinel,
+                "filter must propagate a callback throw"
+            );
+            assert_eq!(
+                crate::dlisp_reduce(throw2, dlisp_make_int(0), coll),
+                sentinel,
+                "reduce must propagate a callback throw"
+            );
+            assert_eq!(
+                crate::dlisp_some(throw1, coll),
+                sentinel,
+                "some must propagate a callback throw"
+            );
+            assert_eq!(
+                crate::dlisp_every(throw1, coll),
+                sentinel,
+                "every must propagate a callback throw"
+            );
+            assert_eq!(
+                crate::dlisp_find(throw1, coll),
+                sentinel,
+                "find must propagate a callback throw"
+            );
+            assert_eq!(
+                crate::dlisp_for_each(throw1, coll),
+                sentinel,
+                "for-each must propagate a callback throw"
+            );
         }
     }
 

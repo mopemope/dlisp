@@ -4,6 +4,17 @@ use crate::lists::{build_list, list_to_vec, vector_to_vec};
 use crate::value::{DlispValue, ValueType};
 use crate::vectors::{dlisp_make_vector, dlisp_vector_push};
 
+/// Returns true when `ptr` is the thread's throw sentinel: a callback
+/// raised a catchable throw, so the helper must return that pointer
+/// immediately instead of integrating it into its result.
+///
+/// # Safety
+/// Only compares addresses; `ptr` need not be dereferenceable.
+#[inline]
+fn is_throw_sentinel(ptr: *mut DlispValue) -> bool {
+    !ptr.is_null() && ptr == crate::dlisp_throw_sentinel()
+}
+
 /// Signature of a compiled closure taking 1 Lisp argument.
 /// The first argument is the environment pointer.
 type ClosureFunc1 =
@@ -79,8 +90,14 @@ pub unsafe extern "C" fn dlisp_map(
             None => return dlisp_make_nil(),
         };
 
-        let mapped: Vec<*mut DlispValue> =
-            elems.iter().map(|&item| func_ptr(env_ptr, item)).collect();
+        let mut mapped: Vec<*mut DlispValue> = Vec::with_capacity(elems.len());
+        for &item in &elems {
+            let out = func_ptr(env_ptr, item);
+            if is_throw_sentinel(out) {
+                return out; // propagate the callback's throw
+            }
+            mapped.push(out);
+        }
 
         build_collection(is_vector, &mapped)
     }
@@ -111,13 +128,16 @@ pub unsafe extern "C" fn dlisp_filter(
             None => return dlisp_make_nil(),
         };
 
-        let kept: Vec<*mut DlispValue> = elems
-            .into_iter()
-            .filter(|&item| {
-                let condition = func_ptr(env_ptr, item);
-                !condition.is_null() && dlisp_is_truthy(condition) != 0
-            })
-            .collect();
+        let mut kept: Vec<*mut DlispValue> = Vec::with_capacity(elems.len());
+        for item in elems {
+            let condition = func_ptr(env_ptr, item);
+            if is_throw_sentinel(condition) {
+                return condition; // propagate the callback's throw
+            }
+            if !condition.is_null() && dlisp_is_truthy(condition) != 0 {
+                kept.push(item);
+            }
+        }
 
         build_collection(is_vector, &kept)
     }
@@ -150,6 +170,9 @@ pub unsafe extern "C" fn dlisp_reduce(
         let mut acc = init;
         for item in elems {
             acc = func_ptr(env_ptr, acc, item);
+            if is_throw_sentinel(acc) {
+                return acc; // propagate; stop feeding the sentinel onward
+            }
         }
 
         acc
@@ -182,6 +205,9 @@ pub unsafe extern "C" fn dlisp_some(
 
         for item in elems {
             let val = func_ptr(env_ptr, item);
+            if is_throw_sentinel(val) {
+                return val; // propagate before any truthiness test
+            }
             if !val.is_null() && dlisp_is_truthy(val) != 0 {
                 return val;
             }
@@ -219,6 +245,9 @@ pub unsafe extern "C" fn dlisp_every(
 
         for item in elems {
             let val = func_ptr(env_ptr, item);
+            if is_throw_sentinel(val) {
+                return val; // propagate before any truthiness test
+            }
             if val.is_null() || dlisp_is_truthy(val) == 0 {
                 return dlisp_make_bool(false);
             }
@@ -254,6 +283,9 @@ pub unsafe extern "C" fn dlisp_find(
 
         for item in elems {
             let val = func_ptr(env_ptr, item);
+            if is_throw_sentinel(val) {
+                return val; // propagate before any truthiness test
+            }
             if !val.is_null() && dlisp_is_truthy(val) != 0 {
                 return item;
             }
@@ -288,7 +320,10 @@ pub unsafe extern "C" fn dlisp_for_each(
         };
 
         for item in elems {
-            func_ptr(env_ptr, item);
+            let out = func_ptr(env_ptr, item);
+            if is_throw_sentinel(out) {
+                return out; // propagate the callback's throw
+            }
         }
 
         dlisp_make_nil()

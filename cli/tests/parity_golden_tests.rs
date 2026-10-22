@@ -10,7 +10,6 @@
 //! between the text and its newline. Line content itself must still match.
 
 use assert_cmd::cargo_bin_cmd;
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,6 +31,7 @@ const GOLDEN_EXAMPLES: &[&str] = &[
     "match.lisp",
     "mutual_recursion.lisp",
     "no_main.lisp",
+    "path_parity.lisp",
     "stdlib_range.lisp",
     "stdlib_collections.lisp",
     "vector.lisp",
@@ -93,20 +93,28 @@ fn run_compiled(source: &Path, dir: &TempDir, name: &str) -> RunResult {
     }
 }
 
-fn line_set(stdout: &str) -> BTreeSet<String> {
-    stdout
+fn sorted_lines(stdout: &str) -> Vec<String> {
+    let mut lines: Vec<_> = stdout
         .lines()
         .map(str::trim_end)
         .filter(|line| !line.is_empty())
         .map(str::to_owned)
-        .collect()
+        .collect();
+    lines.sort_unstable();
+    lines
+}
+
+#[test]
+fn concurrent_output_comparison_preserves_duplicate_counts() {
+    assert_ne!(sorted_lines("item\nitem\n"), sorted_lines("item\n"));
+    assert_eq!(sorted_lines("b\na\na\n"), sorted_lines("a\nb\na\n"));
 }
 
 fn assert_parity(name: &str, interpreted: &RunResult, compiled: &RunResult) {
     if CONCURRENT_EXAMPLES.contains(&name) {
         assert_eq!(
-            line_set(&interpreted.stdout),
-            line_set(&compiled.stdout),
+            sorted_lines(&interpreted.stdout),
+            sorted_lines(&compiled.stdout),
             "output lines diverge between interpreter and AOT for {name}"
         );
     } else {
@@ -142,5 +150,9 @@ fn examples_match_interpreter_and_aot_output() {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let compiled = run_compiled(&source, &tempdir, name);
         assert_parity(name, &interpreted, &compiled);
+        if name == "path_parity.lisp" {
+            assert_eq!(interpreted.stdout, "11\n:neg\n");
+            assert_eq!(interpreted.code, 0);
+        }
     }
 }

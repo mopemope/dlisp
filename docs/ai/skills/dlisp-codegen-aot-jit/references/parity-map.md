@@ -84,11 +84,6 @@ Interpreter-only special forms (`eval`, `apply`,
 - Caught values print as `<error v>`; `type-of` returns `"error"`.
 
 Limitations (compile-time safe, but documented):
-- Throws thrown inside closures passed to higher-order builtins
-  (`map`/`filter`/`reduce`/`some`/`every`/`find`/`for-each`) are NOT
-  propagated: the runtime helpers do not check for the sentinel, so a
-  thrown value can end up as a list element. Keep `throw` out of
-  higher-order callbacks on compiled paths.
 - An uncaught `throw` in a spawned task (OS thread) is reported as
   "Uncaught throw in spawned task" and cleared; it cannot be caught by a
   `try` in another task.
@@ -96,7 +91,33 @@ Limitations (compile-time safe, but documented):
   see the error-reporting divergences above; converting those aborts into
   catchable throws is future work.
 
+## Higher-order builtins propagate throws (verified parity)
+
+Throws inside callbacks passed to `map`/`filter`/`reduce`/`some`/`every`/
+`find`/`for-each` used to be swallowed on compiled paths (the runtime
+helpers integrated the sentinel into their result and `reduce` could feed
+it into later callback calls). They now match the interpreter:
+
+- Every runtime helper (`runtime/src/higher_order.rs`) compares each
+  callback result against the throw sentinel and returns it immediately.
+- The higher-order lowerings route the FFI result through
+  `escape_on_thrown` like user call sites
+  (`compile_binary_builtin_with_throw_escape` /
+  `compile_ternary_builtin_with_throw_escape` in
+  `core/src/codegen/forms/builtins.rs`), present on the JIT and AOT paths
+  alike.
+- A caught HOF throw leaves no stale pending flag, so an unrelated later
+  throw still surfaces (`test_jit_hof_catch_does_not_poison_later_throws`).
+- Regression tests: `runtime/src/verify_tests.rs`
+  (`test_higher_order_helpers_propagate_throws`, all seven helpers) and
+  `core/tests/jit_parity_tests.rs`
+  (`test_jit_hof_throw_is_caught_by_enclosing_try`,
+  `test_jit_hof_throws_are_caught_for_every_helper`,
+  `test_jit_hof_throw_without_catch_reports_dlisp_throw`,
+  `test_jit_hof_throw_paths_match_interpreter`).
+
 ## Known minor divergences: error reporting
+
 Compiled code cannot raise catchable errors, so a few builtins differ from
 the interpreter in their failure mode (value-level results match):
 - `(nth coll -1)` / out-of-range: interpreter errors on negative index;
@@ -204,14 +225,20 @@ Interpreter-only surface can move to `stdlib/src/core.lisp` as Lisp code;
 `(require "core")` forms are compiled into AOT output by
 `collect_required_module` (`core/src/compiler.rs`). Constraints learned from
 the `range` migration:
-- Define callees before callers: each defun eagerly JIT-compiles at
-  definition time, and forward references leave the caller unresolvable
-  ("can't resolve symbol ..." panic when a later function is JIT-compiled).
-- `nth` is vector-only; use `first`/`second`/`third` (car/cdr) for lists.
-- Avoid interpreter-only special forms (`try`, `throw`, `apply`, ...) inside
-  stdlib defuns; they make the definition uncompilable.
-- Degenerate inputs should yield neutral values (e.g. nil) since compiled
-  code cannot raise catchable errors.
+- Prefer a clear callee-before-caller order when practical. `defun` eagerly
+  attempts JIT and `retry_pending_jit_functions` retries unresolved definitions
+  as a batch; forward references alone do not prove a function is unsupported.
+  Verify the final `jit_code` rather than relying on definition order.
+- `nth` supports vectors and lists on interpreter and compiled paths; see
+  `core/src/builtins/vector.rs` and `runtime/src/vectors.rs`. Preserve their
+  existing index/error contract (negative-index differences are listed above).
+- Check current lowering and the JIT gate for each form used by stdlib
+  defuns. `try` and `throw` support compiled paths (see Error handling above);
+  do not classify them as interpreter-only. Unsupported forms still require
+  an explicit interpreter-only decision or a compiled implementation.
+- Preserve each function's existing neutral-value/error contract. Explicit
+  `throw` is catchable on compiled paths; runtime FFI type errors may still
+  abort (see the documented error divergences above).
 
 ## Runtime export check
 - Runtime exported symbols: `rg -n "extern \"C\" fn dlisp_" runtime/src`

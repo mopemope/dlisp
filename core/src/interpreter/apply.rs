@@ -45,12 +45,14 @@ pub async fn apply(
 
             #[allow(clippy::collapsible_if)]
             if let Some(code_ptr) = jit_code {
-                // Detect a throw raised *during this call*: a previously
-                // swallowed throw (e.g. inside a higher-order builtin
-                // callback, a documented limitation) leaves the flag set,
-                // and keying off the absolute state would poison unrelated
-                // calls. run_jit_function returns None for the throw
-                // sentinel, so a genuine throw here always sets the flag.
+                // Detect a throw raised *during this call* by keying off a
+                // false→true transition of `dlisp_thrown_pending` rather
+                // than the absolute flag. The transition rule also covers a
+                // stale pending flag left behind by older code that
+                // swallowed higher-order-callback throws; higher-order
+                // helpers now propagate the sentinel (verified parity), and
+                // run_jit_function returns None for the throw sentinel, so
+                // a genuine throw here always sets the flag.
                 let pending_before = dlisp_runtime::errors::dlisp_thrown_pending() != 0;
 
                 let jit_result = unsafe {
@@ -65,10 +67,7 @@ pub async fn apply(
                 // A compiled function that threw returns the sentinel
                 // (surfaced as None by run_jit_function) while leaving the
                 // flag set. Only that combination is a throw escaping this
-                // call: a sentinel merely captured as a list element by the
-                // documented higher-order-builtin limitation returns a
-                // normal value with the flag also set, which must NOT be
-                // reported as a throw.
+                // call.
                 if jit_result.is_none()
                     && !pending_before
                     && dlisp_runtime::errors::dlisp_thrown_pending() != 0
