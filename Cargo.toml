@@ -33,7 +33,7 @@ libc = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "macros", "time", "fs", "process"] }
 futures = { version = "0.3" }
-async-recursion = { version = "1" }
+async-recursion = { version = "1.2" }
 dirs = "6.0"
 # ... and other deps shared across crates if desired
 
