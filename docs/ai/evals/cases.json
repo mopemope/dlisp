@@ -1,0 +1,130 @@
+[
+  {
+    "id": "parser-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。reader のコメント構文を修正する場合の実装箇所と検証を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-parser-syntax"
+    ],
+    "files": [
+      "core/src/parser.rs",
+      "core/src/ast.rs"
+    ]
+  },
+  {
+    "id": "evaluator-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。let* の束縛順序を修正する場合の実装箇所と検証を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-evaluator-forms"
+    ],
+    "files": [
+      "core/src/forms/",
+      "core/tests/let_star_tests.rs"
+    ]
+  },
+  {
+    "id": "builtin-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。組み込み関数の実装を追加する場合の登録と compiled path の変更箇所を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-builtins-surface"
+    ],
+    "files": [
+      "core/src/builtins/mod.rs",
+      "core/src/codegen/"
+    ]
+  },
+  {
+    "id": "stdlib-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。Lisp 実装の標準ライブラリ関数を追加する場合の制約と検証を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-stdlib"
+    ],
+    "files": [
+      "stdlib/src/core.lisp",
+      "core/tests/stdlib_tests.rs"
+    ]
+  },
+  {
+    "id": "cli-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。ファイル実行時の終了コードを修正する場合の入口と検証を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-cli"
+    ],
+    "files": [
+      "cli/src/main.rs",
+      "cli/tests/integration_tests.rs"
+    ]
+  },
+  {
+    "id": "parity-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。JIT のテストが成功するのに AOT の値が違います。調査方法と必要な検証を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-parity-debugging"
+    ],
+    "files": [
+      "core/src/forms/defun.rs",
+      "core/src/interpreter/apply.rs"
+    ]
+  },
+  {
+    "id": "runtime-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。GC 配下の FFI 戻り値を修正する場合の ABI と検証箇所を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-runtime-ffi"
+    ],
+    "files": [
+      "runtime/src/value.rs",
+      "core/src/codegen/builtins.rs"
+    ]
+  },
+  {
+    "id": "docs-routing",
+    "kind": "routing",
+    "prompt": "読み取り専用の調査です。変更はしないでください。FUNCTIONS.md の説明だけを修正する場合の source of truth と最小検証を調べてください。 関連 Skill の本文を確認し、最終回答に根拠となるファイルパスと検証コマンドを明記してください。",
+    "skills": [
+      "dlisp-language-surface"
+    ],
+    "files": [
+      "core/src/forms/registry.rs",
+      "core/src/builtins/mod.rs"
+    ]
+  },
+  {
+    "id": "repair-runtime-int",
+    "kind": "repair",
+    "prompt": "整数を runtime value に変換すると値が一つずれます。原因を調べて修正し、検証してください。テストや仕様を変更せず、runtime/src/constructors.rs の修正に限定してください。検証は cargo test -p dlisp_runtime --quiet のみで完了とし、ワークスペース全体テストは不要です。追加の独立した採点は評価側が実行します。",
+    "allowed_paths": [
+      "runtime/src/constructors.rs"
+    ],
+    "grader": "runtime",
+    "mutations": [
+      {
+        "path": "runtime/src/constructors.rs",
+        "before": "*ptr = DlispValue::new_int(val);",
+        "after": "*ptr = DlispValue::new_int(val.wrapping_add(1));"
+      }
+    ]
+  },
+  {
+    "id": "repair-abi-width",
+    "kind": "repair",
+    "prompt": "dlisp_make_int の codegen 宣言と runtime の ABI に不一致があります。原因を調べて修正し、検証してください。runtime の ABI・検査ツール・既存テストを変更せず、core/src/codegen/builtins.rs の宣言修正に限定してください。新規テストは追加せず、検証は python3 scripts/check_runtime_abi.py のみで完了とし、ワークスペース全体テストは不要です。独立したビルド検査は評価側が実行します。",
+    "allowed_paths": [
+      "core/src/codegen/builtins.rs"
+    ],
+    "grader": "abi",
+    "mutations": [
+      {
+        "path": "core/src/codegen/builtins.rs",
+        "before": "make_int_sig.params.push(AbiParam::new(types::I64));",
+        "after": "make_int_sig.params.push(AbiParam::new(types::I32));"
+      }
+    ]
+  }
+]

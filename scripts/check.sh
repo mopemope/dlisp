@@ -30,6 +30,15 @@ python3 "$SURFACE_SCRIPT" check || status=1
 step "codegen parity (COMPILED_BUILTINS / lowering / FFI)"
 python3 scripts/check_codegen_parity.py || status=1
 
+step "runtime ABI signatures"
+python3 scripts/check_runtime_abi.py || status=1
+
+step "agent skills (metadata / checkout links)"
+python3 scripts/check_agent_skills.py || status=1
+
+step "agent tooling regression tests"
+python3 -m unittest discover -s scripts/tests -q || status=1
+
 step "doc refs (AGENTS.md / docs/ai paths and test targets)"
 python3 scripts/check_doc_refs.py || status=1
 

@@ -25,6 +25,8 @@
 - runtime / FFI: `runtime/src/lib.rs`(re-export hub), `value.rs`, `gc.rs`, `constructors.rs`,
   `{lists,maps,collections,arith,cmp,strings,predicates,print,task}.rs`, `{io,sys,os,vectors,higher_order}.rs`
 - CLI / REPL: `cli/src/main.rs`, `cli/src/repl.rs`, `cli/src/config.rs`
+- stdlib / require: `stdlib/src/core.lisp`, `core/src/forms/require.rs`
+- parity / fallback: `core/src/forms/defun.rs`, `core/src/interpreter/apply.rs`, `core/tests/jit_parity_tests.rs`
 
 ## Search hints
 - special form の実装位置: `rg -n "reg.register\\(|struct .*Form" core/src/forms core/src/forms/registry.rs`

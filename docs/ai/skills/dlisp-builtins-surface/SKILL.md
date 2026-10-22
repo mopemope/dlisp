@@ -1,6 +1,6 @@
 ---
 name: dlisp-builtins-surface
-description: Use when adding or changing dlisp builtins, builtin registration, language surface docs, FUNCTIONS.md entries, or builtin parity with JIT/AOT/runtime.
+description: Use when implementing, registering, or changing dlisp builtins and their compiled runtime support.
 ---
 
 # dlisp Builtins Surface
@@ -9,3 +9,4 @@ description: Use when adding or changing dlisp builtins, builtin registration, l
 - Read [references/change-checklist.md](references/change-checklist.md) before adding or renaming a builtin.
 - Run `docs/ai/skills/dlisp-language-surface/scripts/extract-surface.sh check` after doc updates.
 - If the builtin must work in compiled code, also use `dlisp-codegen-aot-jit` and `dlisp-runtime-ffi`.
+- If public names or documented behavior change, also use `dlisp-language-surface`.

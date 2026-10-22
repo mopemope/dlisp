@@ -22,7 +22,9 @@
 | 跨 crate 変更・最終確認 | 全部 | `cargo test --workspace --quiet` |
 
 ## 選択ルール
+- 変更ファイルからの候補は `bash scripts/agent-check.sh --plan`。`--focused` は候補を実行、`--final` はコード変更に全体ゲートも追加する。`--base <revision>` で比較基準を指定でき、staged / unstaged / untracked を含む。
+- この選択は保守的な補助であり、意味上の依存は変更者が追加する。不明な領域は全体検証へ寄せる。
 - interpreter 経路の変更 → 対応する `--test` 1本から始め、通ったら JIT 系を確認。
 - JIT/AOT 経路に影響しそうな言語surface変更 → `jit_phase3_tests` と `integration_tests` を追加。
 - runtime FFI の変更 → `-p dlisp_runtime` の後に `integration_tests`(リンク確認)。
-- 最終確認のみ workspace 全体。AGENTS.md の最終ルールに従う。
+- コード変更の最終確認は workspace 全体。文書・Skill のみは文書とリンク検証、補助スクリプト変更は Python 回帰テストも実行する。AGENTS.md を完了条件の唯一の定義とする。
