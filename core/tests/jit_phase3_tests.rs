@@ -49,6 +49,7 @@ fn create_jit_module() -> JITModule {
         "dlisp_cdr",
         "dlisp_print",
         "dlisp_read_file",
+        "dlisp_require_number",
         "dlisp_nil_p",
         "dlisp_list_p",
         "dlisp_number_p",

@@ -22,9 +22,20 @@
 - 関数値、macro 値、error 値も内部的に扱う
 - channel / atom ハンドルも値として扱う。詳細は並行実行の節
 
+小数リテラルは小数部の先頭のゼロを保持する（`0.001` は単一の Float）。整数部・小数部に整数型の範囲制限は適用しない。
+`nil` / `true` / `false` は完全一致した場合だけリテラルとなり、`nilあ` など Unicode 文字が続く名前は単一の Symbol として扱う。
+
 条件式では `nil` と整数 `0` を偽として扱い、それ以外は真として扱う。
 
 比較 builtins(`>`, `<`, `=`, `>=`, `<=`, `/=`)はすべて `Bool` を返す。interpreter / JIT / AOT の全経路で同一である。
+
+## 算術エラー
+- `+`, `-`, `*`, `/`, `%`, `mod` は数値を受け取り、型エラーは `Arguments must be numbers` として `try` で捕捉できる
+- 整数の加減乗除・剰余・単項負号は checked 演算を使い、64 ビット符号付き整数に収まらない結果は `Integer overflow`。debug / release と interpreter / JIT / AOT で共通であり、浮動小数点へ暗黙に変換しない
+- `/`, `%`, `mod` のゼロ除算は `Division by zero`。浮動小数点の `0.0` / `-0.0` も含む
+- `(+)` は 0、`(*)` は 1。単項 `+` / `*` も数値を検査し、単項 `-` は符号を反転する。`/` は最低2引数、`%` / `mod` はちょうど2引数
+- 全引数を左から右へ一度ずつ評価した後に演算する。引数評価中の例外は以降の引数評価を中断する。エラーは `(error-value e)` で文字列を取り出せる。未捕捉時は終了コード1
+- `abs` の整数結果が範囲を超える場合も `Integer overflow` として捕捉できる。`pow` の整数指数は64ビットの値と偶奇を維持する。整数同士の非負指数は `u32::MAX` までで、整数結果のオーバーフロー時は Float に変換する。`abs` / `pow` は interpreter-only で、これらを呼ぶ関数は JIT を使用せず、AOT は明示的なコンパイルエラーになる
 
 ## 評価モデル
 - Symbol は現在の environment から解決する。
@@ -66,7 +77,7 @@
 - `while`, `dotimes`, `dolist`: 反復
 - `loop` / `recur`: スタック安全な反復。`(loop [name init ...] body...)` は束縛を持ち、body 中の任意位置の `(recur expr ...)` が全束縛を再束縛して次の反復へ進む。recur 引数の個数は束縛数と一致が必要。loop を囲まずに recur が評価器の外層へ到達した場合はエラー。interpreter / JIT / AOT の全経路で同一意味論
 - `match`: パターンマッチング(stdlib マクロ)。`(match expr (pattern body...)+)` の形で、expr は一度だけ評価される。pattern はリテラル(`=` の構造的等値)、シンボル束縛、`_` ワイルドカード、list/vector 分解 `[p0 p1]` / `[p0 p1 &rest r]`、map 分解 `{:k p}`(全キー存在必須)、ガード付き `(pat :when guard)`。ネストしたパターンも合成できる。guard 失敗は後続の節へ fall-through し、どの節もマッチしなければ `nil` を返す。guard は型検査しないため必要に応じ `number?` 等と併用する。macro 展開結果は lower 可能な式のみで構成され、interpreter / JIT / AOT の全経路で同一意味論
-- `try` / `throw`: 例外系。`(try body... (catch var handler-body...))` の形で、body 中の `throw` は残りの body を中断して catch 節へ進む。catch 変数には error marker(`(error-value e)` で素の値を取出し、`(error? e)` / `(type-of e)` は `"error"`)が束縛される。catch 節なしの `try` は未捕捉エラーを外層へ伝播する。interpreter / JIT / AOT の全経路で同一意味論。コンパイル済みコードでは sentinel 伝播で実装され、関数境界・lambda 呼び出し・loop 内でも伝播する。`map`/`filter` 等の higher-order builtin のコールバック内での `throw` と、spawn したタスクから別タスクの `try` への伝播は非対応
+- `try` / `throw`: 例外系。`(try body... (catch var handler-body...))` の形で、body 中の `throw` は残りの body を中断して catch 節へ進む。catch 変数には error marker(`(error-value e)` で素の値を取出し、`(error? e)` / `(type-of e)` は `"error"`)が束縛される。catch 節なしの `try` は未捕捉エラーを外層へ伝播する。interpreter / JIT / AOT の全経路で同一意味論。コンパイル済みコードでは sentinel 伝播で実装され、関数境界・lambda 呼び出し・loop 内でも伝播する。`map`/`filter` 等の higher-order builtin のコールバック内からも例外を伝播する。spawn したタスクから別タスクの `try` への伝播は非対応
 
 ## 評価補助とメタプログラミング
 - `quote` は値を評価せずに返す
@@ -94,6 +105,13 @@
   spawn した closure を無限ループで大量生成すると registry が伸び続ける点は channel / atom と同じ
 - REPL と evaluator は async ベースで動作する
 
+## ファイル操作と外部コマンド
+- `read-file`, `file-exists?`, `is-dir?`, `is-file?`, `list-dir`, `delete-file`, `sh` は interpreter / JIT / AOT で利用でき、型・OS エラーを `try` で捕捉できる
+- 不存在の場合、`read-file` は `nil`、`file-exists?` / `is-dir?` / `is-file?` / `delete-file` は `false`。それ以外の OS エラーは例外。`list-dir` の列挙順は保証しない。`delete-file` はディレクトリを再帰削除する
+- `sh` は単一文字列なら `sh -c`、複数文字列なら実行ファイルと引数として実行し、`{:status 整数 :stdout 文字列 :stderr 文字列}` を返す。終了コードが非ゼロでも map を返し、直接指定した実行ファイルが存在しない場合は status -1。シグナル終了も status -1
+- `read-file` の内容に NUL が含まれる場合は `read-file result contains NUL`、`sh` の stdout / stderr に NUL が含まれる場合は `sh output contains NUL`。いずれも全経路で捕捉可能エラーとなり、文字列を切り捨てない
+- compiled runtime の I/O は同期処理。JIT の I/O 待機中は interpreter の協調タスクも待機する。エラーが発生した操作を interpreter fallback で再実行しない
+
 ## JIT / AOT
 - `defun` された関数は interpreter path と JIT path の両方を持ち得る
 - JIT 実行では boxed runtime value ABI を使って interpreter の `Value` と相互変換する
@@ -102,16 +120,16 @@
 - 変更後は interpreter 系テストと JIT / compile 系テストの両方で確認する
 
 ## 深さ制限と終了コード
-- パース前プリスキャンで、括弧ネストが `MAX_EXPRESSION_NESTING` (4096) を超える入力は
+- パース前プリスキャンで、括弧と引用接頭辞（`'`、バッククォート、`,`、`,@`）の合計ネストが `MAX_EXPRESSION_NESTING` (4096) を超える入力は
   "expression nesting too deep" としてパースエラーになる。同様に 64 ビット符号付き整数に
   収まらない整数リテラルは "integer literal out of range" としてパースエラーになる
 - interpreter / JIT の評価は同時ネスト深さ `DLISP_MAX_EVAL_DEPTH` (既定 256) を超えると
   catchable な "Maximum evaluation depth exceeded (limit N)" を返す。自己展開マクロも
-  同一カウンタで停止する。既定値は 8MB メインスレッドの実測スタック限界
+  backquote 内の構文木走査も同一カウンタで停止する。既定値は 8MB メインスレッドの実測スタック限界
   (〜400ネストで overflow、256 は安全側)より低く設定されている。小スタックスレッドに
   埋め込む場合は環境変数 `DLISP_MAX_EVAL_DEPTH`、または `Interpreter::max_eval_depth`
   を小さく設定すること
 - 終了コード:`dlisp file.lisp` (REPL / JIT path) と `dlisp compile` は成功で `0`、
   パースエラー / 評価エラー / コンパイルエラーで `1`、コマンドライン引数の誤り (clap) で `2`。
-  AOT バイナリの未捕捉 throw は `1`。内部異常 (FFI 型エラーの abort 等) は非ゼロで死ぬが
+  AOT バイナリの未捕捉 throw は `1`。内部異常 (未移行の FFI 型エラーの abort 等) は非ゼロで死ぬが
   コードは安定しない

@@ -33,6 +33,9 @@ pub fn sh(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String>> {
 
         match command.output().await {
             Ok(output) => {
+                if output.stdout.contains(&0) || output.stderr.contains(&0) {
+                    return Err("sh output contains NUL".to_string());
+                }
                 let mut map = HashMap::new();
 
                 let status_code =

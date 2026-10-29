@@ -87,9 +87,30 @@ Limitations (compile-time safe, but documented):
 - An uncaught `throw` in a spawned task (OS thread) is reported as
   "Uncaught throw in spawned task" and cleared; it cannot be caught by a
   `try` in another task.
-- Runtime FFI type errors still abort (`eprintln!` + `process::abort`) —
-  see the error-reporting divergences above; converting those aborts into
-  catchable throws is future work.
+- Arithmetic (`+`, `-`, `*`, `/`, `%`, `mod`) and compiled IO/`sh` errors
+  use the same sentinel propagation. Other runtime FFI type errors may still
+  abort; their migration remains future work.
+
+## Arithmetic and IO runtime parity
+
+- Arithmetic uses checked integer operations on every path, including unary
+  negation and `MIN / -1` / `MIN % -1`. Errors carry strings: `Arguments must
+  be numbers`, `Division by zero`, or `Integer overflow`.
+- Numeric arguments evaluate left to right before the arithmetic fold. Each
+  runtime result escapes through `escape_on_thrown` before another fold step.
+  `+` folds from integer 0, preserving the interpreter's signed-zero behavior.
+  `dlisp_require_number` validates unary `-` / `*`; empty `+` / `*` return 0 / 1.
+- `read-file`, file predicates, `list-dir`, `delete-file`, and `sh` use sync
+  std IO on compiled paths, without nested Tokio `block_on`. JIT IO blocks
+  cooperative interpreter tasks until it completes.
+- `sh` returns the same keyword-keyed map on every path. Arguments evaluate
+  left to right. Runtime output/error strings use GC-owned storage.
+- IO errors escape through the sentinel, with no interpreter replay. NUL
+  file contents and command output are explicitly rejected on every path.
+- Regression coverage: `core/tests/runtime_error_parity_tests.rs` checks
+  actual JIT compilation and pure interpreter results;
+  `cli/tests/runtime_parity_tests.rs` checks CLI/AOT output, errors, exit
+  status, and side effects in child processes.
 
 ## Higher-order builtins propagate throws (verified parity)
 
@@ -118,8 +139,8 @@ it into later callback calls). They now match the interpreter:
 
 ## Known minor divergences: error reporting
 
-Compiled code cannot raise catchable errors, so a few builtins differ from
-the interpreter in their failure mode (value-level results match):
+Arithmetic and IO errors are catchable on all paths. Some other builtins
+still differ from the interpreter in their failure mode:
 - `(nth coll -1)` / out-of-range: interpreter errors on negative index;
   compiled code returns nil.
 - `(car x)` / `(cdr x)` on non-lists: interpreter errors; compiled code
@@ -218,7 +239,8 @@ scheduling latency per step and is best avoided (see
 6. dummy symbol in `core/tests/jit_phase3_tests.rs` + compile test
 7. behavior check via REPL defun (auto-JIT) and AOT compile
 
-`scripts/check_codegen_parity.py` statically verifies steps 1-5 stay in sync.
+`scripts/check_codegen_parity.py` statically verifies steps 1-5 stay in sync,
+including explicit JIT bindings for every codegen runtime import.
 
 ## Defining stdlib functions instead of builtins
 Interpreter-only surface can move to `stdlib/src/core.lisp` as Lisp code;

@@ -82,6 +82,7 @@ Compile options:
 - `RUST_LOG=debug cargo run --bin dlisp` で tracing を有効化できる
 - `runtime/build.rs` で `gc` を link する
 - interpreter 実行では `defun` の一部が JIT 化される。固定引数、`&rest`、自己再帰、相互再帰、`spawn` を含む関数が対象で、`spawn f arg...` は zero-arg thunk に lower して実行する
+- JIT/AOT のファイル操作と `sh` は同期 I/O で実行する。JIT の I/O 待機中は interpreter の協調タスクも待機する
 
 ## Quick Example
 

@@ -13,6 +13,21 @@ use std::cell::Cell;
 use crate::gc::dlisp_gc_malloc;
 use crate::value::{DlispValue, ValueType};
 
+/// Copy a NUL-free string into traced storage, avoiding CString leaks.
+pub(crate) fn gc_string(text: &str) -> *mut DlispValue {
+    debug_assert!(!text.contains('\0'));
+    unsafe {
+        let bytes = dlisp_gc_malloc(text.len() + 1) as *mut u8;
+        std::ptr::copy_nonoverlapping(text.as_ptr(), bytes, text.len());
+        *bytes.add(text.len()) = 0;
+        crate::constructors::dlisp_make_string(bytes.cast())
+    }
+}
+
+pub(crate) fn raise_message(message: &str) -> *mut DlispValue {
+    dlisp_throw(gc_string(message))
+}
+
 thread_local! {
     /// Value carried by the most recent `throw` on this thread (null if none).
     static THROWN: Cell<*mut DlispValue> = const { Cell::new(std::ptr::null_mut()) };

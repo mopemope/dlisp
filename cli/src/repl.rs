@@ -84,6 +84,7 @@ mod tests {
 
     #[test]
     fn test_save_history_quietly_reports_failure_without_panicking() {
+        let _guard = crate::TEST_PROCESS_LOCK.lock().unwrap();
         let mut rl = DefaultEditor::new().expect("editor");
         // An empty history is a no-op success in rustyline; memory one
         // entry so the save actually writes.
@@ -102,6 +103,7 @@ mod tests {
 
     #[test]
     fn test_save_history_quietly_succeeds_on_writable_path() {
+        let _guard = crate::TEST_PROCESS_LOCK.lock().unwrap();
         let mut rl = DefaultEditor::new().expect("editor");
         rl.add_history_entry("(+ 1 2)").expect("history entry");
         let temp = tempfile::tempdir().expect("tempdir");

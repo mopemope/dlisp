@@ -26,6 +26,27 @@ async fn run_expect_depth_error(code: &str) -> EvalFailure {
 }
 
 #[tokio::test]
+async fn test_backquote_expansion_obeys_walk_limit_and_recovers() {
+    let mut interpreter = Interpreter::new();
+    interpreter.max_eval_depth = 16;
+    let mut env = default_env();
+    // The quasiquote depth stays at 1 here; tree depth must be guarded separately.
+    let source = format!("{}x{}", "(".repeat(64), ")".repeat(64));
+    let value = parse(&source).unwrap().remove(0);
+    let error = interpreter
+        .expand_backquote(value, &mut env, 1)
+        .await
+        .expect_err("backquote tree walk must obey max_eval_depth");
+    assert!(error.to_string().contains("Maximum evaluation depth"));
+    for _ in 0..32 {
+        assert_eq!(
+            interpreter.eval(Value::Integer(7), &mut env).await.unwrap(),
+            Value::Integer(7)
+        );
+    }
+}
+
+#[tokio::test]
 async fn test_self_expanding_macro_is_catchable_error() {
     let failure = run_expect_depth_error("(defmacro selfloop () '(selfloop))\n(selfloop)").await;
     assert!(

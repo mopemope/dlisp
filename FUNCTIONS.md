@@ -34,6 +34,8 @@
 
 算術:
 - `+`, `-`, `*`, `/`, `%`, `mod`, `max`, `min`, `abs`, `pow`
+- `abs` の整数オーバーフローは捕捉可能なエラー。`pow` は64ビット整数指数を保持する（詳細と compiled path の制限は [言語仕様](spec.md)）
+- `+`, `-`, `*`, `/`, `%`, `mod` の型エラー・ゼロ除算・整数オーバーフローは全経路で try により捕捉できる。(+) は 0、(*) は 1
 
 比較:
 - `>`, `<`, `=`, `>=`, `<=`, `/=` — すべて Bool を返す(interpreter / JIT / AOT で同一)
@@ -43,6 +45,8 @@
 
 ファイルと OS:
 - `read-file`, `write-file`, `file-exists?`, `is-dir?`, `is-file?`, `delete-file`, `list-dir`, `sh`, `exec`
+- `read-file`, `file-exists?`, `is-dir?`, `is-file?`, `delete-file`, `list-dir`, `sh` は全経路 compile 対応。型・OS エラーは捕捉可能
+- `sh` は status・stdout・stderr を keyword キーとする map を返す。`read-file` の内容と `sh` の出力に NUL が含まれる場合は捕捉可能エラー
 
 環境:
 - `getenv`, `setenv`, `cwd`, `set-cwd`, `args`, `exit`, `sleep`

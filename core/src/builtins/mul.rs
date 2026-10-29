@@ -3,7 +3,7 @@ use crate::ast::Value;
 pub fn mul(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
     Box::pin(async move {
-        let mut sum = 1;
+        let mut sum: i64 = 1;
         let mut float_sum = 1.0;
         let mut is_float = false;
 
@@ -13,7 +13,7 @@ pub fn mul(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                     if is_float {
                         float_sum *= *i as f64;
                     } else {
-                        sum *= i;
+                        sum = sum.checked_mul(*i).ok_or("Integer overflow")?;
                     }
                 }
                 Value::Float(f) => {

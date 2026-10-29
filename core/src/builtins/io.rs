@@ -15,6 +15,9 @@ pub fn read_file(args: &[Value]) -> LocalBoxFuture<'static, Result<Value, String
         };
 
         match fs::read_to_string(&path).await {
+            Ok(content) if content.contains('\0') => {
+                Err("read-file result contains NUL".to_string())
+            }
             Ok(content) => Ok(Value::String(content)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Value::Nil),
             Err(e) => Err(format!("read-file error: {}", e)),

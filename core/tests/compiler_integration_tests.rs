@@ -24,6 +24,10 @@ fn test_add_lambda_jit() {
     builder.symbol("dlisp_make_int", dummy_make_int as *const u8);
     builder.symbol("dlisp_make_bool", dummy_make_bool as *const u8);
     builder.symbol("dlisp_add", dummy_add as *const u8);
+    builder.symbol(
+        "dlisp_throw_sentinel",
+        dlisp_runtime::dlisp_throw_sentinel as *const u8,
+    );
     builder.symbol("dlisp_sub", dummy_sub as *const u8);
     builder.symbol("dlisp_lt", dummy_lt as *const u8);
     builder.symbol("dlisp_is_truthy", dummy_is_truthy as *const u8);

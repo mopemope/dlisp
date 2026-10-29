@@ -73,6 +73,7 @@ mod tests {
     /// probe on its own thread; a panic there is the expected observation.
     #[test]
     fn test_legacy_never_appender_panics_on_unwritable_log() {
+        let _guard = crate::TEST_PROCESS_LOCK.lock().unwrap();
         let temp = tempfile::tempdir().expect("tempdir");
         let dir = temp.path().join("dlisp");
         std::fs::create_dir_all(&dir).expect("state dir");
@@ -95,6 +96,7 @@ mod tests {
 
     #[test]
     fn test_open_log_appender_unwritable_log_file_is_none() {
+        let _guard = crate::TEST_PROCESS_LOCK.lock().unwrap();
         // A directory named debug.log makes opening the log file fail; the
         // CLI must run without file logging instead of panicking.
         let temp = tempfile::tempdir().expect("tempdir");
@@ -107,6 +109,7 @@ mod tests {
 
     #[test]
     fn test_open_log_appender_writable_log_file_is_some() {
+        let _guard = crate::TEST_PROCESS_LOCK.lock().unwrap();
         let temp = tempfile::tempdir().expect("tempdir");
         let dir = temp.path().join("dlisp");
         std::fs::create_dir_all(&dir).expect("state dir");

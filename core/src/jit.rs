@@ -61,6 +61,10 @@ impl Default for JIT {
         );
         builder.symbol("dlisp_print", dlisp_runtime::dlisp_print as *const u8);
         builder.symbol("dlisp_add", dlisp_runtime::dlisp_add as *const u8);
+        builder.symbol(
+            "dlisp_require_number",
+            dlisp_runtime::dlisp_require_number as *const u8,
+        );
         builder.symbol("dlisp_sub", dlisp_runtime::dlisp_sub as *const u8);
         builder.symbol("dlisp_mul", dlisp_runtime::dlisp_mul as *const u8);
         builder.symbol("dlisp_gt", dlisp_runtime::dlisp_gt as *const u8);
@@ -267,6 +271,10 @@ impl Default for JIT {
         builder.symbol("dlisp_args", dlisp_runtime::sys::dlisp_args as *const u8);
         builder.symbol("dlisp_exit", dlisp_runtime::sys::dlisp_exit as *const u8);
         builder.symbol("dlisp_sh", dlisp_runtime::os::dlisp_sh as *const u8);
+        builder.symbol(
+            "dlisp_read_file",
+            dlisp_runtime::dlisp_read_file as *const u8,
+        );
         builder.symbol(
             "dlisp_chan_new",
             dlisp_runtime::concurrency::dlisp_chan_new as *const u8,

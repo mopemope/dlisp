@@ -1,95 +1,77 @@
+use crate::errors::{gc_string, raise_message};
 use crate::value::{DlispValue, ValueType};
-use crate::{dlisp_make_int, dlisp_make_string};
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
+use std::process::Command;
+
+unsafe fn result_map(status: i64, stdout: &str, stderr: &str) -> *mut DlispValue {
+    unsafe {
+        let mut map = crate::dlisp_make_map();
+        for (key, value) in [
+            (c"status", crate::dlisp_make_int(status)),
+            (c"stdout", gc_string(stdout)),
+            (c"stderr", gc_string(stderr)),
+        ] {
+            let keyword = crate::dlisp_make_keyword(key.as_ptr().cast_mut());
+            map = crate::dlisp_map_assoc(map, keyword, value);
+        }
+        map
+    }
+}
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
+/// `val` must be null or a valid value pointer containing a list of strings.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_sh(val: *mut DlispValue) -> *mut DlispValue {
     unsafe {
-        // We expect a list of strings
-        if val.is_null() || (*val).type_ != ValueType::List {
-            eprintln!("Type Error: sh requires a list of strings");
-            std::process::abort();
-        }
-
         let mut args = Vec::new();
-        let mut curr = val;
-
-        while !curr.is_null() && (*curr).type_ == ValueType::List {
-            let list_data = (*curr).payload.list_val;
-            if list_data.is_null() {
+        let mut current = val;
+        while !current.is_null() && (*current).type_ == ValueType::List {
+            let node = (*current).payload.list_val;
+            if node.is_null() {
                 break;
             }
-            let item = (*list_data).car;
-            if item.is_null() {
-                break;
+            let item = (*node).car;
+            if item.is_null() || (*item).type_ != ValueType::String {
+                return raise_message("sh arguments must be strings");
             }
-            if (*item).type_ != ValueType::String {
-                eprintln!("Type Error: sh arguments must be strings");
-                std::process::abort();
-            }
-            let c_str = CStr::from_ptr((*item).payload.str_val);
-            args.push(c_str.to_string_lossy().to_string());
-            curr = (*list_data).cdr;
+            args.push(
+                CStr::from_ptr((*item).payload.str_val)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            current = (*node).cdr;
         }
-
+        if !current.is_null() && (*current).type_ != ValueType::Nil {
+            return raise_message("sh requires a list of strings");
+        }
         if args.is_empty() {
-            eprintln!("Type Error: sh requires at least 1 command argument");
-            std::process::abort();
+            return raise_message("sh requires at least 1 argument (command)");
         }
-
-        let result = tokio::runtime::Handle::current().block_on(async move {
-            let mut command = if args.len() == 1 {
-                let mut c = tokio::process::Command::new("sh");
-                c.arg("-c").arg(&args[0]);
-                c
-            } else {
-                let mut c = tokio::process::Command::new(&args[0]);
-                c.args(&args[1..]);
-                c
-            };
-            command.output().await
-        });
-
-        match result {
+        let mut command = if args.len() == 1 {
+            let mut command = Command::new("sh");
+            command.arg("-c").arg(&args[0]);
+            command
+        } else {
+            let mut command = Command::new(&args[0]);
+            command.args(&args[1..]);
+            command
+        };
+        match command.output() {
             Ok(output) => {
-                let status_code =
-                    output
-                        .status
-                        .code()
-                        .unwrap_or(if output.status.success() { 0 } else { -1 })
-                        as i64;
-                let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
-                let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
-
-                let c_stdout = CString::new(stdout_str).unwrap();
-                let c_stderr = CString::new(stderr_str).unwrap();
-
-                let lisp_status = dlisp_make_int(status_code);
-                let lisp_stdout = dlisp_make_string(c_stdout.into_raw());
-                let lisp_stderr = dlisp_make_string(c_stderr.into_raw());
-
-                // Create a list instead of Map, since Map creation via C-ABI is complex and not fully exposed.
-                // Format: (status stdout stderr)
-                let lst3 = crate::dlisp_make_cons(lisp_stderr, crate::dlisp_make_nil());
-                let lst2 = crate::dlisp_make_cons(lisp_stdout, lst3);
-                crate::dlisp_make_cons(lisp_status, lst2)
+                if output.stdout.contains(&0) || output.stderr.contains(&0) {
+                    return raise_message("sh output contains NUL");
+                }
+                let status = output.status.code().map(i64::from).unwrap_or(-1);
+                result_map(
+                    status,
+                    &String::from_utf8_lossy(&output.stdout),
+                    &String::from_utf8_lossy(&output.stderr),
+                )
             }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                let c_stderr = CString::new(format!("Command not found: {}", e)).unwrap();
-                let lisp_status = dlisp_make_int(-1);
-                let lisp_stdout = dlisp_make_string(CString::new("").unwrap().into_raw());
-                let lisp_stderr = dlisp_make_string(c_stderr.into_raw());
-
-                let lst3 = crate::dlisp_make_cons(lisp_stderr, crate::dlisp_make_nil());
-                let lst2 = crate::dlisp_make_cons(lisp_stdout, lst3);
-                crate::dlisp_make_cons(lisp_status, lst2)
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                result_map(-1, "", &format!("Command not found: {error}"))
             }
-            Err(e) => {
-                eprintln!("sh command execution failed: {}", e);
-                std::process::abort();
-            }
+            Err(error) => raise_message(&format!("sh command execution failed: {error}")),
         }
     }
 }

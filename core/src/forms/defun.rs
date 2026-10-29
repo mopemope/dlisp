@@ -61,8 +61,9 @@ fn can_jit_compile_expr(
     current_func: &str,
     env: &Environment,
     pending_functions: &HashSet<String>,
+    locals: &[String],
 ) -> bool {
-    find_uncompiled_call(expr, current_func, env, pending_functions).is_none()
+    find_uncompiled_call(expr, current_func, env, pending_functions, locals).is_none()
 }
 
 /// Returns the offending call target if `expr` contains a call that codegen
@@ -72,8 +73,9 @@ pub(crate) fn find_uncompiled_call(
     current_func: &str,
     env: &Environment,
     pending_functions: &HashSet<String>,
+    locals: &[String],
 ) -> Option<String> {
-    find_uncompiled_call_inner(expr, current_func, env, pending_functions, &[])
+    find_uncompiled_call_inner(expr, current_func, env, pending_functions, locals)
 }
 
 /// Collects the variable names bound by a destructuring pattern.
@@ -107,9 +109,26 @@ fn find_uncompiled_call_inner(
                     return None;
                 }
 
-                // `let` / `let*`: binding heads are names, not calls. Init
-                // expressions see the outer scope; the body sees the new
-                // bindings as locals.
+                // Each cond clause is a test followed by expressions, not a call.
+                if op == "cond" {
+                    return items.iter().skip(1).find_map(|clause| match clause {
+                        Value::List(expressions) if !expressions.is_empty() => {
+                            expressions.iter().find_map(|expression| {
+                                find_uncompiled_call_inner(
+                                    expression,
+                                    current_func,
+                                    env,
+                                    pending_functions,
+                                    locals,
+                                )
+                            })
+                        }
+                        _ => Some(op.clone()),
+                    });
+                }
+
+                // Binding heads are names, not calls. `let` initializers
+                // see the outer scope; `let*` sees earlier bindings too.
                 if op == "let" || op == "let*" {
                     let mut inner_locals: Vec<String> = locals.to_vec();
                     if let Some(Value::List(bindings)) = items.get(1) {
@@ -118,28 +137,32 @@ fn find_uncompiled_call_inner(
                                 if pair.is_empty() {
                                     return Some("let".to_string());
                                 }
-                                collect_pattern_names(&pair[0], &mut inner_locals);
                                 if pair.len() != 2 {
-                                    continue;
+                                    return Some(op.clone());
                                 }
-                                find_uncompiled_call_inner(
+                                if let Some(target) = find_uncompiled_call_inner(
                                     &pair[1],
                                     current_func,
                                     env,
                                     pending_functions,
-                                    locals,
-                                )?;
+                                    if op == "let*" { &inner_locals } else { locals },
+                                ) {
+                                    return Some(target);
+                                }
+                                collect_pattern_names(&pair[0], &mut inner_locals);
                             }
                         }
                     }
                     for item in items.iter().skip(2) {
-                        find_uncompiled_call_inner(
+                        if let Some(target) = find_uncompiled_call_inner(
                             item,
                             current_func,
                             env,
                             pending_functions,
                             &inner_locals,
-                        )?;
+                        ) {
+                            return Some(target);
+                        }
                     }
                     return None;
                 }
@@ -152,22 +175,64 @@ fn find_uncompiled_call_inner(
                             if bs.len() % 2 != 0 {
                                 return Some("loop".to_string());
                             }
-                            for name in bs.iter().step_by(2) {
-                                collect_pattern_names(name, &mut inner_locals);
+                            for pair in bs.as_chunks::<2>().0 {
+                                if let Some(target) = find_uncompiled_call_inner(
+                                    &pair[1],
+                                    current_func,
+                                    env,
+                                    pending_functions,
+                                    locals,
+                                ) {
+                                    return Some(target);
+                                }
+                                collect_pattern_names(&pair[0], &mut inner_locals);
                             }
                         }
                         _ => return Some("loop".to_string()),
                     }
                     for item in items.iter().skip(2) {
+                        if let Some(target) = find_uncompiled_call_inner(
+                            item,
+                            current_func,
+                            env,
+                            pending_functions,
+                            &inner_locals,
+                        ) {
+                            return Some(target);
+                        }
+                    }
+                    return None;
+                }
+
+                // Counted-loop binding lists contain a name and an expression,
+                // not a function call. The iteration variable is body-local.
+                if op == "dotimes" || op == "dolist" {
+                    let Some(Value::List(binding)) = items.get(1) else {
+                        return Some(op.clone());
+                    };
+                    if binding.len() != 2 {
+                        return Some(op.clone());
+                    }
+                    if let Some(target) = find_uncompiled_call_inner(
+                        &binding[1],
+                        current_func,
+                        env,
+                        pending_functions,
+                        locals,
+                    ) {
+                        return Some(target);
+                    }
+                    let mut inner_locals = locals.to_vec();
+                    collect_pattern_names(&binding[0], &mut inner_locals);
+                    return items.iter().skip(2).find_map(|item| {
                         find_uncompiled_call_inner(
                             item,
                             current_func,
                             env,
                             pending_functions,
                             &inner_locals,
-                        )?;
-                    }
-                    return None;
+                        )
+                    });
                 }
 
                 // `lambda`: parameters are locals of the lambda body.
@@ -179,13 +244,15 @@ fn find_uncompiled_call_inner(
                         }
                     }
                     for item in items.iter().skip(2) {
-                        find_uncompiled_call_inner(
+                        if let Some(target) = find_uncompiled_call_inner(
                             item,
                             current_func,
                             env,
                             pending_functions,
                             &inner_locals,
-                        )?;
+                        ) {
+                            return Some(target);
+                        }
                     }
                     return None;
                 }
@@ -205,24 +272,28 @@ fn find_uncompiled_call_inner(
                             inner_locals.push(var.clone());
                         }
                         for item in last_list.iter().skip(2) {
-                            find_uncompiled_call_inner(
+                            if let Some(target) = find_uncompiled_call_inner(
                                 item,
                                 current_func,
                                 env,
                                 pending_functions,
                                 &inner_locals,
-                            )?;
+                            ) {
+                                return Some(target);
+                            }
                         }
                         body_items = &body_items[..body_items.len() - 1];
                     }
                     for item in body_items {
-                        find_uncompiled_call_inner(
+                        if let Some(target) = find_uncompiled_call_inner(
                             item,
                             current_func,
                             env,
                             pending_functions,
                             locals,
-                        )?;
+                        ) {
+                            return Some(target);
+                        }
                     }
                     return None;
                 }
@@ -309,11 +380,13 @@ fn retry_pending_jit_functions(jit: &mut JIT, env: &mut Rc<RefCell<Environment>>
         let borrowed = env.borrow();
         let next: HashSet<String> = candidates
             .iter()
-            .filter(|((name, _, _, body), _)| {
+            .filter(|((name, args, rest_param, body), _)| {
+                let mut locals = args.clone();
+                locals.extend(rest_param.iter().cloned());
                 selected.contains(name)
                     && body
                         .iter()
-                        .all(|expr| can_jit_compile_expr(expr, name, &borrowed, &selected))
+                        .all(|expr| can_jit_compile_expr(expr, name, &borrowed, &selected, &locals))
             })
             .map(|((name, _, _, _), _)| name.clone())
             .collect();
@@ -403,12 +476,15 @@ pub fn defun(
 
     jit.register_signature(&func_name, &arg_names, rest_param.clone());
 
+    let mut locals = arg_names.clone();
+    locals.extend(rest_param.iter().cloned());
     let jit_code = if body.iter().all(|expr| {
         can_jit_compile_expr(
             expr,
             &func_name,
             &env.borrow(),
             &HashSet::from([func_name.clone()]),
+            &locals,
         )
     }) {
         match jit.compile_with_rest(&func_name, &arg_names, rest_param.clone(), &body) {
@@ -429,4 +505,69 @@ pub fn defun(
     env.borrow_mut().set(func_name.clone(), func);
     retry_pending_jit_functions(jit, env);
     Ok(Some(Value::Symbol(func_name)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{interpreter::default_env, parser::parse};
+
+    #[test]
+    fn jit_gate_finds_unsupported_calls_in_scoped_forms() {
+        let env = default_env();
+        for source in [
+            "(let ((x (abs -1))) x)",
+            "(let ((x 1) (y (abs -1))) y)",
+            "(let ((x 1)) x (abs -1))",
+            "(let* ((x 1) (y (abs -1))) y)",
+            "(lambda (x) x (abs -1))",
+            "(loop (x (abs -1)) x)",
+            "(loop (x 1) x (abs -1))",
+            "(try (abs -1) (catch e (error-value e)))",
+            "(try 1 (abs -1) (catch e 0))",
+            "(try 1 (catch e e (abs -1)))",
+            "(cond (true (abs -1)))",
+            "(cond ((abs -1) 1))",
+            "(dotimes (i (abs -1)) i)",
+            "(dotimes (i 1) i (abs -1))",
+            "(dolist (x (list (abs -1))) x)",
+            "(dolist (x '(1)) x (abs -1))",
+        ] {
+            let expr = parse(source).unwrap().remove(0);
+            assert_eq!(
+                find_uncompiled_call(&expr, "probe", &env.borrow(), &HashSet::new(), &[]),
+                Some("abs".into()),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn jit_gate_respects_sequential_binding_scope() {
+        let env = default_env();
+        for source in [
+            "(let* ((f (lambda () 1)) (x (f))) x)",
+            "(let* ((abs (lambda (x) x)) (x (abs 1))) x)",
+        ] {
+            let expr = parse(source).unwrap().remove(0);
+            assert_eq!(
+                find_uncompiled_call(&expr, "probe", &env.borrow(), &HashSet::new(), &[]),
+                None,
+                "{source}"
+            );
+        }
+        for source in [
+            "(let ((abs (lambda (x) x)) (x (abs 1))) x)",
+            "(let* ((abs (abs 1))) abs)",
+            "(loop (abs (abs 1)) abs)",
+            "(loop (abs (lambda (x) x) x (abs 1)) x)",
+        ] {
+            let expr = parse(source).unwrap().remove(0);
+            assert_eq!(
+                find_uncompiled_call(&expr, "probe", &env.borrow(), &HashSet::new(), &[]),
+                Some("abs".into()),
+                "{source}"
+            );
+        }
+    }
 }

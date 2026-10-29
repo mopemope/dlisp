@@ -3,6 +3,7 @@ use crate::codegen::context::FunctionTranslationContext;
 use cranelift::prelude::{Value as IrValue, *};
 use cranelift_module::Module;
 
+use super::control::ensure_open_block;
 use cranelift_module::FuncId;
 
 pub fn compile_builtin<M: Module>(
@@ -21,9 +22,9 @@ pub fn compile_builtin<M: Module>(
         "cons" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_cons),
         "list" => compile_list_builtin(ctx, list),
         "not" => compile_not(ctx, list),
-        "+" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_add),
-        "-" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_sub),
-        "*" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_mul),
+        "+" => compile_numeric_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_add),
+        "-" => compile_numeric_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_sub),
+        "*" => compile_numeric_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_mul),
         ">" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_gt),
         "<" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_lt),
         "=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_eq),
@@ -66,9 +67,13 @@ pub fn compile_builtin<M: Module>(
         "get" => compile_get(ctx, list),
         "keys" => compile_unary(ctx, op, list, ctx.builtins.funcs.dlisp_keys, false),
         // Phase 2
-        "/" => compile_variadic_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_div),
-        "%" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_mod),
-        "mod" => compile_binary_builtin(ctx, op, list, ctx.builtins.funcs.dlisp_mod),
+        "/" => compile_numeric_arithmetic(ctx, op, list, ctx.builtins.funcs.dlisp_div),
+        "%" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_mod)
+        }
+        "mod" => {
+            compile_binary_builtin_with_throw_escape(ctx, op, list, ctx.builtins.funcs.dlisp_mod)
+        }
         ">=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_gte),
         "<=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_lte),
         "/=" => compile_binary_comparison(ctx, op, list, ctx.builtins.funcs.dlisp_neq),
@@ -252,9 +257,13 @@ fn compile_variadic_list_call<M: Module>(
         .module
         .declare_func_in_func(ctx.builtins.funcs.dlisp_make_cons, ctx.builder.func);
 
-    // we must build the list backwards
-    for arg in list[1..].iter().rev() {
-        let arg_val = ctx.compile_expr(arg)?;
+    // Evaluate left to right before constructing the list backwards.
+    let mut values = Vec::new();
+    for arg in &list[1..] {
+        values.push(ctx.compile_expr(arg)?);
+        ensure_open_block(ctx);
+    }
+    for arg_val in values.into_iter().rev() {
         let cons_call = ctx
             .builder
             .ins()
@@ -264,7 +273,8 @@ fn compile_variadic_list_call<M: Module>(
 
     let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
     let call = ctx.builder.ins().call(local_func, &[current_list]);
-    Ok(ctx.builder.inst_results(call)[0])
+    let result = ctx.builder.inst_results(call)[0];
+    ctx.escape_on_thrown(result)
 }
 
 fn compile_nullary<M: Module>(
@@ -292,13 +302,22 @@ fn compile_unary<M: Module>(
         return Err(format!("{} requires exactly 1 argument", op));
     }
     let arg_val = ctx.compile_expr(&list[1])?;
+    ensure_open_block(ctx);
     let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
     let call = ctx.builder.ins().call(local_func, &[arg_val]);
 
     if returns_arg {
         Ok(arg_val)
     } else {
-        Ok(ctx.builder.inst_results(call)[0])
+        let result = ctx.builder.inst_results(call)[0];
+        if matches!(
+            op,
+            "read-file" | "file-exists?" | "is-dir?" | "is-file?" | "list-dir" | "delete-file"
+        ) {
+            ctx.escape_on_thrown(result)
+        } else {
+            Ok(result)
+        }
     }
 }
 
@@ -316,6 +335,60 @@ fn compile_binary_comparison<M: Module>(
     let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
     let call = ctx.builder.ins().call(local_func, &[lhs, rhs]);
     Ok(ctx.builder.inst_results(call)[0])
+}
+
+fn compile_numeric_arithmetic<M: Module>(
+    ctx: &mut FunctionTranslationContext<M>,
+    op: &str,
+    list: &[Value],
+    func_id: FuncId,
+) -> Result<IrValue, String> {
+    let count = list.len() - 1;
+    if (op == "-" && count == 0) || (op == "/" && count < 2) {
+        return Err(format!("{op} has too few arguments"));
+    }
+    // Like the evaluator, finish argument evaluation before any arithmetic.
+    let mut values = Vec::new();
+    for expression in &list[1..] {
+        values.push(ctx.compile_expr(expression)?);
+        ensure_open_block(ctx);
+    }
+    if values.is_empty() {
+        return ctx.compile_expr(&Value::Integer(if op == "*" { 1 } else { 0 }));
+    }
+    // The interpreter sums from +0, including unary addition. Starting with
+    // the first operand instead would preserve -0.0 and change observable output.
+    if op == "+" {
+        let zero = ctx.compile_expr(&Value::Integer(0))?;
+        values.insert(0, zero);
+    }
+    if values.len() == 1 {
+        let require = ctx
+            .module
+            .declare_func_in_func(ctx.builtins.funcs.dlisp_require_number, ctx.builder.func);
+        let call = ctx.builder.ins().call(require, &[values[0]]);
+        let result = ctx.builder.inst_results(call)[0];
+        let result = ctx.escape_on_thrown(result)?;
+        if op != "-" {
+            return Ok(result);
+        }
+        // Multiplying by -1 also preserves IEEE signed-zero negation.
+        let minus_one = ctx.compile_expr(&Value::Integer(-1))?;
+        let negate = ctx
+            .module
+            .declare_func_in_func(ctx.builtins.funcs.dlisp_mul, ctx.builder.func);
+        let call = ctx.builder.ins().call(negate, &[minus_one, result]);
+        let result = ctx.builder.inst_results(call)[0];
+        return ctx.escape_on_thrown(result);
+    }
+    let mut acc = values[0];
+    let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
+    for value in &values[1..] {
+        let call = ctx.builder.ins().call(local_func, &[acc, *value]);
+        let result = ctx.builder.inst_results(call)[0];
+        acc = ctx.escape_on_thrown(result)?;
+    }
+    Ok(acc)
 }
 
 fn compile_variadic_arithmetic<M: Module>(
@@ -391,7 +464,9 @@ fn compile_binary_builtin<M: Module>(
         return Err(format!("{} requires exactly 2 arguments", op));
     }
     let lhs = ctx.compile_expr(&list[1])?;
+    ensure_open_block(ctx);
     let rhs = ctx.compile_expr(&list[2])?;
+    ensure_open_block(ctx);
     let local_func = ctx.module.declare_func_in_func(func_id, ctx.builder.func);
     let call = ctx.builder.ins().call(local_func, &[lhs, rhs]);
     Ok(ctx.builder.inst_results(call)[0])
