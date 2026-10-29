@@ -2,6 +2,11 @@ mod compile;
 mod config;
 mod repl;
 
+// Rustyline temporarily changes the process-wide umask while saving history.
+// Serialize CLI tests that create files/directories or mutate the environment.
+#[cfg(test)]
+static TEST_PROCESS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 use clap::{Parser, Subcommand};
 use config::setup_logging;
 use dlisp_core::ast::Value;
@@ -114,16 +119,10 @@ mod tests {
 
     use crate::config::get_history_path;
     use std::env;
-    use std::sync::Mutex;
-
-    // `dirs::state_dir()` reads `XDG_STATE_HOME` at call time, but env vars
-    // are process-global on macOS (where state_dir() is always None), so
-    // serialize tests that mutate the environment.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_get_history_path_xdg() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = crate::TEST_PROCESS_LOCK.lock().unwrap();
 
         // Create a temporary directory to act as XDG_STATE_HOME
         let temp_dir = tempfile::tempdir().expect("failed to create temp dir");

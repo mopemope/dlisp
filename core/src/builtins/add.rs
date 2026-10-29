@@ -3,7 +3,7 @@ use crate::ast::Value;
 pub fn add(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Value, String>> {
     let args = args.to_vec();
     Box::pin(async move {
-        let mut i_sum = 0;
+        let mut i_sum: i64 = 0;
         let mut f_sum = 0.0;
         let mut is_float = false;
 
@@ -13,7 +13,7 @@ pub fn add(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                     if is_float {
                         f_sum += *n as f64;
                     } else {
-                        i_sum += n;
+                        i_sum = i_sum.checked_add(*n).ok_or("Integer overflow")?;
                     }
                 }
                 Value::Float(n) => {
@@ -23,7 +23,7 @@ pub fn add(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                     }
                     f_sum += n;
                 }
-                _ => return Err(format!("Expected number, got {}", arg)),
+                _ => return Err("Arguments must be numbers".to_string()),
             }
         }
 

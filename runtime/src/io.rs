@@ -1,169 +1,132 @@
+use crate::errors::{gc_string, raise_message};
 use crate::value::{DlispValue, ValueType};
-use crate::{dlisp_make_bool, dlisp_make_nil, dlisp_make_string};
-use std::ffi::{CStr, CString};
+use crate::{dlisp_make_bool, dlisp_make_nil};
+use std::ffi::CStr;
+use std::fs;
+use std::io::ErrorKind;
+
+unsafe fn path_arg(val: *mut DlispValue, message: &str) -> Result<String, *mut DlispValue> {
+    unsafe {
+        if val.is_null() || (*val).type_ != ValueType::String {
+            return Err(raise_message(message));
+        }
+        Ok(CStr::from_ptr((*val).payload.str_val)
+            .to_string_lossy()
+            .into_owned())
+    }
+}
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
+/// `val` must be null or a valid value pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_file_exists(val: *mut DlispValue) -> *mut DlispValue {
-    unsafe {
-        if val.is_null() || (*val).type_ != ValueType::String {
-            eprintln!("Type Error: file-exists? requires string");
-            std::process::abort();
-        }
-        let c_str = CStr::from_ptr((*val).payload.str_val);
-        let path = c_str.to_string_lossy().to_string();
+    let path = match unsafe { path_arg(val, "file-exists? argument must be a string (path)") } {
+        Ok(path) => path,
+        Err(error) => return error,
+    };
+    match fs::exists(path) {
+        Ok(exists) => dlisp_make_bool(exists),
+        Err(error) => raise_message(&format!("file-exists? error: {error}")),
+    }
+}
 
-        let result = tokio::runtime::Handle::current()
-            .block_on(async move { tokio::fs::try_exists(path).await });
-
-        match result {
-            Ok(exists) => dlisp_make_bool(exists),
-            Err(_) => dlisp_make_bool(false),
-        }
+unsafe fn metadata_predicate(val: *mut DlispValue, directory: bool) -> *mut DlispValue {
+    let name = if directory { "is-dir?" } else { "is-file?" };
+    let path = match unsafe { path_arg(val, &format!("{name} argument must be a string (path)")) } {
+        Ok(path) => path,
+        Err(error) => return error,
+    };
+    match fs::metadata(path) {
+        Ok(metadata) => dlisp_make_bool(if directory {
+            metadata.is_dir()
+        } else {
+            metadata.is_file()
+        }),
+        Err(error) if error.kind() == ErrorKind::NotFound => dlisp_make_bool(false),
+        Err(error) => raise_message(&format!("{name} error: {error}")),
     }
 }
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
+/// `val` must be null or a valid value pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_is_dir(val: *mut DlispValue) -> *mut DlispValue {
-    unsafe {
-        if val.is_null() || (*val).type_ != ValueType::String {
-            eprintln!("Type Error: is-dir? requires string");
-            std::process::abort();
-        }
-        let c_str = CStr::from_ptr((*val).payload.str_val);
-        let path = c_str.to_string_lossy().to_string();
-
-        let result = tokio::runtime::Handle::current()
-            .block_on(async move { tokio::fs::metadata(path).await });
-
-        match result {
-            Ok(meta) => dlisp_make_bool(meta.is_dir()),
-            Err(_) => dlisp_make_bool(false),
-        }
-    }
+    unsafe { metadata_predicate(val, true) }
 }
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
+/// `val` must be null or a valid value pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_is_file(val: *mut DlispValue) -> *mut DlispValue {
-    unsafe {
-        if val.is_null() || (*val).type_ != ValueType::String {
-            eprintln!("Type Error: is-file? requires string");
-            std::process::abort();
-        }
-        let c_str = CStr::from_ptr((*val).payload.str_val);
-        let path = c_str.to_string_lossy().to_string();
-
-        let result = tokio::runtime::Handle::current()
-            .block_on(async move { tokio::fs::metadata(path).await });
-
-        match result {
-            Ok(meta) => dlisp_make_bool(meta.is_file()),
-            Err(_) => dlisp_make_bool(false),
-        }
-    }
+    unsafe { metadata_predicate(val, false) }
 }
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
+/// `val` must be null or a valid value pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_list_dir(val: *mut DlispValue) -> *mut DlispValue {
-    unsafe {
-        if val.is_null() || (*val).type_ != ValueType::String {
-            eprintln!("Type Error: list-dir requires string");
-            std::process::abort();
-        }
-        let c_str = CStr::from_ptr((*val).payload.str_val);
-        let path = c_str.to_string_lossy().to_string();
-
-        let result = tokio::runtime::Handle::current().block_on(async move {
-            let mut entries = tokio::fs::read_dir(path).await?;
-            let mut results = Vec::new();
-            while let Some(entry) = entries.next_entry().await? {
+    let path = match unsafe { path_arg(val, "list-dir argument must be a string (path)") } {
+        Ok(path) => path,
+        Err(error) => return error,
+    };
+    let entries = match fs::read_dir(&path) {
+        Ok(entries) => entries,
+        Err(error) => return raise_message(&format!("list-dir error for path '{path}': {error}")),
+    };
+    let mut files = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => {
                 if let Ok(name) = entry.file_name().into_string() {
-                    results.push(name);
+                    files.push(name);
                 }
             }
-            Ok::<Vec<String>, std::io::Error>(results)
-        });
-
-        match result {
-            Ok(files) => {
-                let mut list = dlisp_make_nil();
-                for file in files.into_iter().rev() {
-                    let c_res =
-                        CString::new(file).unwrap_or_else(|_| CString::new("<invalid>").unwrap());
-                    let lisp_str = dlisp_make_string(c_res.into_raw());
-                    list = crate::dlisp_make_cons(lisp_str, list);
-                }
-                list
-            }
-            Err(_) => dlisp_make_nil(),
+            Err(error) => return raise_message(&format!("list-dir error reading entry: {error}")),
         }
     }
+    let mut list = dlisp_make_nil();
+    for file in files.into_iter().rev() {
+        list = unsafe { crate::dlisp_make_cons(gc_string(&file), list) };
+    }
+    list
 }
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
+/// `val` must be null or a valid value pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_delete_file(val: *mut DlispValue) -> *mut DlispValue {
-    unsafe {
-        if val.is_null() || (*val).type_ != ValueType::String {
-            eprintln!("Type Error: delete-file requires string");
-            std::process::abort();
-        }
-        let c_str = CStr::from_ptr((*val).payload.str_val);
-        let path = c_str.to_string_lossy().to_string();
-
-        let result = tokio::runtime::Handle::current().block_on(async move {
-            let meta = tokio::fs::metadata(&path).await?;
-            if meta.is_dir() {
-                tokio::fs::remove_dir_all(&path).await
-            } else {
-                tokio::fs::remove_file(&path).await
-            }
-        });
-
-        match result {
-            Ok(_) => dlisp_make_bool(true),
-            Err(_) => dlisp_make_bool(false),
-        }
+    let path = match unsafe { path_arg(val, "delete-file argument must be a string (path)") } {
+        Ok(path) => path,
+        Err(error) => return error,
+    };
+    let metadata = match fs::metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return dlisp_make_bool(false),
+        Err(error) => return raise_message(&format!("delete-file error: {error}")),
+    };
+    let result = if metadata.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+    match result {
+        Ok(()) => dlisp_make_bool(true),
+        Err(error) => raise_message(&format!("delete-file error: {error}")),
     }
 }
 
 /// # Safety
-/// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `val` points to a valid `DlispValue` struct.
+/// `val` must be null or a valid value pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dlisp_read_file(val: *mut DlispValue) -> *mut DlispValue {
-    unsafe {
-        if (*val).type_ != ValueType::String {
-            eprintln!("Type Error: read-file requires string");
-            std::process::abort();
-        }
-        let c_str = CStr::from_ptr((*val).payload.str_val);
-        let path = c_str.to_string_lossy().to_string();
-
-        let result = tokio::runtime::Handle::current()
-            .block_on(async move { tokio::fs::read_to_string(path).await });
-
-        match result {
-            Ok(content) => {
-                let bytes = content.as_bytes();
-                let len = bytes.len();
-                let ptr = crate::gc::dlisp_gc_malloc(len + 1) as *mut u8;
-                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, len);
-                *ptr.add(len) = 0;
-                dlisp_make_string(ptr as *mut i8)
-            }
-            Err(_) => {
-                // Return nil on error for now
-                dlisp_make_nil()
-            }
-        }
+    let path = match unsafe { path_arg(val, "read-file requires a string argument") } {
+        Ok(path) => path,
+        Err(error) => return error,
+    };
+    match fs::read_to_string(path) {
+        Ok(content) if content.contains('\0') => raise_message("read-file result contains NUL"),
+        Ok(content) => gc_string(&content),
+        Err(error) if error.kind() == ErrorKind::NotFound => dlisp_make_nil(),
+        Err(error) => raise_message(&format!("read-file error: {error}")),
     }
 }

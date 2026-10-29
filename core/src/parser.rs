@@ -23,12 +23,15 @@ enum ScanError {
 
 /// Single left-to-right pass over the source, ahead of the real parser.
 ///
-/// Tracks bracket nesting (skipping string contents and `;` comments) and
+/// Tracks bracket and reader-prefix nesting (skipping strings and comments) and
 /// detects integer literals whose digit runs do not fit in `i64`. Symbol
 /// runs (e.g. `my-123456…`) are skipped as a whole so only true numeric
 /// literals are range-checked.
 fn scan_source(src: &str) -> Result<(), ScanError> {
     let mut depth: usize = 0;
+    let mut pending_prefixes: usize = 0;
+    // Prefixes wrapping each open collection finish when that collection closes.
+    let mut collection_prefixes = Vec::new();
     let mut in_string = false;
     let mut in_comment = false;
     let mut chars = src.char_indices().peekable();
@@ -43,6 +46,8 @@ fn scan_source(src: &str) -> Result<(), ScanError> {
         if in_string {
             if c == '"' {
                 in_string = false;
+                depth -= pending_prefixes;
+                pending_prefixes = 0;
             }
             continue;
         }
@@ -54,9 +59,23 @@ fn scan_source(src: &str) -> Result<(), ScanError> {
                     return Err(ScanError::TooDeep(start));
                 }
                 depth += 1;
+                collection_prefixes.push(pending_prefixes);
+                pending_prefixes = 0;
             }
             ')' | ']' | '}' => {
-                depth = depth.saturating_sub(1);
+                depth = depth
+                    .saturating_sub(1 + pending_prefixes + collection_prefixes.pop().unwrap_or(0));
+                pending_prefixes = 0;
+            }
+            '\'' | '`' | ',' => {
+                if depth == MAX_EXPRESSION_NESTING {
+                    return Err(ScanError::TooDeep(start));
+                }
+                depth += 1;
+                pending_prefixes += 1;
+                if c == ',' && chars.peek().is_some_and(|&(_, next)| next == '@') {
+                    chars.next();
+                }
             }
             c if is_symbol_char(c) => {
                 // Consume the whole symbol-style run, then range-check it
@@ -72,11 +91,22 @@ fn scan_source(src: &str) -> Result<(), ScanError> {
                 let token = &src[start..end];
                 let digits = token.strip_prefix('-').unwrap_or(token);
                 if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) {
-                    // Parse with the sign kept so i64::MIN stays valid.
-                    if token.parse::<i64>().is_err() {
+                    // A decimal's integer and fractional parts are not i64 literals.
+                    let mut after_token = chars.clone();
+                    let is_float = after_token.next().is_some_and(|(_, c)| c == '.')
+                        && after_token.next().is_some_and(|(_, c)| c.is_ascii_digit());
+                    if is_float {
+                        chars.next(); // decimal point
+                        while chars.peek().is_some_and(|&(_, c)| c.is_ascii_digit()) {
+                            chars.next();
+                        }
+                    } else if token.parse::<i64>().is_err() {
+                        // Parse with the sign kept so i64::MIN stays valid.
                         return Err(ScanError::IntOverflow(start));
                     }
                 }
+                depth -= pending_prefixes;
+                pending_prefixes = 0;
             }
             _ => {}
         }
@@ -89,7 +119,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
         .or_not()
         .then(text::int(10))
         .then(just('.'))
-        .then(text::int(10))
+        .then(text::digits(10).to_slice())
         .map(|(((sign, int_part), _dot), frac_part)| {
             let mut s = String::new();
             if sign.is_some() {
@@ -116,11 +146,11 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
         });
     // Keywords nil/true/false must not be followed by symbol characters,
     // otherwise "nil?" should parse as a single symbol.
-    let not_symbol_next =
-        none_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-*/!@$%^&_=<>?:")
-            .rewind()
-            .ignored()
-            .or(end().to(()));
+    let not_symbol_next = any()
+        .filter(|c: &char| !is_symbol_char(*c))
+        .rewind()
+        .ignored()
+        .or(end().to(()));
 
     let boolean = just("true")
         .then_ignore(not_symbol_next)
@@ -130,8 +160,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<Value>, extra::Err<Ric
             .to(Value::Bool(false)));
 
     // Lisp symbols: letters, digits, and extended characters
-    let symbol_char =
-        any().filter(|c: &char| c.is_alphanumeric() || "+-*/!@$%^&_=<>?:".contains(*c));
+    let symbol_char = any().filter(|c: &char| is_symbol_char(*c));
 
     let symbol = symbol_char
         .repeated()
@@ -255,6 +284,91 @@ pub fn parse(src: &str) -> Result<Vec<Value>, Vec<Rich<'_, char>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_float_parts_are_not_limited_to_i64() {
+        for source in [
+            "9223372036854775808.5",
+            "-9223372036854775809.5",
+            "0.12345678901234567890123456789",
+        ] {
+            assert_eq!(
+                parse(source).unwrap(),
+                vec![Value::Float(source.parse().unwrap())]
+            );
+        }
+    }
+
+    #[test]
+    fn test_float_fraction_preserves_leading_zeroes() {
+        for source in ["0.001", "-12.00304", "1.00"] {
+            assert_eq!(
+                parse(source).unwrap(),
+                vec![Value::Float(source.parse().unwrap())]
+            );
+        }
+    }
+
+    #[test]
+    fn test_literal_prefixes_do_not_split_unicode_symbols() {
+        for source in ["nilあ", "trueλ", "false猫"] {
+            assert_eq!(parse(source).unwrap(), vec![Value::Symbol(source.into())]);
+        }
+    }
+
+    #[test]
+    fn test_prescan_counts_reader_prefix_nesting() {
+        for prefix in ["'", "`", ",", ",@"] {
+            let source = format!("{}x", prefix.repeat(MAX_EXPRESSION_NESTING + 1));
+            // Check the guard directly so a regression cannot overflow the test runner.
+            assert!(
+                matches!(scan_source(&source), Err(ScanError::TooDeep(_))),
+                "{prefix}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_prescan_counts_mixed_reader_and_bracket_nesting() {
+        let source = format!(
+            "{}x{}",
+            "'(".repeat(MAX_EXPRESSION_NESTING / 2 + 1),
+            ")".repeat(MAX_EXPRESSION_NESTING / 2 + 1)
+        );
+        assert!(matches!(scan_source(&source), Err(ScanError::TooDeep(_))));
+    }
+
+    #[test]
+    fn test_reader_prefix_depth_resets_after_each_expression() {
+        for expression in [
+            "'x ",
+            "'\"x\" ",
+            "'(x) ",
+            "'[x] ",
+            "'{:x 1} ",
+            "'; ignored\nx ",
+        ] {
+            let source = expression.repeat(MAX_EXPRESSION_NESTING + 1);
+            assert!(scan_source(&source).is_ok(), "{expression}");
+        }
+        let source = format!("{}x", "'".repeat(MAX_EXPRESSION_NESTING));
+        assert!(scan_source(&source).is_ok());
+        assert!(
+            scan_source(&format!(
+                "\"{}\" ;{}",
+                "'".repeat(10_000),
+                "`".repeat(10_000)
+            ))
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_float_scan_does_not_hide_following_integer_overflow() {
+        for source in ["1.2 9223372036854775808", "0.0001 -9223372036854775809"] {
+            assert!(parse(source).is_err(), "{source}");
+        }
+    }
 
     #[test]
     fn test_parse_basics() {

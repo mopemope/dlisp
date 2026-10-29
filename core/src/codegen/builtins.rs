@@ -31,6 +31,7 @@ pub struct BuiltinDefinitions {
     pub dlisp_for_each: FuncId,
     pub dlisp_print: FuncId,
     pub dlisp_add: FuncId,
+    pub dlisp_require_number: FuncId,
     pub dlisp_sub: FuncId,
     pub dlisp_mul: FuncId,
     pub dlisp_gt: FuncId,
@@ -299,6 +300,9 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
     car_sig.returns.push(AbiParam::new(int));
     let car_id = module
         .declare_function("dlisp_car", Linkage::Import, &car_sig)
+        .map_err(|e| e.to_string())?;
+    let require_number_id = module
+        .declare_function("dlisp_require_number", Linkage::Import, &car_sig)
         .map_err(|e| e.to_string())?;
 
     // dlisp_cdr(DlispValue*) -> DlispValue*
@@ -792,6 +796,7 @@ pub fn declare_builtins<M: Module>(module: &mut M) -> Result<BuiltinDefinitions,
         dlisp_for_each: for_each_id,
         dlisp_print: print_id,
         dlisp_add: add_id,
+        dlisp_require_number: require_number_id,
         dlisp_sub: sub_id,
         dlisp_mul: mul_id,
         dlisp_gt: gt_id,

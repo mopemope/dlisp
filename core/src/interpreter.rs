@@ -11,7 +11,7 @@ pub mod apply;
 use crate::eval_failure::EvalFailure;
 use crate::forms::registry::{FormRegistry, standard_registry};
 
-/// Default maximum concurrent `eval`/`expand` nesting before evaluation
+/// Default maximum concurrent `eval`/`expand`/backquote nesting before evaluation
 /// aborts with a catchable depth error.
 ///
 /// Sized below the measured stack-overflow point of interpreted recursion on
@@ -37,7 +37,7 @@ pub struct Interpreter {
     pub jit: JIT,
     pub forms: FormRegistry,
     pub last_error: Option<Value>,
-    /// Maximum concurrent `eval`/`expand` nesting. Exceeding it raises a
+    /// Maximum concurrent `eval`/`expand`/backquote nesting. Exceeding it raises a
     /// catchable `EvalFailure::Message` ("Maximum evaluation depth ...")
     /// instead of overflowing the stack; it also terminates self-expanding
     /// macro loops.
@@ -62,7 +62,7 @@ impl Interpreter {
         }
     }
 
-    /// Enters one `eval`/`expand` nesting level, raising the catchable
+    /// Enters one evaluator/expander nesting level, raising the catchable
     /// depth error when `max_eval_depth` would be exceeded. Returns the
     /// new nesting depth (one above the pre-entry value).
     fn enter_walk(&mut self) -> Result<usize, EvalFailure> {
@@ -371,8 +371,20 @@ impl Interpreter {
         }
     }
 
-    #[async_recursion(?Send)]
     pub async fn expand_backquote(
+        &mut self,
+        val: Value,
+        env: &mut Rc<RefCell<Environment>>,
+        depth: usize,
+    ) -> Result<Value, EvalFailure> {
+        let walk_depth = self.enter_walk()?;
+        let result = self.expand_backquote_inner(val, env, depth).await;
+        self.walk_depth.set(walk_depth - 1);
+        result
+    }
+
+    #[async_recursion(?Send)]
+    async fn expand_backquote_inner(
         &mut self,
         val: Value,
         env: &mut Rc<RefCell<Environment>>,

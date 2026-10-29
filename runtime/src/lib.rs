@@ -26,7 +26,7 @@ pub mod vectors;
 mod verify_tests;
 
 // Re-exports preserving the historical crate-root FFI API (`dlisp_runtime::dlisp_*`).
-pub use arith::{dlisp_add, dlisp_div, dlisp_mod, dlisp_mul, dlisp_sub};
+pub use arith::{dlisp_add, dlisp_div, dlisp_mod, dlisp_mul, dlisp_require_number, dlisp_sub};
 pub use cmp::{dlisp_eq, dlisp_gt, dlisp_gte, dlisp_is_truthy, dlisp_lt, dlisp_lte, dlisp_neq};
 pub use collections::{dlisp_conj, dlisp_get};
 pub use concurrency::{

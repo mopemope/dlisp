@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cross-check the JIT/AOT codegen surface against its sources.
 
-Verifies the four invariants documented in
+Verifies the invariants documented in
 docs/ai/skills/dlisp-codegen-aot-jit/references/parity-map.md:
 
 A. every name in COMPILED_BUILTINS is a registered builtin or special form
@@ -9,6 +9,7 @@ B. every lowering-arm FFI field has a FuncId declaration and an AOT
    declare_function entry
 C. every JIT-bound / AOT-imported dlisp_* symbol is exported by the runtime
 D. every COMPILED_BUILTINS name has a lowering arm in codegen/forms/builtins.rs
+E. every AOT runtime import is explicitly bound by the JIT
 
 Exit status: 0 if all invariants hold, 1 otherwise.
 """
@@ -165,6 +166,9 @@ def main() -> int:
     # D. Every compiled builtin needs a lowering arm.
     for name in sorted(compiled - heads):
         fail("D", f"`{name}` is in COMPILED_BUILTINS but has no lowering arm")
+
+    for sym in sorted(aot_syms - jit_syms):
+        fail("E", f"runtime import `{sym}` has no explicit JIT symbol binding")
 
     # Informational: exports never linked by JIT/AOT and never referenced
     # anywhere else (definition is the sole occurrence).

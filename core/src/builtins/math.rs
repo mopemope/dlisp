@@ -9,11 +9,36 @@ pub fn abs(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
             return Err("abs requires exactly 1 argument".to_string());
         }
         match &args[0] {
-            Value::Integer(i) => Ok(Value::Integer(i.abs())),
+            Value::Integer(i) => i
+                .checked_abs()
+                .map(Value::Integer)
+                .ok_or_else(|| "Integer overflow".to_string()),
             Value::Float(f) => Ok(Value::Float(f.abs())),
             _ => Err("abs requires a number".to_string()),
         }
     })
+}
+
+/// Keep the full i64 exponent, including its parity and i64::MIN magnitude.
+fn pow_integer_exponent(mut base: f64, exponent: i64) -> f64 {
+    if let Ok(exponent) = i32::try_from(exponent) {
+        return base.powi(exponent);
+    }
+    if exponent < 0 {
+        base = base.recip();
+    }
+    let mut exponent = exponent.unsigned_abs();
+    let mut result = 1.0;
+    while exponent != 0 {
+        if exponent & 1 != 0 {
+            result *= base;
+        }
+        exponent >>= 1;
+        if exponent != 0 {
+            base *= base;
+        }
+    }
+    result
 }
 
 /// (pow base exp)
@@ -27,19 +52,19 @@ pub fn pow(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
         match (&args[0], &args[1]) {
             (Value::Integer(b), Value::Integer(e)) => {
                 if *e < 0 {
-                    Ok(Value::Float((*b as f64).powi(*e as i32)))
+                    Ok(Value::Float(pow_integer_exponent(*b as f64, *e)))
                 } else if *e > u32::MAX as i64 {
                     Err(format!("pow: exponent {} is too large", e))
                 } else {
                     match b.checked_pow(*e as u32) {
                         Some(result) => Ok(Value::Integer(result)),
-                        None => Ok(Value::Float((*b as f64).powi(*e as i32))),
+                        None => Ok(Value::Float(pow_integer_exponent(*b as f64, *e))),
                     }
                 }
             }
             (Value::Float(b), Value::Float(e)) => Ok(Value::Float(b.powf(*e))),
             (Value::Integer(b), Value::Float(e)) => Ok(Value::Float((*b as f64).powf(*e))),
-            (Value::Float(b), Value::Integer(e)) => Ok(Value::Float(b.powi(*e as i32))),
+            (Value::Float(b), Value::Integer(e)) => Ok(Value::Float(pow_integer_exponent(*b, *e))),
             _ => Err("pow requires numbers".to_string()),
         }
     })
@@ -48,6 +73,32 @@ pub fn pow(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_abs_min_integer_is_catchable_overflow() {
+        assert_eq!(
+            abs(&[Value::Integer(i64::MIN)]).await,
+            Err("Integer overflow".into())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pow_does_not_truncate_integer_exponents() {
+        for (base, exponent, expected) in [
+            (Value::Integer(2), -4_294_967_296, 0.0),
+            (Value::Integer(2), 2_147_483_648, f64::INFINITY),
+            (Value::Float(2.0), 4_294_967_296, f64::INFINITY),
+            (Value::Float(2.0), -4_294_967_296, 0.0),
+            (Value::Float(-1.0), i64::MAX, -1.0),
+            (Value::Float(-1.0), i64::MIN, 1.0),
+        ] {
+            assert_eq!(
+                pow(&[base, Value::Integer(exponent)]).await,
+                Ok(Value::Float(expected)),
+                "exponent={exponent}"
+            );
+        }
+    }
 
     #[tokio::test]
     async fn test_abs() {

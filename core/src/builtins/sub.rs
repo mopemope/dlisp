@@ -13,7 +13,7 @@ pub fn sub(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
         // Let's defer full implementation or do a simple one.
         // Supporting just binary for now or multi-arg.
         let first = &args[0];
-        let mut i_acc = 0;
+        let mut i_acc: i64 = 0;
         let mut f_acc = 0.0;
         let mut is_float = false;
 
@@ -23,7 +23,7 @@ pub fn sub(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                 is_float = true;
                 f_acc = *n;
             }
-            _ => return Err("Expected number".to_string()),
+            _ => return Err("Arguments must be numbers".to_string()),
         }
 
         if args.len() == 1 {
@@ -31,7 +31,9 @@ pub fn sub(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
             return if is_float {
                 Ok(Value::Float(-f_acc))
             } else {
-                Ok(Value::Integer(-i_acc))
+                Ok(Value::Integer(
+                    i_acc.checked_neg().ok_or("Integer overflow")?,
+                ))
             };
         }
 
@@ -41,7 +43,7 @@ pub fn sub(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                     if is_float {
                         f_acc -= *n as f64;
                     } else {
-                        i_acc -= n;
+                        i_acc = i_acc.checked_sub(*n).ok_or("Integer overflow")?;
                     }
                 }
                 Value::Float(n) => {
@@ -51,7 +53,7 @@ pub fn sub(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                     }
                     f_acc -= n;
                 }
-                _ => return Err(format!("Expected number, got {}", arg)),
+                _ => return Err("Arguments must be numbers".to_string()),
             }
         }
 

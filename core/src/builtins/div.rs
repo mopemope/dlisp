@@ -34,7 +34,7 @@ pub fn div(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result<Va
                         if is_float {
                             float_acc /= *v as f64;
                         } else {
-                            int_acc /= v;
+                            int_acc = int_acc.checked_div(*v).ok_or("Integer overflow")?;
                         }
                     }
                     Value::Float(v) => {
@@ -73,7 +73,7 @@ pub fn modulo(args: &[Value]) -> futures::future::LocalBoxFuture<'static, Result
                 if *b == 0 {
                     return Err("Division by zero".to_string());
                 }
-                Ok(Value::Integer(a % b))
+                Ok(Value::Integer(a.checked_rem(*b).ok_or("Integer overflow")?))
             }
             (Value::Float(a), Value::Float(b)) => {
                 if *b == 0.0 {
